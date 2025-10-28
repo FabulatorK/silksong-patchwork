@@ -64,6 +64,7 @@ public class Plugin : BaseUnityPlugin
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
+        AudioSourcePatch.ApplyPatches(harmony);
     }
 
     private void FindPatchworkFolder()
