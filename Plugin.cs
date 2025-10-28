@@ -93,6 +93,12 @@ public class Plugin : BaseUnityPlugin
 
         if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
             SceneTraverser.TraverseAllScenes();
+
+        if (SpriteFileWatcher.ReloadScene)
+        {
+            SpriteFileWatcher.ReloadScene = false;
+            GameManager.instance.LoadScene(SceneManager.GetActiveScene().name);
+        }
     }
     
     private void InitializeFolders()

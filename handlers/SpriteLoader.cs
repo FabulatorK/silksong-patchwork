@@ -132,17 +132,23 @@ public static class SpriteLoader
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
     {
-        if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
-            LoadedSprites[collectionName][atlasName].Remove(spriteName);
+        lock (LoadedSprites)
+        {
+            if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
+                LoadedSprites[collectionName][atlasName].Remove(spriteName);
+        }
     }
     
 
     public static void MarkReloadAtlas(string collectionName, string atlasName)
     {
-        if (LoadedAtlases.ContainsKey(collectionName))
-            LoadedAtlases[collectionName].Remove(atlasName);
+        lock (LoadedAtlases)
+        {
+            if (LoadedAtlases.ContainsKey(collectionName))
+                LoadedAtlases[collectionName].Remove(atlasName);
 
-        if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
-            LoadedSprites[collectionName][atlasName].Clear();
+            if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
+                LoadedSprites[collectionName][atlasName].Clear();
+        }
     }
 }

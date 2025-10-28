@@ -11,6 +11,8 @@ public class SpriteFileWatcher
     public FileSystemWatcher SpriteWatcher;
     public FileSystemWatcher AtlasWatcher;
 
+    public static bool ReloadScene = false;
+
     public SpriteFileWatcher()
     {
         SpriteWatcher = new FileSystemWatcher();
@@ -45,7 +47,7 @@ public class SpriteFileWatcher
         {
             T2DHandler.InvalidateCache(Path.GetFileNameWithoutExtension(pathParts[^1]));
             if (Plugin.Config.ReloadSceneOnChange)
-                GameManager.instance.LoadScene(SceneManager.GetActiveScene().name);
+                ReloadScene = true;
             return;
         }
 
@@ -60,7 +62,7 @@ public class SpriteFileWatcher
         Plugin.Logger.LogDebug($"Invalidated cache for collection {collectionName}, atlas {atlasName}, sprite {spriteName} due to file change: {e.ChangeType} {e.FullPath}");
 
         if (Plugin.Config.ReloadSceneOnChange)
-            GameManager.instance.LoadScene(SceneManager.GetActiveScene().name);
+            ReloadScene = true;
     }
 
     private void OnAtlasChanged(object sender, FileSystemEventArgs e)
@@ -77,6 +79,6 @@ public class SpriteFileWatcher
         Plugin.Logger.LogDebug($"Invalidated cache for collection {collectionName} due to atlas change: {e.ChangeType} {e.FullPath}");
 
         if (Plugin.Config.ReloadSceneOnChange)
-            GameManager.instance.LoadScene(SceneManager.GetActiveScene().name);
+            ReloadScene = true;
     }
 }
