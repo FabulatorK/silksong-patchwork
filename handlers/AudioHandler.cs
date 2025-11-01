@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
 using Patchwork.GUI;
@@ -9,6 +10,10 @@ namespace Patchwork.Handlers;
 [HarmonyPatch]
 public static class AudioSourcePatch
 {
+    private static readonly string SoundFolder = Path.Combine(Plugin.BasePath, "Sounds");
+
+    private static readonly Dictionary<string, AudioClip> LoadedClips = new();
+
     public static void ApplyPatches(Harmony harmony)
     {
         // Play()
@@ -30,7 +35,6 @@ public static class AudioSourcePatch
         if (clip != null)
         {
             AudioGUI.LogAudio(clip);
-            Debug.Log($"Play called with clip: {clip.name}");
         }
     }
 
@@ -54,12 +58,12 @@ public static class AudioSourcePatch
 
     static AudioClip LoadWav(string soundName)
     {
-        string path = Path.Combine(Plugin.BasePath, "Sounds", soundName + ".wav");
+        string path = Path.Combine(SoundFolder, soundName + ".wav");
         if (!File.Exists(path))
-        {
-            Debug.LogWarning($"Sound file not found: {path}");
             return null;
-        }
+
+        if (LoadedClips.TryGetValue(soundName, out var cachedClip))
+            return cachedClip;
 
         byte[] wavBytes = File.ReadAllBytes(path);
         int channels = BitConverter.ToInt16(wavBytes, 22);
@@ -81,6 +85,7 @@ public static class AudioSourcePatch
 
         AudioClip clip = AudioClip.Create(soundName, sampleCount / channels, channels, sampleRate, false);
         clip.SetData(samples, 0);
+        LoadedClips[soundName] = clip;
         return clip;
     }
 }
