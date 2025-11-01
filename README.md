@@ -9,11 +9,17 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 
 ## Features
 * Sprite replacement with individual sprite image files, including proper names, rotations & sizing - no more bulky spritesheets
-* Ability to replace (at least almost) every sprite in the game
 * Support for Texture2D Sprites (which previously required Silksong Customizer + CustomizerT2D)
 * Full compatibility with spritesheet-based skins
-* Automatic reloading of sprites when files change, so you can see your sprites ingame immediately
+* Automatic reloading of assets when files change, so you can see your skin ingame immediately without closing the game
 * Built-in sprite dumping functionality
+* Audio replacement supporting both sound effects and music
+
+### Planned features
+* Conditional sprites (e.g. different textures for Hornet depending on crest, health, etc.)
+* Ingame asset pack manager
+* Support for cutscene replacements
+* Support for text replacements
 
 ## Configuration
 
