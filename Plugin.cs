@@ -101,9 +101,9 @@ public class Plugin : BaseUnityPlugin
         if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
             SceneTraverser.TraverseAllScenes();
 
-        if (SpriteFileWatcher.ReloadScene)
+        if (SpriteFileWatcher.ReloadSprites)
         {
-            SpriteFileWatcher.ReloadScene = false;
+            SpriteFileWatcher.ReloadSprites = false;
             SpriteLoader.Reload();
         }
     }

@@ -17,7 +17,6 @@ public static class SpriteLoader
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
-        PerformanceTimer.Start($"LoadCollection {collection.name}");
         foreach (var mat in collection.materials)
         {
             string matname = mat.name.Split(' ')[0];
@@ -27,10 +26,8 @@ public static class SpriteLoader
             {
                 var unreadableTex = mat.mainTexture;
                 mat.mainTexture = FindSpritesheet(collection, matname);
-                if (Plugin.Config.LogSpriteLoading) Plugin.Logger.LogInfo($"Made texture readable for collection {collection.name}, material {mat.name}");
             }
 
-            PerformanceTimer.Start($"LoadSpritesForMaterial {collection.name} {mat.name}");
             var previous = RenderTexture.active;
             RenderTexture.active = mat.mainTexture as RenderTexture;
             GL.PushMatrix();
@@ -73,9 +70,7 @@ public static class SpriteLoader
             mat.mainTexture.IncrementUpdateCount();
             GL.PopMatrix();
             RenderTexture.active = previous;
-            PerformanceTimer.Stop($"LoadSpritesForMaterial {collection.name} {mat.name}");
         }
-        PerformanceTimer.Stop($"LoadCollection {collection.name}");
     }
 
     private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)

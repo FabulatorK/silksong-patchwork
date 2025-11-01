@@ -61,8 +61,6 @@ public static class T2DHandler
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
             LoadedT2DSprites[sprite.name] = newSprite;
             spriteRenderer.sprite = newSprite;
-            if (Plugin.Config.LogSpriteLoading)
-                Plugin.Logger.LogInfo($"Loaded T2D sprite {sprite.name} (Atlas texture {sprite.texture.name})");
 
             if(!SpriteAtlasMap.ContainsKey(sprite.texture.name))
                 SpriteAtlasMap[sprite.texture.name] = new HashSet<string>();
@@ -82,8 +80,6 @@ public static class T2DHandler
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
             LoadedT2DSprites[sprite.texture.name] = newSprite;
             spriteRenderer.sprite = newSprite;
-            if (Plugin.Config.LogSpriteLoading)
-                Plugin.Logger.LogInfo($"Loaded T2D texture {sprite.texture.name} (Standalone texture)");
         }
     }
 
@@ -137,8 +133,6 @@ public static class T2DHandler
 
             byte[] pngData = spriteTex.EncodeToPNG();
             File.WriteAllBytes(savePath, pngData);
-            if (Plugin.Config.LogSpriteDumping)
-                Plugin.Logger.LogInfo($"Dumped T2D sprite {sprite.name} from texture {sprite.texture.name} to {savePath}");
         }
         else
         {
@@ -155,8 +149,6 @@ public static class T2DHandler
             if (File.Exists(savePath))
                 return;
             File.WriteAllBytes(savePath, pngData);
-            if (Plugin.Config.LogSpriteDumping)
-                Plugin.Logger.LogInfo($"Dumped T2D texture {sprite.texture.name} to {savePath}");
         }
     }
 

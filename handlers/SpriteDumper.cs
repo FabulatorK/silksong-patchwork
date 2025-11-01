@@ -17,16 +17,11 @@ public static class SpriteDumper
         foreach (var mat in collection.materials)
         {
             if (mat == null || mat.mainTexture == null)
-            {
-                if (Plugin.Config.LogSpriteWarnings) Plugin.Logger.LogWarning($"Skipping null material or material with null texture in collection {collection.name}");
                 continue;
-            }
+
             Texture matTex = mat.mainTexture;
             if (matTex.width == 0 || matTex.height == 0)
-            {
-                if (Plugin.Config.LogSpriteWarnings) Plugin.Logger.LogWarning($"Skipping material {mat.name} with invalid texture size {matTex.width}x{matTex.height}");
                 continue;
-            }
             if (!matTex.isReadable || matTex is not RenderTexture)
                 matTex = TexUtil.GetReadable(matTex);
 
@@ -41,17 +36,11 @@ public static class SpriteDumper
             {
                 if (string.IsNullOrEmpty(def.name)) continue;
                 if (File.Exists(Path.Combine(DumpPath, collection.name, matname, def.name + ".png")))
-                {
-                    if (Plugin.Config.LogSpriteWarnings) Plugin.Logger.LogWarning($"Sprite {def.name} from collection {collection.name}, material {matname} already dumped, skipping.");
                     continue;
-                }
 
                 Rect spriteRect = SpriteUtil.GetSpriteRect(def, matTex);
                 if(spriteRect.width == 0 || spriteRect.height == 0)
-                {
-                    if (Plugin.Config.LogSpriteWarnings) Plugin.Logger.LogWarning($"Skipping sprite {def.name} from collection {collection.name}, material {matname} with invalid size {spriteRect.width}x{spriteRect.height}");
                     continue;
-                }
 
                 Texture2D spriteTex = new((int)spriteRect.width, (int)spriteRect.height, TextureFormat.RGBA32, false);
                 spriteTex.ReadPixels(spriteRect, 0, 0);
@@ -62,7 +51,6 @@ public static class SpriteDumper
                     var png = spriteTex.EncodeToPNG();
                     IOUtil.EnsureDirectoryExists(Path.Combine(DumpPath, collection.name, matname));
                     File.WriteAllBytes(Path.Combine(DumpPath, collection.name, matname, def.name + ".png"), png);
-                    if (Plugin.Config.LogSpriteDumping) Plugin.Logger.LogInfo($"Dumped sprite {def.name} from collection {collection.name}, material {matname}");
                 }
                 else
                 {
@@ -99,7 +87,6 @@ public static class SpriteDumper
                     var png = finalTex.EncodeToPNG();
                     IOUtil.EnsureDirectoryExists(Path.Combine(DumpPath, collection.name, matname));
                     File.WriteAllBytes(Path.Combine(DumpPath, collection.name, matname, def.name + ".png"), png);
-                    if (Plugin.Config.LogSpriteDumping) Plugin.Logger.LogInfo($"Dumped rotated sprite {def.name} from collection {collection.name}, material {matname}");
                 }
             }
 
