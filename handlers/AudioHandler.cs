@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using HarmonyLib;
 using Patchwork.GUI;
 using UnityEngine;
@@ -50,8 +51,8 @@ public static class AudioHandler
 
     static AudioClip LoadWav(string soundName)
     {
-        string path = Path.Combine(SoundFolder, soundName + ".wav");
-        if (!File.Exists(path))
+        string path = GetSoundPath(soundName);
+        if (string.IsNullOrEmpty(path))
             return null;
 
         if (LoadedClips.TryGetValue(soundName, out var cachedClip))
@@ -79,5 +80,22 @@ public static class AudioHandler
         clip.SetData(samples, 0);
         LoadedClips[soundName] = clip;
         return clip;
+    }
+
+    static string GetSoundPath(string soundName)
+    {
+        var files = Directory.GetFiles(SoundFolder, $"{soundName}.wav", SearchOption.AllDirectories);
+        if (files.Any())
+            return files.First();
+        
+        foreach (var packPath in Plugin.PluginPackPaths)
+        {
+            if (!Directory.Exists(Path.Combine(packPath, "Sounds")))
+                continue;
+            var packFiles = Directory.GetFiles(Path.Combine(packPath, "Sounds"), $"{soundName}.wav", SearchOption.AllDirectories);
+            if (packFiles.Any())
+                return packFiles.First();
+        }
+        return null;
     }
 }
