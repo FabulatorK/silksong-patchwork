@@ -16,12 +16,6 @@ public class PatchworkConfig
     private readonly ConfigEntry<bool> _ReloadSceneOnChange;
     public bool ReloadSceneOnChange { get { return _ReloadSceneOnChange.Value; } }
 
-    private readonly ConfigEntry<bool> _EnableForceReload;
-    public bool EnableForceReload { get { return _EnableForceReload.Value; } }
-
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ForceReloadKey = null;
-    public UnityEngine.KeyCode ForceReloadKey { get { return _ForceReloadKey.Value; } }
-
     private readonly ConfigEntry<UnityEngine.KeyCode> _FullDumpKey = null;
     public UnityEngine.KeyCode FullDumpKey { get { return _FullDumpKey.Value; } }
 
@@ -44,10 +38,8 @@ public class PatchworkConfig
 
         _CacheAtlases = config.Bind("Advanced", "CacheAtlases", true, "Enable caching of sprite atlases in memory to speed up sprite loading");
 
-        _ReloadSceneOnChange = config.Bind("Reloading", "ReloadSceneOnChange", false, "Enable automatic scene reload when a sprite file changes. May cause instability.");
-        _EnableForceReload = config.Bind("Reloading", "EnableForceReload", false, "Enable the ability to force reload the current scene with a key press.");
+        _ReloadSceneOnChange = config.Bind("Reloading", "ReloadSceneOnChange", true, "Enable automatic scene reload when a sprite file changes.");
 
-        _ForceReloadKey = config.Bind("Keybinds", "ForceReloadKey", UnityEngine.KeyCode.F5, "Key to force reload all sprite collections");
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
 
         _LogSpriteLoading = config.Bind("Logging", "LogSpriteLoading", false, "Enable detailed logging of sprite loading operations. May slow down the game.");
