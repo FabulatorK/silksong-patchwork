@@ -1,3 +1,7 @@
+### v2.2.0
+* Added support for AudioClip replacement
+* Implemented seamless sprite reloading (Sprite changes no longer reload the entire area)
+
 ### v2.1.2
 * Fixed crashes when auto-reloading certain sprites
 
