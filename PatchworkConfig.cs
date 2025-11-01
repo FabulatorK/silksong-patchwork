@@ -42,8 +42,8 @@ public class PatchworkConfig
 
     public PatchworkConfig(ConfigFile config)
     {
-        _DumpSprites = config.Bind("General", "DumpSprites", false, "Enable dumping of sprites");
-        _LoadSprites = config.Bind("General", "LoadSprites", true, "Enable loading of custom sprites");
+        _DumpSprites = config.Bind("Sprites", "DumpSprites", false, "Enable dumping of sprites");
+        _LoadSprites = config.Bind("Sprites", "LoadSprites", true, "Enable loading of custom sprites");
 
         _CacheAtlases = config.Bind("Advanced", "CacheAtlases", true, "Enable caching of sprite atlases in memory to speed up sprite loading");
 
