@@ -1,4 +1,10 @@
 ![Patchwork](https://raw.githubusercontent.com/Ashiepaws/silksong-patchwork/refs/heads/master/img/Patchwork.png)
+[![Discord](https://img.shields.io/discord/1297141570805694554?style=for-the-badge&label=Discord&link=https%3A%2F%2Fdiscord.gg%2FDeCtHA84AM)](https://discord.gg/DeCtHA84AM)
+ [![Thunderstore Downloads](https://img.shields.io/thunderstore/dt/Ashiepaws/Patchwork?style=for-the-badge)](https://thunderstore.io/c/hollow-knight-silksong/p/Ashiepaws/Patchwork/) [![Twitch Status](https://img.shields.io/twitch/status/ashiepaws?style=for-the-badge&link=https%3A%2F%2Ftwitch.tv%2Fashiepaws)](https://twitch.tv/ashiepaws)
+ [![Static Badge](https://img.shields.io/badge/ko--fi-donate-blue?style=for-the-badge&link=https%3A%2F%2Fko-fi.com%2Fashiepaws)](https://ko-fi.com/ashiepaws)
+
+
+
 A custom asset mod for Hollow Knight: Silksong with particular attention to ease of creation.
 
 ## Features
