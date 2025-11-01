@@ -1,4 +1,4 @@
-# Patchwork
+![Patchwork](https://raw.githubusercontent.com/Ashiepaws/silksong-patchwork/refs/heads/master/img/Patchwork.png)
 A custom asset mod for Hollow Knight: Silksong with particular attention to ease of creation.
 
 ## Features
