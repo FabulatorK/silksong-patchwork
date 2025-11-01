@@ -31,6 +31,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<bool> _EnablePerformanceTimers;
     public bool EnablePerformanceTimers { get { return _EnablePerformanceTimers.Value; } }
 
+    private readonly ConfigEntry<bool> _ShowAudioLog;
+    public bool ShowAudioLog { get { return _ShowAudioLog.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
         _DumpSprites = config.Bind("General", "DumpSprites", false, "Enable dumping of sprites");
@@ -46,5 +49,7 @@ public class PatchworkConfig
         _LogSpriteDumping = config.Bind("Logging", "LogSpriteDumping", false, "Enable detailed logging of sprite dumping operations. May slow down the game.");
         _LogSpriteWarnings = config.Bind("Logging", "LogSpriteWarnings", false, "Enable logging of warnings related to sprite loading and dumping.");
         _EnablePerformanceTimers = config.Bind("Logging", "EnablePerformanceTimers", false, "Measure and log the time taken for sprite loading and dumping operations. May impact performance.");
+
+        _ShowAudioLog = config.Bind("GUI", "ShowAudioLog", false, "Show the audio play log on screen.");
     }
 }

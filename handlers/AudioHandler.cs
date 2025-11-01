@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using HarmonyLib;
+using Patchwork.GUI;
 using UnityEngine;
 
 namespace Patchwork.Handlers;
@@ -27,7 +28,10 @@ public static class AudioSourcePatch
     {
         var clip = __instance.clip;
         if (clip != null)
+        {
+            AudioGUI.LogAudio(clip);
             Debug.Log($"Play called with clip: {clip.name}");
+        }
     }
 
     static void PlayOneShotPatch(AudioSource __instance, ref AudioClip clip)
@@ -43,6 +47,7 @@ public static class AudioSourcePatch
         if (clip != null)
         {
             // TODO: Use volumeScale if needed
+            AudioGUI.LogAudio(clip);
             clip = LoadWav(clip.name) ?? clip;
         }
     }

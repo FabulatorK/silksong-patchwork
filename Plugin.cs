@@ -6,6 +6,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using Patchwork.Handlers;
 using Patchwork.Util;
+using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -62,6 +63,11 @@ public class Plugin : BaseUnityPlugin
             };
         }
 
+        SceneManager.sceneLoaded += (scene, mode) =>
+        {
+            AudioGUI.ClearLog();
+        };
+
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
         AudioSourcePatch.ApplyPatches(harmony);
@@ -97,6 +103,12 @@ public class Plugin : BaseUnityPlugin
             SpriteFileWatcher.ReloadScene = false;
             SpriteLoader.Reload();
         }
+    }
+
+    private void OnGUI()
+    {
+        if (Config.ShowAudioLog)
+            AudioGUI.DrawAudioLog();
     }
     
     private void InitializeFolders()
