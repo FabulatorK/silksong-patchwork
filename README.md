@@ -83,10 +83,3 @@ I am investigating a way to detect and handle these duplicate sprites, and this 
 * To [Douglas Gregory](https://bsky.app/profile/dmgregory.ca) without whose help I wouldn't have been able to add the GPU-related performance improvements that made Patchwork v2 as fast as it is now.
 * To [RatherChaoticDev](https://next.nexusmods.com/profile/RatherChaoticDev) who created the original [Silksong Customizer](https://www.nexusmods.com/hollowknightsilksong/mods/142) mod that Patchwork was based on
 * To [Su4enka](https://next.nexusmods.com/profile/Su4enka) whose CustomizerT2D plugin (as part of their [Cute Hornet skin](https://www.nexusmods.com/hollowknightsilksong/mods/203)) helped with adding T2D support to Patchwork
-
-## Links
-GitHub Repository: https://github.com/Ashiepaws/silksong-patchwork
-
-Discord: https://discord.gg/DeCtHA84AM (originally meant for my little Twitch community, but I'd be happy to chat and hang out! :3)
-
-Ko-Fi Donations: https://ko-fi.com/ashiepaws
