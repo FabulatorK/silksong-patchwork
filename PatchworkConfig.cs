@@ -10,9 +10,6 @@ public class PatchworkConfig
     private readonly ConfigEntry<bool> _LoadSprites;
     public bool LoadSprites { get { return _LoadSprites.Value; } }
 
-    private readonly ConfigEntry<bool> _CacheAtlases;
-    public bool CacheAtlases { get { return _CacheAtlases.Value; } }
-
     private readonly ConfigEntry<bool> _ReloadSceneOnChange;
     public bool ReloadSceneOnChange { get { return _ReloadSceneOnChange.Value; } }
 
@@ -44,8 +41,6 @@ public class PatchworkConfig
     {
         _DumpSprites = config.Bind("Sprites", "DumpSprites", false, "Enable dumping of sprites");
         _LoadSprites = config.Bind("Sprites", "LoadSprites", true, "Enable loading of custom sprites");
-
-        _CacheAtlases = config.Bind("Advanced", "CacheAtlases", true, "Enable caching of sprite atlases in memory to speed up sprite loading");
 
         _ReloadSceneOnChange = config.Bind("Reloading", "ReloadSceneOnChange", true, "Enable automatic scene reload when a sprite file changes.");
 
