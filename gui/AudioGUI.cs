@@ -6,11 +6,11 @@ namespace Patchwork.GUI;
 
 public static class AudioGUI
 {
-    private static Dictionary<string, AudioPlayEntry> audioPlayLog = new();
+    private static readonly Dictionary<string, AudioPlayEntry> AudioPlayLog = new();
 
     public static void DrawAudioLog()
     {
-        if (audioPlayLog.Count == 0)
+        if (AudioPlayLog.Count == 0)
             return;
 
         GUILayout.BeginVertical();
@@ -18,14 +18,14 @@ public static class AudioGUI
         UnityEngine.GUI.contentColor = Color.yellow;
         GUILayout.Label("Audio Play Log:");
 
-        List<AudioPlayEntry> sortedEntries = new(audioPlayLog.Values);
+        List<AudioPlayEntry> sortedEntries = new(AudioPlayLog.Values);
         sortedEntries.Sort((a, b) => a.ClipName.CompareTo(b.ClipName));
 
         foreach (var entry in sortedEntries)
         {
             if (entry.IsExpired())
             {
-                audioPlayLog.Remove(entry.ClipName);
+                AudioPlayLog.Remove(entry.ClipName);
                 continue;
             }
 
@@ -40,7 +40,7 @@ public static class AudioGUI
 
     public static void LogAudio(AudioClip clip, bool loaded = false)
     {
-        audioPlayLog[clip.name] = new AudioPlayEntry
+        AudioPlayLog[clip.name] = new AudioPlayEntry
         {
             ClipName = clip.name,
             StartTime = DateTime.Now,
@@ -51,7 +51,7 @@ public static class AudioGUI
     
     public static void ClearLog()
     {
-        audioPlayLog.Clear();
+        AudioPlayLog.Clear();
     }
 
     internal class AudioPlayEntry
