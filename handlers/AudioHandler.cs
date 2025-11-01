@@ -16,17 +16,13 @@ public static class AudioHandler
 
     public static void ApplyPatches(Harmony harmony)
     {
-        // Play()
-        var playMethod = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.Play));
-        harmony.Patch(playMethod, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayPatch)));
-
-        // PlayOneShot(AudioClip)
-        var playOneShot1 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), new Type[] { typeof(AudioClip) });
-        harmony.Patch(playOneShot1, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotPatch)));
-
         // PlayOneShot(AudioClip, float)
-        var playOneShot2 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), new Type[] { typeof(AudioClip), typeof(float) });
+        var playOneShot2 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), [typeof(AudioClip), typeof(float)]);
         harmony.Patch(playOneShot2, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotVolumePatch)));
+
+        // Clip setter
+        var clipSetter = AccessTools.PropertySetter(typeof(AudioSource), nameof(AudioSource.clip));
+        harmony.Patch(clipSetter, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(SetterPatch)));
     }
 
     public static void InvalidateCache(string soundName)
@@ -34,28 +30,19 @@ public static class AudioHandler
         LoadedClips.Remove(soundName);
     }
 
-    static void PlayPatch(AudioSource __instance)
+    static void SetterPatch(ref AudioClip value)
     {
-        var clip = __instance.clip;
-        if (clip != null)
+        if (value != null)
         {
-            AudioGUI.LogAudio(clip);
+            AudioGUI.LogAudio(value, true);
+            value = LoadWav(value.name) ?? value;
         }
     }
 
-    static void PlayOneShotPatch(AudioSource __instance, ref AudioClip clip)
+    static void PlayOneShotVolumePatch(ref AudioClip clip, float volumeScale)
     {
         if (clip != null)
         {
-            clip = LoadWav(clip.name) ?? clip;
-        }
-    }
-
-    static void PlayOneShotVolumePatch(AudioSource __instance, ref AudioClip clip, float volumeScale)
-    {
-        if (clip != null)
-        {
-            // TODO: Use volumeScale if needed
             AudioGUI.LogAudio(clip);
             clip = LoadWav(clip.name) ?? clip;
         }
@@ -84,8 +71,8 @@ public static class AudioHandler
         for (int i = 0; i < sampleCount; i++)
         {
             short val = BitConverter.ToInt16(wavBytes, offset);
-            samples[i] = val / 32768f; // normalize to [-1,1]
-            offset += 2; // 16-bit
+            samples[i] = val / 32768f;
+            offset += 2;
         }
 
         AudioClip clip = AudioClip.Create(soundName, sampleCount / channels, channels, sampleRate, false);
