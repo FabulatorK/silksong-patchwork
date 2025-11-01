@@ -37,6 +37,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<double> _LogAudioDuration;
     public double LogAudioDuration { get { return _LogAudioDuration.Value; } }
 
+    private readonly ConfigEntry<bool> _HideModdedAudioInLog;
+    public bool HideModdedAudioInLog { get { return _HideModdedAudioInLog.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
         _DumpSprites = config.Bind("General", "DumpSprites", false, "Enable dumping of sprites");
@@ -55,5 +58,6 @@ public class PatchworkConfig
 
         _ShowAudioLog = config.Bind("Audio", "ShowAudioLog", false, "Show the audio play log on screen.");
         _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
+        _HideModdedAudioInLog = config.Bind("Audio", "HideModdedAudioInLog", true, "Hide modded audio clips from the audio log.");
     }
 }

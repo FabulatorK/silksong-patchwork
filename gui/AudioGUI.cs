@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using Patchwork.Handlers;
 using UnityEngine;
 
 namespace Patchwork.GUI;
@@ -22,19 +24,11 @@ public static class AudioGUI
 
     private static void AudioLogWindow(int windowID)
     {
-        GUILayout.BeginVertical();
-
-        if (AudioPlayLog.Count == 0)
-        {
-            GUILayout.Label("No audio played recently.");
-            GUILayout.EndVertical();
-            UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
-            return;
-        }
-
+        int shown = 0;
         List<AudioPlayEntry> sortedEntries = new(AudioPlayLog.Values);
         sortedEntries.Sort((a, b) => a.ClipName.CompareTo(b.ClipName));
 
+        GUILayout.BeginVertical();
         foreach (var entry in sortedEntries)
         {
             if (entry.IsExpired())
@@ -43,10 +37,19 @@ public static class AudioGUI
                 continue;
             }
 
+            if (Plugin.Config.HideModdedAudioInLog && File.Exists(Path.Combine(AudioHandler.SoundFolder, entry.ClipName + ".wav")))
+                continue;
+
             var opacity = entry.GetOpacity();
             var color = entry.Loaded ? new Color(0f, 1f, 0f, opacity) : new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.contentColor = color;
             GUILayout.Label($"{entry.ClipName}");
+            shown++;
+        }
+        if (shown == 0)
+        {
+            UnityEngine.GUI.contentColor = Color.yellow;
+            GUILayout.Label("No audio played recently.");
         }
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
