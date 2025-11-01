@@ -16,6 +16,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="README.md" CopyToOutputDirectory="Always" />
+    <None Include="manifest.json" CopyToOutputDirectory="Always" />
+    <None Include="CHANGELOG.md" CopyToOutputDirectory="Always" />
+    <None Include="img/icon.png" CopyToOutputDirectory="Always" Link="icon.png" />
+    <None Include="assetbundle/patchwork.assetbundle" CopyToOutputDirectory="Always" Link="patchwork.assetbundle" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
     <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Core" Version="5.*" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
