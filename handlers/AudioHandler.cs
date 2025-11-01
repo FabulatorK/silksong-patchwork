@@ -8,9 +8,9 @@ using UnityEngine;
 namespace Patchwork.Handlers;
 
 [HarmonyPatch]
-public static class AudioSourcePatch
+public static class AudioHandler
 {
-    private static readonly string SoundFolder = Path.Combine(Plugin.BasePath, "Sounds");
+    public static readonly string SoundFolder = Path.Combine(Plugin.BasePath, "Sounds");
 
     private static readonly Dictionary<string, AudioClip> LoadedClips = new();
 
@@ -18,15 +18,20 @@ public static class AudioSourcePatch
     {
         // Play()
         var playMethod = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.Play));
-        harmony.Patch(playMethod, prefix: new HarmonyMethod(typeof(AudioSourcePatch), nameof(PlayPatch)));
+        harmony.Patch(playMethod, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayPatch)));
 
         // PlayOneShot(AudioClip)
         var playOneShot1 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), new Type[] { typeof(AudioClip) });
-        harmony.Patch(playOneShot1, prefix: new HarmonyMethod(typeof(AudioSourcePatch), nameof(PlayOneShotPatch)));
+        harmony.Patch(playOneShot1, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotPatch)));
 
         // PlayOneShot(AudioClip, float)
         var playOneShot2 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), new Type[] { typeof(AudioClip), typeof(float) });
-        harmony.Patch(playOneShot2, prefix: new HarmonyMethod(typeof(AudioSourcePatch), nameof(PlayOneShotVolumePatch)));
+        harmony.Patch(playOneShot2, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotVolumePatch)));
+    }
+
+    public static void InvalidateCache(string soundName)
+    {
+        LoadedClips.Remove(soundName);
     }
 
     static void PlayPatch(AudioSource __instance)

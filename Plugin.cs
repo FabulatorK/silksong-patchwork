@@ -9,6 +9,7 @@ using Patchwork.Util;
 using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Patchwork.Watchers;
 
 namespace Patchwork;
 
@@ -17,7 +18,8 @@ public class Plugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
     internal static new PatchworkConfig Config;
-    internal static SpriteFileWatcher FileWatcher;
+    internal static SpriteFileWatcher SpriteFileWatcher;
+    internal static AudioFileWatcher AudioFileWatcher;
 
     private static string PatchworkFolderName = "Patchwork";
     public static string BasePath { get { return Path.Combine(Paths.PluginPath, PatchworkFolderName); } }
@@ -36,7 +38,8 @@ public class Plugin : BaseUnityPlugin
 
         TexUtil.Initialize();
         InitializeFolders();
-        FileWatcher = new SpriteFileWatcher(); // Needs config to be initialized first
+        AudioFileWatcher = new AudioFileWatcher();
+        SpriteFileWatcher = new SpriteFileWatcher();
 
         if (Config.DumpSprites)
         {
@@ -70,7 +73,7 @@ public class Plugin : BaseUnityPlugin
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
-        AudioSourcePatch.ApplyPatches(harmony);
+        AudioHandler.ApplyPatches(harmony);
     }
 
     private void FindPatchworkFolder()
@@ -117,5 +120,6 @@ public class Plugin : BaseUnityPlugin
         IOUtil.EnsureDirectoryExists(SpriteLoader.LoadPath);
         IOUtil.EnsureDirectoryExists(SpriteLoader.AtlasLoadPath);
         IOUtil.EnsureDirectoryExists(T2DHandler.T2DDumpPath);
+        IOUtil.EnsureDirectoryExists(AudioHandler.SoundFolder);
     }
 }
