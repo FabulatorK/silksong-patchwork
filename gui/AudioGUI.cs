@@ -44,8 +44,7 @@ public static class AudioGUI
         {
             ClipName = clip.name,
             StartTime = DateTime.Now,
-            Loaded = loaded,
-            EndTime = DateTime.Now.AddSeconds(clip.length)
+            Loaded = loaded
         };
     }
     
@@ -58,22 +57,9 @@ public static class AudioGUI
     {
         public string ClipName;
         public DateTime StartTime;
-        public DateTime EndTime;
         public bool Loaded;
 
-        public float GetOpacity()
-        {
-            var totalDuration = (EndTime - StartTime).TotalSeconds;
-            if (totalDuration < 2.0)
-                totalDuration = 2.0;
-            var elapsed = (DateTime.Now - StartTime).TotalSeconds;
-            return 1.0f - (float)(elapsed / totalDuration);
-        }
-
-        public bool IsExpired()
-        {
-            var endTime = (EndTime - StartTime).TotalSeconds < 2.0 ? StartTime.AddSeconds(2.0) : EndTime;
-            return DateTime.Now >= endTime;
-        }
+        public float GetOpacity() => 1.0f - (float)((DateTime.Now - StartTime).TotalSeconds / Plugin.Config.LogAudioDuration);
+        public bool IsExpired() => DateTime.Now >= StartTime.AddSeconds(Plugin.Config.LogAudioDuration);
     }
 }
