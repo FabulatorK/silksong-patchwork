@@ -10,13 +10,27 @@ public static class AudioGUI
 
     public static void DrawAudioLog()
     {
-        if (AudioPlayLog.Count == 0)
-            return;
+        GUILayout.Window(6969, new Rect(
+            Screen.width - (Screen.width / 8),
+            10,
+            Screen.width / 8,
+            Screen.height / 16),
+            AudioLogWindow,
+            "Patchwork Audio Log"
+        );
+    }
 
+    private static void AudioLogWindow(int windowID)
+    {
         GUILayout.BeginVertical();
 
-        UnityEngine.GUI.contentColor = Color.yellow;
-        GUILayout.Label("Audio Play Log:");
+        if (AudioPlayLog.Count == 0)
+        {
+            GUILayout.Label("No audio played recently.");
+            GUILayout.EndVertical();
+            UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
+            return;
+        }
 
         List<AudioPlayEntry> sortedEntries = new(AudioPlayLog.Values);
         sortedEntries.Sort((a, b) => a.ClipName.CompareTo(b.ClipName));
@@ -36,6 +50,8 @@ public static class AudioGUI
         }
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
+
+        UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
     }
 
     public static void LogAudio(AudioClip clip, bool loaded = false)
