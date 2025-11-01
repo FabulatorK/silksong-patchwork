@@ -98,7 +98,7 @@ public class Plugin : BaseUnityPlugin
         if (SpriteFileWatcher.ReloadScene)
         {
             SpriteFileWatcher.ReloadScene = false;
-            GameManager.instance.LoadScene(SceneManager.GetActiveScene().name);
+            SpriteLoader.Reload();
         }
     }
     

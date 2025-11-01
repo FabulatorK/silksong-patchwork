@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Patchwork.Util;
+using UnityEngine.SceneManagement;
 
 namespace Patchwork.Handlers;
 
@@ -138,7 +139,7 @@ public static class SpriteLoader
                 LoadedSprites[collectionName][atlasName].Remove(spriteName);
         }
     }
-    
+
 
     public static void MarkReloadAtlas(string collectionName, string atlasName)
     {
@@ -150,5 +151,14 @@ public static class SpriteLoader
             if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
                 LoadedSprites[collectionName][atlasName].Clear();
         }
+    }
+    
+    public static void Reload()
+    {
+        Plugin.Logger.LogInfo($"Reloading sprites for scene {SceneManager.GetActiveScene().name}");
+        var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
+        foreach (var collection in spriteCollections)
+            LoadCollection(collection);
+        Plugin.Logger.LogInfo($"Finished reloading sprites for scene {SceneManager.GetActiveScene().name}");
     }
 }
