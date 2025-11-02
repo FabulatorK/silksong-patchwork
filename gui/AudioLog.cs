@@ -36,7 +36,7 @@ public static class AudioLog
                 continue;
 
             var opacity = entry.GetOpacity();
-            var color = entry.Loaded ? new Color(0f, 1f, 0f, opacity) : new Color(1.0f, 1.0f, 1.0f, opacity);
+            var color = new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.contentColor = color;
             GUILayout.Label($"{entry.ClipName}");
             shown++;
@@ -52,13 +52,12 @@ public static class AudioLog
         UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
     }
 
-    public static void LogAudio(AudioClip clip, bool loaded = false)
+    public static void LogAudio(AudioClip clip)
     {
         AudioPlayLog[clip.name] = new AudioPlayEntry
         {
             ClipName = clip.name,
-            StartTime = DateTime.Now,
-            Loaded = loaded
+            StartTime = DateTime.Now
         };
     }
     
@@ -71,7 +70,6 @@ public static class AudioLog
     {
         public string ClipName;
         public DateTime StartTime;
-        public bool Loaded;
 
         public float GetOpacity() => 1.0f - (float)((DateTime.Now - StartTime).TotalSeconds / Plugin.Config.LogAudioDuration);
         public bool IsExpired() => DateTime.Now >= StartTime.AddSeconds(Plugin.Config.LogAudioDuration);
