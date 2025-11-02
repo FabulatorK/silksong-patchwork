@@ -30,6 +30,7 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 
 ### Audio
 * `ShowAudioLog`: Shows a window that logs the names of all sounds that are being played that Patchwork has access to. If you're adding custom files to the "Sounds" folder, you must name them exactly the same as shown in order for Patchwork to replace them.
+* `ShowAudioList`: Shows a window that lists all statically loaded sound effects. Can be used to find names of sounds which don't show up in the Audio Log.
 * `LogAudioDuration`: How long the name of a sound is shown in the log after being played, in seconds. (Default: 5)
 * `HideModdedAudioInLog`: On by default. If enabled, sounds which already have a modded file are omitted from the log. This makes it easier to find the names of specific sounds you want to mod.
 
@@ -43,9 +44,10 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 **WARNING:** Putting *all* dumped sprites into the Sprites folder may cause issues due to duplicate sprites. It's a good idea to only put sprites into the folder you're actively working on, and add more later. For more information, refer to the "Known Issues" section.
 
 ## Audio Creation Guide
-1. Enable the `ShowAudioLog` option in the mod config and boot up the game.
+1. Enable the `ShowAudioLog` and `ShowAudioList` options in the mod config and boot up the game.
 2. Cause the sound you want to modify to be played. You should see its name pop up in the Audio Log in the top right corner of the screen.
-3. Put a WAV file with the same name you saw in the Audio Log into the "Patchwork/Sounds" folder. For example, to replace the title screen music, you'd name the file "Title.wav".
+   * If you don't see your sound show up in the Audio Log, it may be a pre-loaded one. Make sure to check the Loaded Audio list in that case.
+3. Put a WAV file with the same name you saw in the Audio Log (or Loaded Audio list) into the "Patchwork/Sounds" folder. For example, to replace the title screen music, you'd name the file "Title.wav".
 4. Cause the sound to be played again. It should now play your custom sound!
 
 **WARNING:** It is important that the file you put into the sounds folder is a WAV file. If your file uses any other format, you must convert it to a WAV file first.

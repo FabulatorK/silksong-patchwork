@@ -1,3 +1,7 @@
+### v2.2.1
+* Fix occasional pop sound at the end of custom sounds
+* Added support for more sounds
+
 ### v2.2.0
 * Added support for AudioClip replacement
 * Implemented seamless sprite reloading (Sprite changes no longer reload the entire area)
