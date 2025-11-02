@@ -17,30 +17,27 @@ public static class AudioHandler
 
     public static void ApplyPatches(Harmony harmony)
     {
-        // PlayOneShot(AudioClip, float)
-        var playOneShot2 = AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShot), [typeof(AudioClip), typeof(float)]);
-        harmony.Patch(playOneShot2, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotVolumePatch)));
+        harmony.Patch(
+            AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayHelper), [typeof(AudioSource), typeof(ulong)]),
+            prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayHelperPatch))
+        );
 
-        // Clip setter
-        var clipSetter = AccessTools.PropertySetter(typeof(AudioSource), nameof(AudioSource.clip));
-        harmony.Patch(clipSetter, prefix: new HarmonyMethod(typeof(AudioHandler), nameof(SetterPatch)));
+        harmony.Patch(
+            AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShotHelper), [typeof(AudioSource), typeof(AudioClip), typeof(float)]),
+            prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotHelperPatch))
+        );
     }
 
-    public static void InvalidateCache(string soundName)
+    public static void PlayHelperPatch(AudioSource source, ulong delay)
     {
-        LoadedClips.Remove(soundName);
-    }
-
-    static void SetterPatch(ref AudioClip value)
-    {
-        if (value != null)
+        if (source.clip != null)
         {
-            AudioGUI.LogAudio(value, true);
-            value = LoadWav(value.name) ?? value;
+            AudioGUI.LogAudio(source.clip);
+            source.clip = LoadWav(source.clip.name) ?? source.clip;
         }
     }
 
-    static void PlayOneShotVolumePatch(ref AudioClip clip, float volumeScale)
+    public static void PlayOneShotHelperPatch(AudioSource source, ref AudioClip clip, float volumeScale)
     {
         if (clip != null)
         {
@@ -49,7 +46,12 @@ public static class AudioHandler
         }
     }
 
-    static AudioClip LoadWav(string soundName)
+    public static void InvalidateCache(string soundName)
+    {
+        LoadedClips.Remove(soundName);
+    }
+
+    public static AudioClip LoadWav(string soundName)
     {
         string path = GetSoundPath(soundName);
         if (string.IsNullOrEmpty(path))
