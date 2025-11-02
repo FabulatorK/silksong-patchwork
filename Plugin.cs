@@ -66,10 +66,7 @@ public class Plugin : BaseUnityPlugin
             };
         }
 
-        SceneManager.sceneLoaded += (scene, mode) =>
-        {
-            AudioGUI.ClearLog();
-        };
+        SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
@@ -106,12 +103,20 @@ public class Plugin : BaseUnityPlugin
             SpriteFileWatcher.ReloadSprites = false;
             SpriteLoader.Reload();
         }
+
+        if (AudioFileWatcher.ReloadAudio)
+        {
+            AudioFileWatcher.ReloadAudio = false;
+            AudioHandler.Reload();
+        }
     }
 
     private void OnGUI()
     {
         if (Config.ShowAudioLog)
-            AudioGUI.DrawAudioLog();
+            AudioLog.DrawAudioLog();
+        if (Config.ShowAudioList)
+            AudioList.DrawAudioList();
     }
     
     private void InitializeFolders()

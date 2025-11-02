@@ -7,6 +7,8 @@ public class AudioFileWatcher
 {
     public FileSystemWatcher AudioWatcher;
 
+    public static bool ReloadAudio = false;
+
     public AudioFileWatcher()
     {
         AudioWatcher = new FileSystemWatcher();
@@ -25,5 +27,6 @@ public class AudioFileWatcher
     {
         string filename = Path.GetFileNameWithoutExtension(e.FullPath);
         AudioHandler.InvalidateCache(filename);
+        ReloadAudio = true;
     }
 }

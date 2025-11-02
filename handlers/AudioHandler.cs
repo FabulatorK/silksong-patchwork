@@ -31,18 +31,37 @@ public static class AudioHandler
     public static void PlayHelperPatch(AudioSource source, ulong delay)
     {
         if (source.clip != null)
-        {
-            AudioGUI.LogAudio(source.clip);
-            source.clip = LoadWav(source.clip.name) ?? source.clip;
-        }
+            AudioLog.LogAudio(source.clip);
     }
 
     public static void PlayOneShotHelperPatch(AudioSource source, ref AudioClip clip, float volumeScale)
     {
         if (clip != null)
+            AudioLog.LogAudio(clip);
+    }
+
+    public static void Reload()
+    {
+        foreach (var source in Resources.FindObjectsOfTypeAll<AudioSource>())
         {
-            AudioGUI.LogAudio(clip);
-            clip = LoadWav(clip.name) ?? clip;
+            AudioLog.ClearLog();
+            AudioList.ClearList();
+
+            LoadAudio(source);
+            AudioList.LogAudio(source);
+        }
+    }
+
+    public static void LoadAudio(AudioSource source)
+    {
+        if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name) || LoadedClips.ContainsKey(source.clip?.name))
+            return;
+
+        AudioClip loadedClip = LoadWav(source.clip.name);
+        if (loadedClip != null)
+        {
+            source.clip = loadedClip;
+            LoadedClips[source.clip.name] = loadedClip;
         }
     }
 
@@ -77,6 +96,7 @@ public static class AudioHandler
             samples[i] = val / 32768f;
             offset += 2;
         }
+        samples[^1] = 0f; // ensure last sample is zero to avoid pops
 
         AudioClip clip = AudioClip.Create(soundName, sampleCount / channels, channels, sampleRate, false);
         clip.SetData(samples, 0);
@@ -89,7 +109,7 @@ public static class AudioHandler
         var files = Directory.GetFiles(SoundFolder, $"{soundName}.wav", SearchOption.AllDirectories);
         if (files.Any())
             return files.First();
-        
+
         foreach (var packPath in Plugin.PluginPackPaths)
         {
             if (!Directory.Exists(Path.Combine(packPath, "Sounds")))

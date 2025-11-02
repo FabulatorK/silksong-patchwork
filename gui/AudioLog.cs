@@ -6,20 +6,15 @@ using UnityEngine;
 
 namespace Patchwork.GUI;
 
-public static class AudioGUI
+public static class AudioLog
 {
     private static readonly Dictionary<string, AudioPlayEntry> AudioPlayLog = new();
 
+    private static Rect windowRect = new Rect(Screen.width - 310, 10, 300, 400);
+
     public static void DrawAudioLog()
     {
-        GUILayout.Window(6969, new Rect(
-            Screen.width - (Screen.width / 8),
-            10,
-            Screen.width / 8,
-            Screen.height / 16),
-            AudioLogWindow,
-            "Patchwork Audio Log"
-        );
+        windowRect = GUILayout.Window(6969, windowRect, AudioLogWindow, "Patchwork Audio Log");
     }
 
     private static void AudioLogWindow(int windowID)
