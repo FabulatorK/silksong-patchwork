@@ -1,3 +1,6 @@
+### v2.2.2
+* Added support for even more sounds
+
 ### v2.2.1
 * Fix occasional pop sound at the end of custom sounds
 * Added support for more sounds
