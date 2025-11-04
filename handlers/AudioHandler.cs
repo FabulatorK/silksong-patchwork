@@ -26,6 +26,11 @@ public static class AudioHandler
             AccessTools.Method(typeof(AudioSource), nameof(AudioSource.PlayOneShotHelper), [typeof(AudioSource), typeof(AudioClip), typeof(float)]),
             prefix: new HarmonyMethod(typeof(AudioHandler), nameof(PlayOneShotHelperPatch))
         );
+
+        harmony.Patch(
+            AccessTools.PropertySetter(typeof(AudioSource), nameof(AudioSource.clip)),
+            postfix: new HarmonyMethod(typeof(AudioHandler), nameof(ClipSetterPatch))
+        );
     }
 
     public static void PlayHelperPatch(AudioSource source, ulong delay)
@@ -40,13 +45,20 @@ public static class AudioHandler
             AudioLog.LogAudio(clip);
     }
 
+    public static void ClipSetterPatch(AudioSource __instance, AudioClip value)
+    {
+        if (value != null)
+        {
+            AudioLog.LogAudio(value);
+            if (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Substring("PATCHWORK_".Length)))
+                LoadAudio(__instance);
+        }
+    }
+
     public static void Reload()
     {
         foreach (var source in Resources.FindObjectsOfTypeAll<AudioSource>())
         {
-            AudioLog.ClearLog();
-            AudioList.ClearList();
-
             LoadAudio(source);
             AudioList.LogAudio(source);
         }
@@ -54,8 +66,14 @@ public static class AudioHandler
 
     public static void LoadAudio(AudioSource source)
     {
-        if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name) || LoadedClips.ContainsKey(source.clip?.name))
+        if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name))
             return;
+
+        if (LoadedClips.ContainsKey(source.clip.name))
+        {
+            source.clip = LoadedClips[source.clip.name];
+            return;
+        }
 
         AudioClip loadedClip = LoadWav(source.clip.name);
         if (loadedClip != null)
@@ -98,7 +116,7 @@ public static class AudioHandler
         }
         samples[^1] = 0f; // ensure last sample is zero to avoid pops
 
-        AudioClip clip = AudioClip.Create(soundName, sampleCount / channels, channels, sampleRate, false);
+        AudioClip clip = AudioClip.Create("PATCHWORK_" + soundName, sampleCount / channels, channels, sampleRate, false);
         clip.SetData(samples, 0);
         LoadedClips[soundName] = clip;
         return clip;

@@ -49,7 +49,7 @@ public static class AudioList
         if (source == null || string.IsNullOrEmpty(source.clip?.name))
             return;
 
-        string soundName = source.clip.name;
+        string soundName = source.clip.name.Replace("PATCHWORK_", "");
         LoadedAudioClips.Add(soundName);
     }
     

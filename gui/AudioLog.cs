@@ -56,7 +56,7 @@ public static class AudioLog
     {
         AudioPlayLog[clip.name] = new AudioPlayEntry
         {
-            ClipName = clip.name,
+            ClipName = clip.name.Replace("PATCHWORK_", ""),
             StartTime = DateTime.Now
         };
     }
