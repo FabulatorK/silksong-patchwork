@@ -50,7 +50,7 @@ public static class AudioHandler
         if (value != null)
         {
             AudioLog.LogAudio(value);
-            if (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Substring("PATCHWORK_".Length)))
+            if (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", "")))
                 LoadAudio(__instance);
         }
     }
@@ -68,18 +68,19 @@ public static class AudioHandler
     {
         if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name))
             return;
+        string clipName = source.clip.name.Replace("PATCHWORK_", "");
 
-        if (LoadedClips.ContainsKey(source.clip.name))
+        if (LoadedClips.ContainsKey(clipName))
         {
-            source.clip = LoadedClips[source.clip.name];
+            source.clip = LoadedClips[clipName];
             return;
         }
 
-        AudioClip loadedClip = LoadWav(source.clip.name);
+        AudioClip loadedClip = LoadWav(clipName);
         if (loadedClip != null)
         {
+            LoadedClips[clipName] = loadedClip;
             source.clip = loadedClip;
-            LoadedClips[source.clip.name] = loadedClip;
         }
     }
 
