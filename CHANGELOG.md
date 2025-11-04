@@ -1,3 +1,6 @@
+### v2.2.3
+* Fixed crash on sound file change
+
 ### v2.2.2
 * Added support for even more sounds
 
