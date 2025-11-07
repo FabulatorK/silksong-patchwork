@@ -47,10 +47,10 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 1. Enable the `ShowAudioLog` and `ShowAudioList` options in the mod config and boot up the game.
 2. Cause the sound you want to modify to be played. You should see its name pop up in the Audio Log in the top right corner of the screen.
    * If you don't see your sound show up in the Audio Log, it may be a pre-loaded one. Make sure to check the Loaded Audio list in that case.
-3. Put a WAV file with the same name you saw in the Audio Log (or Loaded Audio list) into the "Patchwork/Sounds" folder. For example, to replace the title screen music, you'd name the file "Title.wav".
+3. Put an audio file with the same name you saw in the Audio Log (or Loaded Audio list) into the "Patchwork/Sounds" folder. For example, to replace the title screen music, you'd name the file "Title.wav" or "Title.mp3".
 4. Cause the sound to be played again. It should now play your custom sound!
 
-**WARNING:** It is important that the file you put into the sounds folder is a WAV file. If your file uses any other format, you must convert it to a WAV file first.
+**NOTE:** Patchwork supports all [Unity-supported audio formats.](https://docs.unity3d.com/Manual/AudioFiles-compatibility.html)
 
 ## Publishing Packs on Thunderstore
 

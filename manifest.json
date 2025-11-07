@@ -1,7 +1,7 @@
 {
     "name": "Patchwork",
     "description": "A custom asset mod for Hollow Knight: Silksong with particular attention to ease of creation.",
-    "version_number": "2.2.3",
+    "version_number": "2.2.4",
     "dependencies": [
         "BepInEx-BepInExPack_Silksong-5.4.2304"
     ],

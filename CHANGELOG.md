@@ -1,3 +1,6 @@
+### v2.2.4
+* Added support for all Unity-supported audio formats
+
 ### v2.2.3
 * Fixed crash on sound file change
 
