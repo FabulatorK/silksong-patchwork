@@ -14,7 +14,7 @@ public class AudioFileWatcher
         AudioWatcher = new FileSystemWatcher();
         AudioWatcher.Path = AudioHandler.SoundFolder;
         AudioWatcher.IncludeSubdirectories = true;
-        AudioWatcher.Filter = "*.wav";
+        AudioWatcher.Filter = "*.*";
         AudioWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.DirectoryName;
         AudioWatcher.Changed += OnAudioChanged;
         AudioWatcher.Created += OnAudioChanged;

@@ -5,6 +5,7 @@ using System.Linq;
 using HarmonyLib;
 using Patchwork.GUI;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Patchwork.Handlers;
 
@@ -98,34 +99,25 @@ public static class AudioHandler
         if (LoadedClips.TryGetValue(soundName, out var cachedClip))
             return cachedClip;
 
-        byte[] wavBytes = File.ReadAllBytes(path);
-        int channels = BitConverter.ToInt16(wavBytes, 22);
-        int sampleRate = BitConverter.ToInt32(wavBytes, 24);
-        int bitsPerSample = BitConverter.ToInt16(wavBytes, 34);
-        int dataStart = 44; // standard PCM WAV header
-        int dataLength = wavBytes.Length - dataStart;
-
-        int sampleCount = dataLength / (bitsPerSample / 8);
-        float[] samples = new float[sampleCount];
-
-        int offset = dataStart;
-        for (int i = 0; i < sampleCount; i++)
+        string url = "file:///" + Uri.EscapeUriString(path.Replace("\\", "/"));
+        var request = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.UNKNOWN);
+        var operation = request.SendWebRequest();
+        while (!operation.isDone) { }
+        if (request.result != UnityWebRequest.Result.Success)
         {
-            short val = BitConverter.ToInt16(wavBytes, offset);
-            samples[i] = val / 32768f;
-            offset += 2;
+            Plugin.Logger.LogError($"[Patchwork] Failed to load audio clip from {path}: {request.error}");
+            return null;
         }
-        samples[^1] = 0f; // ensure last sample is zero to avoid pops
 
-        AudioClip clip = AudioClip.Create("PATCHWORK_" + soundName, sampleCount / channels, channels, sampleRate, false);
-        clip.SetData(samples, 0);
+        AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
+        clip.name = "PATCHWORK_" + soundName;
         LoadedClips[soundName] = clip;
         return clip;
     }
 
     static string GetSoundPath(string soundName)
     {
-        var files = Directory.GetFiles(SoundFolder, $"{soundName}.wav", SearchOption.AllDirectories);
+        var files = Directory.GetFiles(SoundFolder, $"{soundName}.*", SearchOption.AllDirectories);
         if (files.Any())
             return files.First();
 
@@ -133,7 +125,7 @@ public static class AudioHandler
         {
             if (!Directory.Exists(Path.Combine(packPath, "Sounds")))
                 continue;
-            var packFiles = Directory.GetFiles(Path.Combine(packPath, "Sounds"), $"{soundName}.wav", SearchOption.AllDirectories);
+            var packFiles = Directory.GetFiles(Path.Combine(packPath, "Sounds"), $"{soundName}.*", SearchOption.AllDirectories);
             if (packFiles.Any())
                 return packFiles.First();
         }
