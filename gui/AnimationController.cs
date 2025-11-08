@@ -10,6 +10,8 @@ public static class AnimationController
     public static string SelectedAnimator { get; private set; } = null;
 
     private static bool Paused = false;
+    private static bool Frozen = false;
+    private static Vector3 FrozenPosition;
 
     private static Dictionary<string, tk2dSpriteAnimator> animators = new Dictionary<string, tk2dSpriteAnimator>();
 
@@ -43,6 +45,13 @@ public static class AnimationController
             }
         }
 
+        if (Input.GetKeyDown(Plugin.Config.AnimationControllerFreezeKey) && SelectedAnimator != null)
+        {
+            Frozen = !Frozen;
+            if (animators.TryGetValue(SelectedAnimator, out var animator))
+                FrozenPosition = animator.gameObject.transform.position;
+        }
+
         if (Paused && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var selectedAnimator))
         {
             if (Input.GetKeyDown(Plugin.Config.AnimationControllerNextFrameKey))
@@ -62,6 +71,9 @@ public static class AnimationController
                 selectedAnimator.UpdateAnimation(Time.deltaTime);
             }
         }
+
+        if (Frozen && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var frozenAnimator))
+            frozenAnimator.gameObject.transform.position = FrozenPosition;
     }
 
     private static void SelectAnimator(tk2dSpriteAnimator animator)
@@ -103,12 +115,21 @@ public static class AnimationController
             if (GUILayout.Button(name, GUILayout.ExpandWidth(false)))
                 SelectAnimator(animator);
             GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+
             if (Paused && SelectedAnimator == name)
             {
                 GUI.contentColor = Color.red;
                 GUILayout.Label(" [PAUSED]");
                 GUI.contentColor = Color.white;
             }
+
+            if (Frozen && SelectedAnimator == name)
+            {
+                GUI.contentColor = Color.cyan;
+                GUILayout.Label(" [FROZEN]");
+                GUI.contentColor = Color.white;
+            }
+
             GUILayout.EndHorizontal();
         }
         GUILayout.EndVertical();
