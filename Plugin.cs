@@ -26,6 +26,9 @@ public class Plugin : BaseUnityPlugin
 
     public static HashSet<string> PluginPackPaths = new();
 
+    public static bool ShowAudioLog = false;
+    public static bool ShowAudioList = false;
+
     private void Awake()
     {
         // Plugin startup logic
@@ -98,6 +101,11 @@ public class Plugin : BaseUnityPlugin
         if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
             SceneTraverser.TraverseAllScenes();
 
+        if (Input.GetKeyDown(Config.ShowAudioLogKey))
+            ShowAudioLog = !ShowAudioLog;
+        if (Input.GetKeyDown(Config.ShowAudioListKey))
+            ShowAudioList = !ShowAudioList;
+
         if (SpriteFileWatcher.ReloadSprites)
         {
             SpriteFileWatcher.ReloadSprites = false;
@@ -113,9 +121,9 @@ public class Plugin : BaseUnityPlugin
 
     private void OnGUI()
     {
-        if (Config.ShowAudioLog)
+        if (ShowAudioLog)
             AudioLog.DrawAudioLog();
-        if (Config.ShowAudioList)
+        if (ShowAudioList)
             AudioList.DrawAudioList();
     }
     
