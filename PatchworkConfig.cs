@@ -25,6 +25,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAudioList;
     public UnityEngine.KeyCode ShowAudioListKey { get { return _ShowAudioList.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAnimationController;
+    public UnityEngine.KeyCode ShowAnimationControllerKey { get { return _ShowAnimationController.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -36,5 +39,6 @@ public class PatchworkConfig
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
         _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
         _ShowAudioList = config.Bind("Keybinds", "ShowAudioList", UnityEngine.KeyCode.Alpha2, "Key to toggle the audio list display.");
+        _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
     }
 }

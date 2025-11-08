@@ -28,6 +28,7 @@ public class Plugin : BaseUnityPlugin
 
     public static bool ShowAudioLog = false;
     public static bool ShowAudioList = false;
+    public static bool ShowAnimationController = false;
 
     private void Awake()
     {
@@ -71,6 +72,14 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
+        SceneManager.sceneLoaded += (scene, mode) =>
+        {
+            AnimationController.ClearAnimators();
+            var animators = Resources.FindObjectsOfTypeAll<tk2dSpriteAnimator>();
+            foreach (var animator in animators)
+                AnimationController.RegisterAnimator(animator);
+        };
+
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
         AudioHandler.ApplyPatches(harmony);
@@ -105,6 +114,8 @@ public class Plugin : BaseUnityPlugin
             ShowAudioLog = !ShowAudioLog;
         if (Input.GetKeyDown(Config.ShowAudioListKey))
             ShowAudioList = !ShowAudioList;
+        if (Input.GetKeyDown(Config.ShowAnimationControllerKey))
+            ShowAnimationController = !ShowAnimationController;
 
         if (SpriteFileWatcher.ReloadSprites)
         {
@@ -125,6 +136,8 @@ public class Plugin : BaseUnityPlugin
             AudioLog.DrawAudioLog();
         if (ShowAudioList)
             AudioList.DrawAudioList();
+        if (ShowAnimationController)
+            AnimationController.DrawAnimationController();
     }
     
     private void InitializeFolders()
