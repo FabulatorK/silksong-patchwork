@@ -42,6 +42,26 @@ public static class AnimationController
                     animator.Paused = false;
             }
         }
+
+        if (Paused && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var selectedAnimator))
+        {
+            if (Input.GetKeyDown(Plugin.Config.AnimationControllerNextFrameKey))
+            {
+                int nextFrame = selectedAnimator.CurrentFrame + 1;
+                if (nextFrame >= selectedAnimator.CurrentClip.frames.Length)
+                    nextFrame = 0;
+                selectedAnimator.PlayFromFrame(nextFrame);
+                selectedAnimator.UpdateAnimation(Time.deltaTime);
+            }
+            if (Input.GetKeyDown(Plugin.Config.AnimationControllerPrevFrameKey))
+            {
+                int prevFrame = selectedAnimator.CurrentFrame - 1;
+                if (prevFrame < 0)
+                    prevFrame = selectedAnimator.CurrentClip.frames.Length - 1;
+                selectedAnimator.PlayFromFrame(prevFrame);
+                selectedAnimator.UpdateAnimation(Time.deltaTime);
+            }
+        }
     }
 
     private static void SelectAnimator(tk2dSpriteAnimator animator)
@@ -67,17 +87,11 @@ public static class AnimationController
                 continue;
 
             if (animator.CurrentFrame < 0 || animator.CurrentFrame >= animator.CurrentClip.frames.Length)
-            {
-                Plugin.Logger.LogWarning($"Animator {name} has invalid current frame {animator.CurrentFrame} for clip {animator.CurrentClip.name}");
                 continue;
-            }
             int currentSpriteId = animator.CurrentClip.frames[animator.CurrentFrame].spriteId;
             tk2dSpriteCollectionData spriteCollection = animator.CurrentClip.frames[animator.CurrentFrame].spriteCollection;
             if (spriteCollection == null || currentSpriteId < 0 || currentSpriteId >= spriteCollection.spriteDefinitions.Length)
-            {
-                Plugin.Logger.LogWarning($"Animator {name} has invalid sprite ID {currentSpriteId} in collection for clip {animator.CurrentClip.name}");
                 continue;
-            }
             tk2dSpriteDefinition currentFrameDef = spriteCollection.spriteDefinitions[currentSpriteId];
 
             if (SelectedAnimator == name)
@@ -85,11 +99,10 @@ public static class AnimationController
             else
                 GUI.contentColor = Color.white;
 
+            GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
             if (GUILayout.Button(name, GUILayout.ExpandWidth(false)))
                 SelectAnimator(animator);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"{name}: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+            GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
             if (Paused && SelectedAnimator == name)
             {
                 GUI.contentColor = Color.red;

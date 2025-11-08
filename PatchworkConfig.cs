@@ -31,6 +31,12 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerPauseKey;
     public UnityEngine.KeyCode AnimationControllerPauseKey { get { return _AnimationControllerPauseKey.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerNextFrameKey;
+    public UnityEngine.KeyCode AnimationControllerNextFrameKey { get { return _AnimationControllerNextFrameKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerPrevFrameKey;
+    public UnityEngine.KeyCode AnimationControllerPrevFrameKey { get { return _AnimationControllerPrevFrameKey.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -45,5 +51,7 @@ public class PatchworkConfig
         _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
+        _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");
+        _AnimationControllerPrevFrameKey = config.Bind("Keybinds", "AnimationControllerPrevFrameKey", UnityEngine.KeyCode.Insert, "Key to go back one frame in the selected animator in the animation controller when paused.");
     }
 }
