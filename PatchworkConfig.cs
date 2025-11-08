@@ -28,6 +28,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAnimationController;
     public UnityEngine.KeyCode ShowAnimationControllerKey { get { return _ShowAnimationController.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerPauseKey;
+    public UnityEngine.KeyCode AnimationControllerPauseKey { get { return _AnimationControllerPauseKey.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -40,5 +43,7 @@ public class PatchworkConfig
         _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
         _ShowAudioList = config.Bind("Keybinds", "ShowAudioList", UnityEngine.KeyCode.Alpha2, "Key to toggle the audio list display.");
         _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
+
+        _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
     }
 }

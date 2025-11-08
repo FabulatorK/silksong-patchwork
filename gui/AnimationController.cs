@@ -7,6 +7,10 @@ public static class AnimationController
     private static Vector2 scrollPosition = Vector2.zero;
     private static Rect windowRect = new Rect(Screen.width / 2 - 300, 10, 600, 800);
 
+    public static string SelectedAnimator { get; private set; } = null;
+
+    private static bool Paused = false;
+
     private static Dictionary<string, tk2dSpriteAnimator> animators = new Dictionary<string, tk2dSpriteAnimator>();
 
     public static void RegisterAnimator(tk2dSpriteAnimator animator)
@@ -23,6 +27,31 @@ public static class AnimationController
     public static void DrawAnimationController()
     {
         windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller");
+    }
+
+    public static void Update()
+    {
+        if (Input.GetKeyDown(Plugin.Config.AnimationControllerPauseKey) && SelectedAnimator != null)
+        {
+            Paused = !Paused;
+            if (animators.TryGetValue(SelectedAnimator, out var animator))
+            {
+                if (Paused)
+                    animator.Paused = true;
+                else
+                    animator.Paused = false;
+            }
+        }
+    }
+
+    private static void SelectAnimator(tk2dSpriteAnimator animator)
+    {
+        if (Paused && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var currentAnimator))
+        {
+            currentAnimator.Paused = false;
+            Paused = false;
+        }
+        SelectedAnimator = animator.gameObject.name;
     }
 
     private static void AnimationControllerWindow(int windowID)
@@ -50,8 +79,24 @@ public static class AnimationController
                 continue;
             }
             tk2dSpriteDefinition currentFrameDef = spriteCollection.spriteDefinitions[currentSpriteId];
-            GUILayout.Label($"{name}: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
 
+            if (SelectedAnimator == name)
+                GUI.contentColor = Color.green;
+            else
+                GUI.contentColor = Color.white;
+
+            if (GUILayout.Button(name, GUILayout.ExpandWidth(false)))
+                SelectAnimator(animator);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{name}: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+            if (Paused && SelectedAnimator == name)
+            {
+                GUI.contentColor = Color.red;
+                GUILayout.Label(" [PAUSED]");
+                GUI.contentColor = Color.white;
+            }
+            GUILayout.EndHorizontal();
         }
         GUILayout.EndVertical();
         GUILayout.EndScrollView();

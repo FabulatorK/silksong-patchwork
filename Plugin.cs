@@ -128,6 +128,8 @@ public class Plugin : BaseUnityPlugin
             AudioFileWatcher.ReloadAudio = false;
             AudioHandler.Reload();
         }
+
+        AnimationController.Update();
     }
 
     private void OnGUI()
