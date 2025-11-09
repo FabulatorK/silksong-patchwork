@@ -1,6 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using HarmonyLib;
 using Patchwork;
+using Patchwork.Handlers;
+using Patchwork.Util;
 using UnityEngine;
 
 [HarmonyPatch]
@@ -220,6 +224,26 @@ public static class AnimationController
             }
             GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]");
             GUILayout.EndHorizontal();
+
+            if (SelectedAnimator == name)
+            {
+                if (GUILayout.Button("Edit Current Sprite"))
+                {
+                    SpriteDumper.DumpSingleSprite(currentFrameDef, spriteCollection);
+                    if (!File.Exists(Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png")))
+                        Plugin.Logger.LogError($"Failed to dump sprite for editing: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+                    else
+                    {
+                        IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0]));
+                        File.Copy(
+                            Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
+                            Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
+                            true
+                        );
+                        Process.Start(@Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"));
+                    }
+                }
+            }
         }
         GUILayout.EndVertical();
         GUILayout.EndScrollView();
