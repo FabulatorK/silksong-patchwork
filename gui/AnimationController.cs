@@ -156,6 +156,28 @@ public static class AnimationController
 
         if (Frozen && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var frozenAnimator))
             frozenAnimator.gameObject.transform.position = FrozenPosition;
+
+        for (int i = 0; i < Animators.Count; i++)
+        {
+            var kvp = new List<KeyValuePair<string, tk2dSpriteAnimator>>(Animators)[i];
+            string name = kvp.Key;
+            tk2dSpriteAnimator checkAnimator = kvp.Value;
+
+            if (checkAnimator == null || checkAnimator.gameObject == null || !checkAnimator.gameObject.activeSelf || checkAnimator.CurrentClip == null)
+            {
+                Animators.Remove(name);
+                if (SelectedAnimator == name)
+                    SelectedAnimator = null;
+                continue;
+            }
+            if (checkAnimator.CurrentFrame < 0 || checkAnimator.CurrentFrame >= checkAnimator.CurrentClip.frames.Length)
+            {
+                Animators.Remove(name);
+                if (SelectedAnimator == name)
+                    SelectedAnimator = null;
+                continue;
+            }
+        }
     }
 
     private static void SelectAnimator(tk2dSpriteAnimator animator)
