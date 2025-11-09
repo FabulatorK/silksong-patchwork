@@ -198,18 +198,19 @@ public static class AnimationController
             if (GUILayout.Button(name, GUILayout.ExpandWidth(false)))
                 SelectAnimator(animator);
             GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+            GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]");
 
             if (Paused && SelectedAnimator == name)
             {
                 GUI.contentColor = Color.red;
-                GUILayout.Label(" [PAUSED]");
+                GUILayout.Label("[P]");
                 GUI.contentColor = Color.white;
             }
 
             if (Frozen && SelectedAnimator == name)
             {
                 GUI.contentColor = Color.cyan;
-                GUILayout.Label(" [FROZEN]");
+                GUILayout.Label("[F]");
                 GUI.contentColor = Color.white;
             }
 
