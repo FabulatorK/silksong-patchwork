@@ -72,17 +72,12 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
-        SceneManager.sceneLoaded += (scene, mode) =>
-        {
-            AnimationController.ClearAnimators();
-            var animators = Resources.FindObjectsOfTypeAll<tk2dSpriteAnimator>();
-            foreach (var animator in animators)
-                AnimationController.RegisterAnimator(animator);
-        };
+        SceneManager.sceneLoaded += (scene, mode) => AnimationController.ClearAnimators();
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
         AudioHandler.ApplyPatches(harmony);
+        AnimationController.ApplyPatches(harmony);
     }
 
     private void FindPatchworkFolder()

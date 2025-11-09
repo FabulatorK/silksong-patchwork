@@ -1,15 +1,18 @@
 using System.Collections.Generic;
+using HarmonyLib;
 using Patchwork;
 using UnityEngine;
 
+[HarmonyPatch]
 public static class AnimationController
 {
     private static Vector2 scrollPosition = Vector2.zero;
-    private static Rect windowRect = new Rect(Screen.width / 2 - 300, 10, 600, 800);
+    private static Rect windowRect = new Rect(Screen.width / 3, 10, 600, 800);
 
     public static string SelectedAnimator { get; private set; } = null;
 
     private static bool Paused = false;
+    private static bool FrameChangeRequested = false;
     private static bool Frozen = false;
     private static Vector3 FrozenPosition;
 
@@ -26,11 +29,80 @@ public static class AnimationController
         animators.Clear();
     }
 
-    public static void DrawAnimationController()
+    #region Patching
+    public static void ApplyPatches(Harmony harmony)
     {
-        windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller");
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.Play)),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayPatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.Play), new[] { typeof(string) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayWithNamePatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.Play), new[] { typeof(tk2dSpriteAnimationClip) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayWithClipPatch))
+        );
+
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFromFrame), new[] { typeof(int) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromFramePatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFromFrame), new[] { typeof(string), typeof(int) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromFrameWithNamePatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFromFrame), new[] { typeof(tk2dSpriteAnimationClip), typeof(int) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromFrameWithClipPatch))
+        );
+
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFrom), new[] { typeof(float) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromPatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFrom), new[] { typeof(string), typeof(float) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromWithNamePatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.PlayFrom), new[] { typeof(tk2dSpriteAnimationClip), typeof(float) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayFromWithClipPatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(tk2dSpriteAnimator), nameof(tk2dSpriteAnimator.Play), new[] { typeof(tk2dSpriteAnimationClip), typeof(float), typeof(float) }),
+            prefix: new HarmonyMethod(typeof(AnimationController), nameof(PlayOverrideFpsPatch))
+        );
+
     }
 
+    private static bool PlayPatchInternal(tk2dSpriteAnimator __instance)
+    {
+        if (__instance != null)
+        {
+            RegisterAnimator(__instance);
+            if (SelectedAnimator == __instance.gameObject.name && Paused && !FrameChangeRequested)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static bool PlayPatch(tk2dSpriteAnimator __instance) => PlayPatchInternal(__instance);
+    public static bool PlayWithNamePatch(tk2dSpriteAnimator __instance, string name) => PlayPatchInternal(__instance);
+    public static bool PlayWithClipPatch(tk2dSpriteAnimator __instance, tk2dSpriteAnimationClip clip) => PlayPatchInternal(__instance);
+    public static bool PlayFromFramePatch(tk2dSpriteAnimator __instance, int frame) => PlayPatchInternal(__instance);
+    public static bool PlayFromFrameWithNamePatch(tk2dSpriteAnimator __instance, string name, int frame) => PlayPatchInternal(__instance);
+    public static bool PlayFromFrameWithClipPatch(tk2dSpriteAnimator __instance, tk2dSpriteAnimationClip clip, int frame) => PlayPatchInternal(__instance);
+    public static bool PlayFromPatch(tk2dSpriteAnimator __instance, float clipStartTime) => PlayPatchInternal(__instance);
+    public static bool PlayFromWithNamePatch(tk2dSpriteAnimator __instance, string name, float clipStartTime) => PlayPatchInternal(__instance);
+    public static bool PlayFromWithClipPatch(tk2dSpriteAnimator __instance, tk2dSpriteAnimationClip clip, float clipStartTime) => PlayPatchInternal(__instance);
+    public static bool PlayOverrideFpsPatch(tk2dSpriteAnimator __instance, tk2dSpriteAnimationClip clip, float clipStartTime, float overrideFps) => PlayPatchInternal(__instance);
+    #endregion
+
+    #region Functionality
     public static void Update()
     {
         if (Input.GetKeyDown(Plugin.Config.AnimationControllerPauseKey) && SelectedAnimator != null)
@@ -39,9 +111,9 @@ public static class AnimationController
             if (animators.TryGetValue(SelectedAnimator, out var animator))
             {
                 if (Paused)
-                    animator.Paused = true;
+                    animator.Pause();
                 else
-                    animator.Paused = false;
+                    animator.Resume();
             }
         }
 
@@ -59,16 +131,20 @@ public static class AnimationController
                 int nextFrame = selectedAnimator.CurrentFrame + 1;
                 if (nextFrame >= selectedAnimator.CurrentClip.frames.Length)
                     nextFrame = 0;
+                FrameChangeRequested = true;
                 selectedAnimator.PlayFromFrame(nextFrame);
                 selectedAnimator.UpdateAnimation(Time.deltaTime);
+                FrameChangeRequested = false;
             }
             if (Input.GetKeyDown(Plugin.Config.AnimationControllerPrevFrameKey))
             {
                 int prevFrame = selectedAnimator.CurrentFrame - 1;
                 if (prevFrame < 0)
                     prevFrame = selectedAnimator.CurrentClip.frames.Length - 1;
+                FrameChangeRequested = true;
                 selectedAnimator.PlayFromFrame(prevFrame);
                 selectedAnimator.UpdateAnimation(Time.deltaTime);
+                FrameChangeRequested = false;
             }
         }
 
@@ -84,6 +160,13 @@ public static class AnimationController
             Paused = false;
         }
         SelectedAnimator = animator.gameObject.name;
+    }
+    #endregion
+
+    #region GUI
+    public static void DrawAnimationController()
+    {
+        windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller");
     }
 
     private static void AnimationControllerWindow(int windowID)
@@ -136,4 +219,5 @@ public static class AnimationController
         GUILayout.EndScrollView();
         GUI.DragWindow(new Rect(0, 0, 10000, 20));
     }
+    #endregion
 }
