@@ -229,18 +229,24 @@ public static class AnimationController
             {
                 if (GUILayout.Button("Edit Current Sprite"))
                 {
-                    SpriteDumper.DumpSingleSprite(currentFrameDef, spriteCollection);
-                    if (!File.Exists(Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png")))
-                        Plugin.Logger.LogError($"Failed to dump sprite for editing: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+                    string openPath = Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
+                    if (File.Exists(openPath))
+                        Process.Start(openPath);
                     else
                     {
-                        IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0]));
-                        File.Copy(
-                            Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
-                            Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
-                            true
-                        );
-                        Process.Start(@Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"));
+                        SpriteDumper.DumpSingleSprite(currentFrameDef, spriteCollection);
+                        if (!File.Exists(Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png")))
+                            Plugin.Logger.LogError($"Failed to dump sprite for editing: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+                        else
+                        {
+                            IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0]));
+                            File.Copy(
+                                Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
+                                openPath,
+                                true
+                            );
+                            Process.Start(openPath);
+                        }
                     }
                 }
             }
