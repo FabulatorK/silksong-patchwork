@@ -20,17 +20,19 @@ public static class AnimationController
     private static bool Frozen = false;
     private static Vector3 FrozenPosition;
 
-    private static Dictionary<string, tk2dSpriteAnimator> animators = new Dictionary<string, tk2dSpriteAnimator>();
+    private static readonly Dictionary<string, bool> ShowAnimationDropdown = new Dictionary<string, bool>();
+
+    private static readonly Dictionary<string, tk2dSpriteAnimator> Animators = new Dictionary<string, tk2dSpriteAnimator>();
 
     public static void RegisterAnimator(tk2dSpriteAnimator animator)
     {
-        if (animator != null && !animators.ContainsKey(animator.gameObject.name))
-            animators.Add(animator.gameObject.name, animator);
+        if (animator != null && !Animators.ContainsKey(animator.gameObject.name))
+            Animators.Add(animator.gameObject.name, animator);
     }
 
     public static void ClearAnimators()
     {
-        animators.Clear();
+        Animators.Clear();
     }
 
     #region Patching
@@ -112,7 +114,7 @@ public static class AnimationController
         if (Input.GetKeyDown(Plugin.Config.AnimationControllerPauseKey) && SelectedAnimator != null)
         {
             Paused = !Paused;
-            if (animators.TryGetValue(SelectedAnimator, out var animator))
+            if (Animators.TryGetValue(SelectedAnimator, out var animator))
             {
                 if (Paused)
                     animator.Pause();
@@ -124,11 +126,11 @@ public static class AnimationController
         if (Input.GetKeyDown(Plugin.Config.AnimationControllerFreezeKey) && SelectedAnimator != null)
         {
             Frozen = !Frozen;
-            if (animators.TryGetValue(SelectedAnimator, out var animator))
+            if (Animators.TryGetValue(SelectedAnimator, out var animator))
                 FrozenPosition = animator.gameObject.transform.position;
         }
 
-        if (Paused && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var selectedAnimator))
+        if (Paused && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var selectedAnimator))
         {
             if (Input.GetKeyDown(Plugin.Config.AnimationControllerNextFrameKey))
             {
@@ -152,13 +154,14 @@ public static class AnimationController
             }
         }
 
-        if (Frozen && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var frozenAnimator))
+        if (Frozen && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var frozenAnimator))
             frozenAnimator.gameObject.transform.position = FrozenPosition;
     }
 
     private static void SelectAnimator(tk2dSpriteAnimator animator)
     {
-        if (Paused && SelectedAnimator != null && animators.TryGetValue(SelectedAnimator, out var currentAnimator))
+        Frozen = false;
+        if (Paused && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var currentAnimator))
         {
             currentAnimator.Paused = false;
             Paused = false;
@@ -179,7 +182,7 @@ public static class AnimationController
     {
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
         GUILayout.BeginVertical();
-        foreach (var kvp in animators)
+        foreach (var kvp in Animators)
         {
             string name = kvp.Key;
             tk2dSpriteAnimator animator = kvp.Value;
@@ -207,6 +210,35 @@ public static class AnimationController
             GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
 
             GUILayout.FlexibleSpace();
+
+            if (SelectedAnimator == name)
+            {
+                GUILayout.BeginVertical();
+                if (GUILayout.Button(animator.CurrentClip.name + (ShowAnimationDropdown.GetValueOrDefault(name, false) ? " ▲" : " ▼")))
+                    ShowAnimationDropdown[name] = !ShowAnimationDropdown.GetValueOrDefault(name, false);
+                if (ShowAnimationDropdown.GetValueOrDefault(name, false))
+                {
+                    foreach (var clip in animator.Library.clips)
+                    {
+                        if (string.IsNullOrEmpty(clip.name))
+                            continue;
+                        if (GUILayout.Button(clip.name))
+                        {
+                            Paused = true;
+                            animator.Pause();
+                            ShowAnimationDropdown[name] = false;
+                            FrameChangeRequested = true;
+                            animator.Play(clip);
+                            animator.UpdateAnimation(Time.deltaTime);
+                            FrameChangeRequested = false;
+                        }
+                    }
+                }
+                GUILayout.EndVertical();
+            }
+            else
+                GUILayout.Label(animator.CurrentClip.name);
+
             if (Paused && SelectedAnimator == name)
             {
                 Color temp = GUI.contentColor;
