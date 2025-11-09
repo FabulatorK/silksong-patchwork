@@ -7,7 +7,7 @@ using UnityEngine;
 public static class AnimationController
 {
     private static Vector2 scrollPosition = Vector2.zero;
-    private static Rect windowRect = new Rect(Screen.width / 3, 10, 600, 800);
+    private static Rect windowRect;
 
     public static string SelectedAnimator { get; private set; } = null;
 
@@ -166,7 +166,9 @@ public static class AnimationController
     #region GUI
     public static void DrawAnimationController()
     {
-        windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller");
+        if (windowRect.width == 0)
+            windowRect = new Rect(Screen.width - Screen.width / 3 - 10, 10, Screen.width / 3, Screen.height / 3);
+        windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller", GUILayout.MinWidth(300), GUILayout.MinHeight(200));
     }
 
     private static void AnimationControllerWindow(int windowID)
@@ -194,26 +196,29 @@ public static class AnimationController
             else
                 GUI.contentColor = Color.white;
 
-            GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
-            if (GUILayout.Button(name, GUILayout.ExpandWidth(false)))
+            if (GUILayout.Button(name))
                 SelectAnimator(animator);
-            GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
-            GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]");
 
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
+
+            GUILayout.FlexibleSpace();
             if (Paused && SelectedAnimator == name)
             {
+                Color temp = GUI.contentColor;
                 GUI.contentColor = Color.red;
-                GUILayout.Label("[P]");
-                GUI.contentColor = Color.white;
+                GUILayout.Label("[PAUSED]");
+                GUI.contentColor = temp;
             }
 
             if (Frozen && SelectedAnimator == name)
             {
+                Color temp = GUI.contentColor;
                 GUI.contentColor = Color.cyan;
-                GUILayout.Label("[F]");
-                GUI.contentColor = Color.white;
+                GUILayout.Label("[FROZEN]");
+                GUI.contentColor = temp;
             }
-
+            GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]");
             GUILayout.EndHorizontal();
         }
         GUILayout.EndVertical();
