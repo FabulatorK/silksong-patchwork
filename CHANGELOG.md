@@ -1,3 +1,10 @@
+### v2.3.0
+* Implemented the Patchwork Animation Controller:
+  * Freeze the in-world locations of game objects for easier testing
+  * Pause animations and step through them frame by frame ingame
+  * Force-play animations ingame, selectable through a dropdown menu
+  * "Edit Current Sprite" button, which automatically dumps the currently shown sprite and opens it for editing
+
 ### v2.2.4
 * Added support for all Unity-supported audio formats
 

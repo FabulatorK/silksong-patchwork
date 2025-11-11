@@ -29,22 +29,33 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 * `LoadSprites`: On by default, lets you disable custom textures if you would like that for whatever reason.
 
 ### Audio
-* `ShowAudioLog`: Shows a window that logs the names of all sounds that are being played that Patchwork has access to. If you're adding custom files to the "Sounds" folder, you must name them exactly the same as shown in order for Patchwork to replace them.
-* `ShowAudioList`: Shows a window that lists all statically loaded sound effects. Can be used to find names of sounds which don't show up in the Audio Log.
 * `LogAudioDuration`: How long the name of a sound is shown in the log after being played, in seconds. (Default: 5)
 * `HideModdedAudioInLog`: On by default. If enabled, sounds which already have a modded file are omitted from the log. This makes it easier to find the names of specific sounds you want to mod.
 
-## Texture Creation Guide
-1. Dump the textures you want to modify. 
-   * Enable the `DumpSprites` option in the mod config, boot up the game and enter the areas where the sprites you want to modify are loaded. You can also press the "Full Dump" key (Default: F6) to dump all sprites, but this takes quite a while!
-2. Put the sprites you want to modify into "Patchwork/Sprites" in your game folder.
-   * You can put them into as many subfolders as you want, but the names of the last two folders MUST be the same as in the dump (for example: "Patchwork/Sprites/HUD Cln/atlas0" is fine, so is "Patchwork/Sprites/SomeTexturePack/HUD Cln/atlas0")
-3. If you make changes to the files while they are in the Sprites folder, they will automatically be shown ingame.
+### Menu Hotkeys
+* `ShowAudioLog`: Keybind for showing the audio log window that logs the names of all sounds that are being played that Patchwork has access to. If you're adding custom files to the "Sounds" folder, you must name them exactly the same as shown in order for Patchwork to replace them. (Default: 1)
+* `ShowAudioList`: Keybind for showing the audio list, which lists all statically loaded sound effects. Can be used to find names of sounds which don't show up in the Audio Log. (Default: 2)
+* `ShowAnimationController`: Keybind for showing the animation controller, which lets you freeze individual objects, pause and play specific animations, and pick individual sprite images to be dumped and edited immediately. (Default: 3)
 
-**WARNING:** Putting *all* dumped sprites into the Sprites folder may cause issues due to duplicate sprites. It's a good idea to only put sprites into the folder you're actively working on, and add more later. For more information, refer to the "Known Issues" section.
+### Animation Controller Hotkeys
+* `AnimationControllerPauseKey`: Toggles the "Paused" state on the currently selected object, freezing the animation and allowing for manual frame selection.
+* `AnimationControllerNextFrameKey`: Advances the animation by one frame, if the selected object is paused
+* `AnimationControllerPrevFrameKey`: Shows the previous frame of the animation, if the selected object is paused
+* `AnimationControllerFreezeKey`: Toggles the "Frozen" state on the currently selected object, locking its position within the game world, to make animations that include movement easier to see and test.
+
+## Texture Creation Guide
+1. Load a save file and open the Patchwork Animation Controller (this is bound to the "3" key by default)
+2. Open the pause menu and click the name of the object you want to modify the sprites of. It should then turn green in the Animation Controller
+3. Select the animation you want to edit using the dropdown, or pause the sprite with the animation controller pause key (by default "Home") while it's doing the animation you want to edit
+4. Use the animation controller frame forwards/backwards keys (by default "Page Up"/"Insert" respectively) to select the specific frame you want to edit
+5. Click the "Edit Current Sprite" button (you may have to open the pause menu again for this if you've closed it)
+6. The sprite will now open up in your default image editing program. Edit it as you like and save the file.
+7. Your edited sprite will now automatically appear in the game while it's still running. You don't need to restart the game to apply your changes.
+
+**NOTE:** You can find your custom sprites at `BepInEx/plugins/Ashiepaws-Patchwork/Sprites` after clicking the "Edit Current Sprite" button.
 
 ## Audio Creation Guide
-1. Enable the `ShowAudioLog` and `ShowAudioList` options in the mod config and boot up the game.
+1. Open the audio log and audio list windows after booting the game. (By default these are mapped to the "1" and "2" keys)
 2. Cause the sound you want to modify to be played. You should see its name pop up in the Audio Log in the top right corner of the screen.
    * If you don't see your sound show up in the Audio Log, it may be a pre-loaded one. Make sure to check the Loaded Audio list in that case.
 3. Put an audio file with the same name you saw in the Audio Log (or Loaded Audio list) into the "Patchwork/Sounds" folder. For example, to replace the title screen music, you'd name the file "Title.wav" or "Title.mp3".
@@ -70,15 +81,6 @@ YourName-PackName.zip
          \- Sounds
              \- <your files here...>
 ```
-
-## Known Issues
-
-### Duplicate Sprites
-Some sprite textures have multiple definitions within the game files, meaning that while the game treats them as two separate textures, they take up the same space on the spritesheet. When dropping the full set of dumped sprites into the Patchwork folder, this may cause sprites to overwrite each other. (This is for example the case on Hornet's "idle" sprites.)
-
-**Temporary Solution:** Only keep the Sprites you've already modified in your Patchwork folder, and move them there as you create new ones. The auto-reload feature will work regardless, and there's no risk of conflicts.
-
-I am investigating a way to detect and handle these duplicate sprites, and this issue should be resolved at some point in the future with an update.
 
 ## Special Thanks
 
