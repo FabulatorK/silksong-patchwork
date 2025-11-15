@@ -37,13 +37,19 @@ public static class AudioHandler
     public static void PlayHelperPatch(AudioSource source, ulong delay)
     {
         if (source.clip != null)
+        {
             AudioLog.LogAudio(source.clip);
+            LoadAudio(source);
+        }
     }
 
     public static void PlayOneShotHelperPatch(AudioSource source, ref AudioClip clip, float volumeScale)
     {
         if (clip != null)
+        {
             AudioLog.LogAudio(clip);
+            LoadAudio(ref clip);
+        }
     }
 
     public static void ClipSetterPatch(AudioSource __instance, AudioClip value)
@@ -82,6 +88,26 @@ public static class AudioHandler
         {
             LoadedClips[clipName] = loadedClip;
             source.clip = loadedClip;
+        }
+    }
+
+    public static void LoadAudio(ref AudioClip clip)
+    {
+        if (clip == null || string.IsNullOrEmpty(clip?.name))
+            return;
+        string clipName = clip.name.Replace("PATCHWORK_", "");
+
+        if (LoadedClips.ContainsKey(clipName))
+        {
+            clip = LoadedClips[clipName];
+            return;
+        }
+
+        AudioClip loadedClip = LoadWav(clipName);
+        if (loadedClip != null)
+        {
+            LoadedClips[clipName] = loadedClip;
+            clip = loadedClip;
         }
     }
 
