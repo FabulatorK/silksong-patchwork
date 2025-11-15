@@ -1,3 +1,7 @@
+### v2.3.1
+* Fixed sprite loading breaking in certain areas
+* Fixed non-statically loaded audio not being replaced
+
 ### v2.3.0
 * Implemented the Patchwork Animation Controller:
   * Freeze the in-world locations of game objects for easier testing
