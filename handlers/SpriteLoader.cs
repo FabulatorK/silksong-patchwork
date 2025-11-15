@@ -19,6 +19,9 @@ public static class SpriteLoader
     {
         foreach (var mat in collection.materials)
         {
+            if (mat == null)
+                continue;
+                
             string matname = mat.name.Split(' ')[0];
             if (!LoadedAtlases.ContainsKey(collection.name))
                 LoadedAtlases[collection.name] = new HashSet<string>();
