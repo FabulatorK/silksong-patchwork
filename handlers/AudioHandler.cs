@@ -83,7 +83,7 @@ public static class AudioHandler
             return;
         }
 
-        AudioClip loadedClip = LoadWav(clipName);
+        AudioClip loadedClip = LoadAudioClip(clipName);
         if (loadedClip != null)
         {
             LoadedClips[clipName] = loadedClip;
@@ -103,7 +103,7 @@ public static class AudioHandler
             return;
         }
 
-        AudioClip loadedClip = LoadWav(clipName);
+        AudioClip loadedClip = LoadAudioClip(clipName);
         if (loadedClip != null)
         {
             LoadedClips[clipName] = loadedClip;
@@ -116,7 +116,7 @@ public static class AudioHandler
         LoadedClips.Remove(soundName);
     }
 
-    public static AudioClip LoadWav(string soundName)
+    public static AudioClip LoadAudioClip(string soundName)
     {
         string path = GetSoundPath(soundName);
         if (string.IsNullOrEmpty(path))
