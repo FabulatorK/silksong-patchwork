@@ -34,14 +34,15 @@ public static class SpriteLoader
         {
             if (mat == null)
                 continue;
-                
-            string matname = mat.name.Split(' ')[0];
+            
+            string matname = mat.name;
+            string matnameAbbr = mat.name.Split(' ')[0];
             if (!LoadedAtlases.ContainsKey(collection.name))
                 LoadedAtlases[collection.name] = new HashSet<string>();
             if (LoadedAtlases[collection.name].Add(matname))
             {
                 var unreadableTex = mat.mainTexture;
-                mat.mainTexture = FindSpritesheet(collection, matname);
+                mat.mainTexture = FindSpritesheet(collection, matnameAbbr);
                 if (!LoadedAtlasesTextures.ContainsKey(collection.name))
                     LoadedAtlasesTextures[collection.name] = new Dictionary<string, RenderTexture>();
                 LoadedAtlasesTextures[collection.name][matname] = mat.mainTexture as RenderTexture;
@@ -63,7 +64,7 @@ public static class SpriteLoader
                     LoadedSprites[collection.name][matname] = new HashSet<string>();
                 if (!LoadedSprites[collection.name][matname].Add(def.name)) continue;
 
-                Texture2D spriteTex = FindSprite(collection.name, matname, def.name);
+                Texture2D spriteTex = FindSprite(collection.name, matnameAbbr, def.name);
                 if (spriteTex == null) continue;
 
                 Rect spriteRect = SpriteUtil.GetSpriteRect(def, mat.mainTexture);
