@@ -26,7 +26,6 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 ### Sprites
 
 * `DumpSprites`: Enables sprite dumping, which saves sprites for any loaded scene into the "Patchwork/Dumps" folder. These files can be used to make new texture packs. DO NOT enable this during normal gameplay, as it slows down loading the game by a lot. If this is enabled, the mod will also let you dump textures from all scenes in the game by pressing the button configured under "Keybinds/FullDumpKey" (Default: F6)
-* `LoadSprites`: On by default, lets you disable custom textures if you would like that for whatever reason.
 
 ### Audio
 * `LogAudioDuration`: How long the name of a sound is shown in the log after being played, in seconds. (Default: 5)

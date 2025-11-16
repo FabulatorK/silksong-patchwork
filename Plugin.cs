@@ -58,18 +58,6 @@ public class Plugin : BaseUnityPlugin
             };
         }
 
-        if (Config.LoadSprites)
-        {
-            SceneManager.sceneLoaded += (scene, mode) =>
-            {
-                Logger.LogInfo($"Loading sprites for scene {scene.name}");
-                var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
-                foreach (var collection in spriteCollections)
-                    SpriteLoader.LoadCollection(collection);
-                Logger.LogInfo($"Finished loading sprites for scene {scene.name}");
-            };
-        }
-
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
         SceneManager.sceneLoaded += (scene, mode) => AnimationController.ClearAnimators();
@@ -78,6 +66,7 @@ public class Plugin : BaseUnityPlugin
         harmony.PatchAll();
         AudioHandler.ApplyPatches(harmony);
         AnimationController.ApplyPatches(harmony);
+        SpriteLoader.ApplyPatches(harmony);
     }
 
     private void FindPatchworkFolder()

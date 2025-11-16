@@ -4,16 +4,29 @@ using System.Linq;
 using UnityEngine;
 using Patchwork.Util;
 using UnityEngine.SceneManagement;
+using HarmonyLib;
 
 namespace Patchwork.Handlers;
 
+[HarmonyPatch]
 public static class SpriteLoader
 {
     public static string LoadPath { get { return Path.Combine(Plugin.BasePath, "Sprites"); } }
     public static string AtlasLoadPath { get { return Path.Combine(Plugin.BasePath, "Spritesheets"); } }
 
     private static readonly Dictionary<string, HashSet<string>> LoadedAtlases = new();
+    private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
+
+    public static void ApplyPatches(Harmony harmony)
+    {
+        harmony.Patch(
+            original: AccessTools.Method(typeof(tk2dSpriteCollectionData), nameof(tk2dSpriteCollectionData.Init)),
+            postfix: new HarmonyMethod(typeof(SpriteLoader), nameof(InitPostfix))
+        );
+    }
+
+    private static void InitPostfix(tk2dSpriteCollectionData __instance) => LoadCollection(__instance);
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
@@ -29,6 +42,11 @@ public static class SpriteLoader
             {
                 var unreadableTex = mat.mainTexture;
                 mat.mainTexture = FindSpritesheet(collection, matname);
+                if (!LoadedAtlasesTextures.ContainsKey(collection.name))
+                    LoadedAtlasesTextures[collection.name] = new Dictionary<string, RenderTexture>();
+                LoadedAtlasesTextures[collection.name][matname] = mat.mainTexture as RenderTexture;
+            } else {
+                mat.mainTexture = LoadedAtlasesTextures[collection.name][matname];
             }
 
             var previous = RenderTexture.active;

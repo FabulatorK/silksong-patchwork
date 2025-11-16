@@ -25,8 +25,7 @@ public static class T2DHandler
         if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
             HandleDump(__instance, value);
 
-        if (Plugin.Config.LoadSprites)
-            HandleLoad(__instance, value);
+        HandleLoad(__instance, value);
     }
 
     public static void InvalidateCache(string spriteName)
