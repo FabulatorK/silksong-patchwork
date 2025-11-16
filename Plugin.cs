@@ -67,6 +67,7 @@ public class Plugin : BaseUnityPlugin
         AudioHandler.ApplyPatches(harmony);
         AnimationController.ApplyPatches(harmony);
         SpriteLoader.ApplyPatches(harmony);
+        VideoHandler.ApplyPatches(harmony);
     }
 
     private void FindPatchworkFolder()
@@ -133,5 +134,6 @@ public class Plugin : BaseUnityPlugin
         IOUtil.EnsureDirectoryExists(SpriteLoader.AtlasLoadPath);
         IOUtil.EnsureDirectoryExists(T2DHandler.T2DDumpPath);
         IOUtil.EnsureDirectoryExists(AudioHandler.SoundFolder);
+        IOUtil.EnsureDirectoryExists(VideoHandler.VideoLoadPath);
     }
 }
