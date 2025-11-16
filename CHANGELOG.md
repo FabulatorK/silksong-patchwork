@@ -1,3 +1,6 @@
+### v2.3.3
+* Fixed custom sprites not appearing for some enemy sprites that include Hornet
+
 ### v2.3.2
 * Fixed some custom sprites reverting to default sprites after death
 * Removed `LoadSprites` config option
