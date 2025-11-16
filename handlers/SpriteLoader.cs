@@ -152,8 +152,13 @@ public static class SpriteLoader
     {
         lock (LoadedSprites)
         {
-            if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
-                LoadedSprites[collectionName][atlasName].Remove(spriteName);
+            if (!LoadedSprites.ContainsKey(collectionName))
+                return;
+            foreach (string key in LoadedSprites[collectionName].Keys.ToList())
+            {
+                if (key.StartsWith(atlasName))
+                    LoadedSprites[collectionName][key].Remove(spriteName);
+            }
         }
     }
 
@@ -163,10 +168,15 @@ public static class SpriteLoader
         lock (LoadedAtlases)
         {
             if (LoadedAtlases.ContainsKey(collectionName))
-                LoadedAtlases[collectionName].Remove(atlasName);
-
-            if (LoadedSprites.ContainsKey(collectionName) && LoadedSprites[collectionName].ContainsKey(atlasName))
-                LoadedSprites[collectionName][atlasName].Clear();
+            {
+                foreach (string key in LoadedAtlases[collectionName].Where(a => a.StartsWith(atlasName)).ToList())
+                    LoadedAtlases[collectionName].Remove(key);
+            }
+            if (LoadedSprites.ContainsKey(collectionName))
+            {
+                foreach (string key in LoadedSprites[collectionName].Keys.Where(a => a.StartsWith(atlasName)).ToList())
+                    LoadedSprites[collectionName][key].Clear();
+            }
         }
     }
     
