@@ -14,17 +14,16 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 * Automatic reloading of assets when files change, so you can see your skin ingame immediately without closing the game
 * Built-in sprite dumping functionality
 * Audio replacement supporting both sound effects and music
+* Cutscene replacement with no fuss - simple video file drag & drop
 
 ### Planned features
 * Conditional sprites (e.g. different textures for Hornet depending on crest, health, etc.)
 * Ingame asset pack manager
-* Support for cutscene replacements
 * Support for text replacements
 
 ## Configuration
 
 ### Sprites
-
 * `DumpSprites`: Enables sprite dumping, which saves sprites for any loaded scene into the "Patchwork/Dumps" folder. These files can be used to make new texture packs. DO NOT enable this during normal gameplay, as it slows down loading the game by a lot. If this is enabled, the mod will also let you dump textures from all scenes in the game by pressing the button configured under "Keybinds/FullDumpKey" (Default: F6)
 
 ### Audio
@@ -62,6 +61,13 @@ A custom asset mod for Hollow Knight: Silksong with particular attention to ease
 
 **NOTE:** Patchwork supports all [Unity-supported audio formats.](https://docs.unity3d.com/Manual/AudioFiles-compatibility.html)
 
+## Cutscene Replacement Guide
+1. Find the internal name of the cutscene you want to replace. You can find a list of all available cutscenes [here.](https://github.com/Ashiepaws/silksong-patchwork/wiki/Cutscene-Names)
+2. Put your replacement video file in the `plugins/Ashiepaws-Patchwork/Videos` folder, naming it the same as the cutscene you want to replace. (For example: `Intro_Cinematic.mp4`)
+3. Your video file will now play instead of the cutscene!
+
+**NOTE:** Patchwork supports all [Unity-supported video formats.](https://docs.unity3d.com/Manual/VideoSources-FileCompatibility.html)
+
 ## Publishing Packs on Thunderstore
 
 Patchwork is structured in a way that lets creators publish their packs as plugins on Thunderstore! In order to be automatically installed correctly when players download them, make sure to follow the following structure with your plugins:
@@ -77,7 +83,9 @@ YourName-PackName.zip
          |   \- <your files here...>
          |- Spritesheets
          |   \- <your files here...>
-         \- Sounds
+         |- Sounds
+         |   \- <your files here...>
+         \- Videos
              \- <your files here...>
 ```
 
