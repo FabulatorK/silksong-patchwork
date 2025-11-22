@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using HarmonyLib;
 using TeamCherry.Cinematics;
+using UnityEngine;
 
 namespace Patchwork.Handlers;
 
@@ -70,14 +71,22 @@ public class VideoHandler
             return;
         
         __instance.videoPlayer.url = customVideoPath;
+        __instance.videoPlayer.clip = null;
         __instance.videoPlayer.playbackSpeed = 1f;
 
         if (config.AudioSource)
         {
+            AudioSource audioSource = config.AudioSource.gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
             __instance.videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.AudioSource;
-            __instance.videoPlayer.SetTargetAudioSource(0, config.AudioSource);
+            __instance.videoPlayer.SetTargetAudioSource(0, audioSource);
+            __instance.videoPlayer.controlledAudioTrackCount = 1;
+            audioSource.volume = 1.0f;
         } else
+        {
+            Plugin.Logger.LogWarning($"Using custom video file '{config.VideoReference.VideoFileName}' with direct audio output. This may result in no audio being played.");
             __instance.videoPlayer.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.Direct;
+        }
         
         __instance.videoPlayer.Prepare();
     }
