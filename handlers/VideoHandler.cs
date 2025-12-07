@@ -26,6 +26,10 @@ public class VideoHandler
             original: AccessTools.Method(typeof(EmbeddedCinematicVideoPlayer), nameof(EmbeddedCinematicVideoPlayer.Update)),
             postfix: new HarmonyMethod(typeof(VideoHandler), nameof(UpdatePostfix))
         );
+        harmony.Patch(
+            original: AccessTools.Method(typeof(CinematicPlayer), nameof(CinematicPlayer.StartVideo)),
+            prefix: new HarmonyMethod(typeof(VideoHandler), nameof(StartVideoPrefix))
+        );
     }
 
     private static string FindVideoFile(string name)
@@ -56,6 +60,12 @@ public class VideoHandler
 
         VideoFileMap[name] = null;
         return null;
+    }
+
+    private static void StartVideoPrefix(CinematicPlayer __instance)
+    {
+        if (__instance.videoClip.VideoFileName != null && FindVideoFile(__instance.videoClip.VideoFileName) != null)
+            __instance.additionalAudio = null;
     }
 
     private static void UpdatePostfix(EmbeddedCinematicVideoPlayer __instance)
