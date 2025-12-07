@@ -7,6 +7,10 @@
 
 A custom asset mod for Hollow Knight: Silksong with particular attention to ease of creation.
 
+# IMPORTANT NOTES BEFORE UPDATING PATCHWORK!
+**ALWAYS KEEP BACKUPS OF YOUR IN-PROGRESS ASSET PACKS OUTSIDE OF THE PATCHWORK FOLDER!!!**
+Thunderstore (and Gale) delete all asset folder inside the Patchwork folder when updating to a new version. Please always back up asset packs you're working on in a safe location outside of any game folders.
+
 ## Features
 * Sprite replacement with individual sprite image files, including proper names, rotations & sizing - no more bulky spritesheets
 * Support for Texture2D Sprites (which previously required Silksong Customizer + CustomizerT2D)
