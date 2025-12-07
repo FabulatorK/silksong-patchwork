@@ -1,3 +1,6 @@
+### v2.4.0
+* Implemented cutscene replacement support
+
 ### v2.3.3
 * Fixed custom sprites not appearing for some enemy sprites that include Hornet
 
