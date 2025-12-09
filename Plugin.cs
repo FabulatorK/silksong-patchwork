@@ -10,6 +10,7 @@ using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Patchwork.Watchers;
+using TeamCherry.Localization;
 
 namespace Patchwork;
 
@@ -57,6 +58,9 @@ public class Plugin : BaseUnityPlugin
                 Logger.LogInfo($"Finished dumping sprites for scene {scene.name}");
             };
         }
+
+        if (Config.DumpText)
+            SceneManager.sceneLoaded += (scene, mode) => { if (scene.name == "Pre_Menu_Intro") DialogueHandler.DumpText(); };
 
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 

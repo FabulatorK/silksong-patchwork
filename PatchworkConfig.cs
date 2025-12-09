@@ -10,6 +10,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _FullDumpKey = null;
     public UnityEngine.KeyCode FullDumpKey { get { return _FullDumpKey.Value; } }
 
+    private readonly ConfigEntry<bool> _DumpText;
+    public bool DumpText { get { return _DumpText.Value; } }
+
     private readonly ConfigEntry<double> _LogAudioDuration;
     public double LogAudioDuration { get { return _LogAudioDuration.Value; } }
 
@@ -42,7 +45,8 @@ public class PatchworkConfig
         _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
         _HideModdedAudioInLog = config.Bind("Audio", "HideModdedAudioInLog", true, "Hide modded audio clips from the audio log.");
 
-        _DumpSprites = config.Bind("Sprites", "DumpSprites", false, "Enable dumping of sprites");
+        _DumpSprites = config.Bind("Dumping", "DumpSprites", false, "Enable dumping of sprites");
+        _DumpText = config.Bind("Dumping", "DumpText", false, "Enable dumping of text when the game starts.");
 
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
         _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
