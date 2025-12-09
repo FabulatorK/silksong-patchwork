@@ -10,6 +10,8 @@ public class DialogueHandler
 {
     public static string TextDumpPath { get { return Path.Combine(Plugin.BasePath, "TextDumps"); } }
 
+    public static Dictionary<string, Dictionary<string, string>> TextCache = new Dictionary<string, Dictionary<string, string>>();
+
     public static void DumpText()
     {
         foreach(string lang in Language.GetLanguages())
@@ -32,5 +34,18 @@ public class DialogueHandler
                 writer.Close();
             }
         }
+    }
+
+    public static void ApplyPatches(Harmony harmony)
+    {
+        harmony.Patch(
+            original: AccessTools.Method(typeof(Language), nameof(Language.Get), new[] { typeof(string), typeof(string) }),
+            postfix: new HarmonyMethod(typeof(DialogueHandler), nameof(GetTextPostfix))
+        );
+    }
+
+    private static void GetTextPostfix(string key, string sheetTitle, ref string __result)
+    {
+        Plugin.Logger.LogInfo($"Key requested: {key} from sheet: {sheetTitle}, value: {__result}");
     }
 }

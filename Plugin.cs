@@ -59,9 +59,6 @@ public class Plugin : BaseUnityPlugin
             };
         }
 
-        if (Config.DumpText)
-            SceneManager.sceneLoaded += (scene, mode) => { if (scene.name == "Pre_Menu_Intro") DialogueHandler.DumpText(); };
-
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
         SceneManager.sceneLoaded += (scene, mode) => AnimationController.ClearAnimators();
@@ -72,6 +69,17 @@ public class Plugin : BaseUnityPlugin
         AnimationController.ApplyPatches(harmony);
         SpriteLoader.ApplyPatches(harmony);
         VideoHandler.ApplyPatches(harmony);
+        
+        StartCoroutine(AwakeDelayed(harmony));
+    }
+
+    private IEnumerator<object> AwakeDelayed(Harmony harmony)
+    {
+        yield return null;
+        DialogueHandler.ApplyPatches(harmony);
+
+        if (Config.DumpText)
+            DialogueHandler.DumpText();
     }
 
     private void FindPatchworkFolder()
