@@ -37,6 +37,15 @@ public class DialogueHandler
         }
     }
 
+    public static void InvalidateCache(string sheet, string lang)
+    {
+        if (TextCache.ContainsKey(lang) && TextCache[lang].ContainsKey(sheet))
+        {
+            Plugin.Logger.LogInfo($"Invalidating text cache for sheet: {sheet}, lang: {lang}");
+            TextCache[lang].Remove(sheet);
+        }
+    }
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(

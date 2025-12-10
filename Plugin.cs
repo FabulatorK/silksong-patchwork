@@ -10,7 +10,6 @@ using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Patchwork.Watchers;
-using TeamCherry.Localization;
 
 namespace Patchwork;
 
@@ -21,6 +20,7 @@ public class Plugin : BaseUnityPlugin
     internal static new PatchworkConfig Config;
     internal static SpriteFileWatcher SpriteFileWatcher;
     internal static AudioFileWatcher AudioFileWatcher;
+    internal static TextFileWatcher TextFileWatcher;
 
     private static string PatchworkFolderName = "Patchwork";
     public static string BasePath { get { return Path.Combine(Paths.PluginPath, PatchworkFolderName); } }
@@ -45,6 +45,7 @@ public class Plugin : BaseUnityPlugin
         InitializeFolders();
         AudioFileWatcher = new AudioFileWatcher();
         SpriteFileWatcher = new SpriteFileWatcher();
+        TextFileWatcher = new TextFileWatcher();
 
         if (Config.DumpSprites)
         {
@@ -147,5 +148,7 @@ public class Plugin : BaseUnityPlugin
         IOUtil.EnsureDirectoryExists(T2DHandler.T2DDumpPath);
         IOUtil.EnsureDirectoryExists(AudioHandler.SoundFolder);
         IOUtil.EnsureDirectoryExists(VideoHandler.VideoLoadPath);
+        IOUtil.EnsureDirectoryExists(DialogueHandler.TextDumpPath);
+        IOUtil.EnsureDirectoryExists(DialogueHandler.TextLoadPath);
     }
 }
