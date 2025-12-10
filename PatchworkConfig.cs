@@ -40,10 +40,17 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerFreezeKey;
     public UnityEngine.KeyCode AnimationControllerFreezeKey { get { return _AnimationControllerFreezeKey.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowTextLog;
+    public UnityEngine.KeyCode ShowTextLogKey { get { return _ShowTextLog.Value; } }
+
+    private readonly ConfigEntry<double> _TextLogDuration;
+    public double TextLogDuration { get { return _TextLogDuration.Value; } }
+
     public PatchworkConfig(ConfigFile config)
     {
-        _LogAudioDuration = config.Bind("Audio", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
-        _HideModdedAudioInLog = config.Bind("Audio", "HideModdedAudioInLog", true, "Hide modded audio clips from the audio log.");
+        _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
+        _HideModdedAudioInLog = config.Bind("GUI", "HideModdedAudioInLog", true, "Hide modded audio clips from the audio log.");
+        _TextLogDuration = config.Bind("GUI", "TextLogDuration", 10.0, "Duration (in seconds) to keep text log entries visible.");
 
         _DumpSprites = config.Bind("Dumping", "DumpSprites", false, "Enable dumping of sprites");
         _DumpText = config.Bind("Dumping", "DumpText", false, "Enable dumping of text when the game starts.");
@@ -52,6 +59,7 @@ public class PatchworkConfig
         _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
         _ShowAudioList = config.Bind("Keybinds", "ShowAudioList", UnityEngine.KeyCode.Alpha2, "Key to toggle the audio list display.");
         _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
+        _ShowTextLog = config.Bind("Keybinds", "ShowTextLog", UnityEngine.KeyCode.Alpha4, "Key to toggle the text log display.");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");

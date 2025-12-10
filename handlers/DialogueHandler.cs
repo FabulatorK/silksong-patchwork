@@ -3,6 +3,7 @@ using System.IO;
 using HarmonyLib;
 using MonoMod.Utils;
 using Patchwork;
+using Patchwork.GUI;
 using Patchwork.Util;
 using TeamCherry.Localization;
 
@@ -56,8 +57,6 @@ public class DialogueHandler
 
     private static void GetTextPostfix(string key, string sheetTitle, ref string __result)
     {
-        Plugin.Logger.LogInfo($"Key requested: {key} from sheet: {sheetTitle}, value: {__result}");
-
         string lang = Language.CurrentLanguage().ToString();
         if (!TextCache.ContainsKey(lang))
             TextCache[lang] = [];
@@ -65,6 +64,8 @@ public class DialogueHandler
             TextCache[lang][sheetTitle] = LoadTextSheet(sheetTitle, lang);
         if (TextCache[lang][sheetTitle].ContainsKey(key))
             __result = TextCache[lang][sheetTitle][key];
+
+        TextLog.LogText(sheetTitle, key, __result);
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang)

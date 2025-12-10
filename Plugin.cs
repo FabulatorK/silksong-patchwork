@@ -30,6 +30,7 @@ public class Plugin : BaseUnityPlugin
     public static bool ShowAudioLog = false;
     public static bool ShowAudioList = false;
     public static bool ShowAnimationController = false;
+    public static bool ShowTextLog = false;
 
     private void Awake()
     {
@@ -114,6 +115,8 @@ public class Plugin : BaseUnityPlugin
             ShowAudioList = !ShowAudioList;
         if (Input.GetKeyDown(Config.ShowAnimationControllerKey))
             ShowAnimationController = !ShowAnimationController;
+        if (Input.GetKeyDown(Config.ShowTextLogKey))
+            ShowTextLog = !ShowTextLog;
 
         if (SpriteFileWatcher.ReloadSprites)
         {
@@ -138,6 +141,8 @@ public class Plugin : BaseUnityPlugin
             AudioList.DrawAudioList();
         if (ShowAnimationController)
             AnimationController.DrawAnimationController();
+        if (ShowTextLog)
+            TextLog.DrawTextLog();
     }
     
     private void InitializeFolders()
