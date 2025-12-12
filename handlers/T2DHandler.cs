@@ -15,30 +15,60 @@ public static class T2DHandler
     private static readonly Dictionary<string, Sprite> LoadedT2DSprites = new();
     private static readonly Dictionary<string, HashSet<string>> SpriteAtlasMap = new();
 
+    private static readonly HashSet<int> InitializedSpriteRenderers = new();
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SpriteRenderer), nameof(SpriteRenderer.sprite), MethodType.Setter)]
     public static void SetSpritePostfix(SpriteRenderer __instance, Sprite value)
     {
         if (__instance == null || value == null || __instance.gameObject.name == "TempSpriteRenderer")
             return;
+        InitializedSpriteRenderers.Add(__instance.GetInstanceID());
 
         if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
             HandleDump(__instance, value);
 
+        // Check stack to avoid infinite loops
+        var stackTrace = new System.Diagnostics.StackTrace();
+        if (stackTrace.GetFrames().Any(f => f.GetMethod().Name == nameof(HandleLoad)))
+            return;
+        
         HandleLoad(__instance, value);
+    }
+
+    public static void CheckForUninitializedSprites()
+    {
+        foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        {
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+                continue;
+
+            if (!InitializedSpriteRenderers.Contains(spriteRenderer.GetInstanceID()))
+            {
+                InitializedSpriteRenderers.Add(spriteRenderer.GetInstanceID());
+                spriteRenderer.sprite = spriteRenderer.sprite;
+            }
+        }
+    }
+
+    public static void ReloadSpritesInScene()
+    {
+        LoadedT2DSprites.Clear();
+        foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        {
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+                continue;
+            HandleLoad(spriteRenderer, spriteRenderer.sprite);
+        }
     }
 
     public static void InvalidateCache(string spriteName)
     {
-        if (LoadedT2DSprites.Remove(spriteName))
-            Plugin.Logger.LogDebug($"Invalidated T2D sprite cache for {spriteName}");
+        LoadedT2DSprites.Remove(spriteName);
         if (SpriteAtlasMap.ContainsKey(spriteName))
         {
             foreach (var sprName in SpriteAtlasMap[spriteName])
-            {
-                if (LoadedT2DSprites.Remove(sprName))
-                    Plugin.Logger.LogDebug($"Invalidated T2D sprite cache for {sprName} due to atlas change {spriteName}");
-            }
+                LoadedT2DSprites.Remove(sprName);
             SpriteAtlasMap.Remove(spriteName);
         }
     }
@@ -50,14 +80,16 @@ public static class T2DHandler
             spriteRenderer.sprite = LoadedT2DSprites[sprite.name];
             return;
         }
-
+        
         if (sprite.texture.name.Contains("-BC7-") || sprite.texture.name.Contains("DXT5|BC3-"))
         {
             Texture2D spriteTex = FindT2DSprite(CleanTextureName(sprite.texture.name), sprite.name);
             if (spriteTex == null)
                 return;
+            spriteTex.name = sprite.texture.name;
 
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+            newSprite.name = sprite.name;
             LoadedT2DSprites[sprite.name] = newSprite;
             spriteRenderer.sprite = newSprite;
 
@@ -76,7 +108,9 @@ public static class T2DHandler
             Texture2D spriteTex = FindT2DSprite(sprite.texture.name);
             if (spriteTex == null)
                 return;
+            spriteTex.name = sprite.texture.name;
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+            newSprite.name = sprite.name;
             LoadedT2DSprites[sprite.texture.name] = newSprite;
             spriteRenderer.sprite = newSprite;
         }

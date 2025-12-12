@@ -122,6 +122,7 @@ public class Plugin : BaseUnityPlugin
         {
             SpriteFileWatcher.ReloadSprites = false;
             SpriteLoader.Reload();
+            T2DHandler.ReloadSpritesInScene();
         }
 
         if (AudioFileWatcher.ReloadAudio)
@@ -131,6 +132,8 @@ public class Plugin : BaseUnityPlugin
         }
 
         AnimationController.Update();
+
+        T2DHandler.CheckForUninitializedSprites();
     }
 
     private void OnGUI()
