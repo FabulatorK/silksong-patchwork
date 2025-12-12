@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
@@ -16,26 +17,32 @@ public class DialogueHandler
 
     public static void DumpText()
     {
-        foreach(string lang in Language.GetLanguages())
+        string initialLang = Language.CurrentLanguage().ToString();
+        foreach(var langEnum in Enum.GetValues(typeof(GlobalEnums.SupportedLanguages)))
         {
-            Plugin.Logger.LogInfo($"--- Dumping language: {lang} ---");
+            string lang = langEnum.ToString();
+            Plugin.Logger.LogInfo($"Dumping text for language code {lang}...");
             Language.SwitchLanguage(lang);
+            int keys = 0;
+            int sheets = 0;
             foreach(string sheet in Language.GetSheets())
             {
                 IOUtil.EnsureDirectoryExists(Path.Combine(TextDumpPath, sheet));
                 string filePath = Path.Combine(TextDumpPath, sheet, $"{lang}.yml");
                 using StreamWriter writer = new StreamWriter(filePath);
-                Plugin.Logger.LogInfo($"# {sheet}:");
                 foreach (var key in Language.GetKeys(sheet))
                 {
                     string value = Language.Get(key, sheet);
-                    Plugin.Logger.LogInfo($"  {key} = {value}");
                     writer.WriteLine($"{key}: \"{value.Replace("\"", "\\\"")}\"");
+                    keys++;
                 }
                 writer.Flush();
                 writer.Close();
+                sheets++;
             }
+            Plugin.Logger.LogInfo($"Finished dumping text for language code {lang}. Dumped {keys} keys in {sheets} sheets.");
         }
+        Language.SwitchLanguage(initialLang);
     }
 
     public static void InvalidateCache(string sheet, string lang)
