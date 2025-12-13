@@ -11,9 +11,11 @@ namespace Patchwork.Handlers;
 public static class SpriteDumper
 {
     public static string DumpPath { get { return Path.Combine(Plugin.BasePath, "Dumps"); } }
+    public static string ConvertPath { get { return Path.Combine(Plugin.BasePath, "Converted"); } }
 
-    public static void DumpCollection(tk2dSpriteCollectionData collection)
+    public static void DumpCollection(tk2dSpriteCollectionData collection, bool convert = false)
     {
+        string baseDir = convert ? ConvertPath : DumpPath;
         foreach (var mat in collection.materials)
         {
             if (mat == null || mat.mainTexture == null)
@@ -35,7 +37,7 @@ public static class SpriteDumper
             foreach (var def in spriteDefinitions)
             {
                 if (string.IsNullOrEmpty(def.name)) continue;
-                if (File.Exists(Path.Combine(DumpPath, collection.name, matname, def.name + ".png")))
+                if (File.Exists(Path.Combine(baseDir, collection.name, matname, def.name + ".png")))
                     continue;
 
                 Rect spriteRect = SpriteUtil.GetSpriteRect(def, matTex);
@@ -49,8 +51,8 @@ public static class SpriteDumper
                 if (def.flipped == tk2dSpriteDefinition.FlipMode.None)
                 {
                     var png = spriteTex.EncodeToPNG();
-                    IOUtil.EnsureDirectoryExists(Path.Combine(DumpPath, collection.name, matname));
-                    File.WriteAllBytes(Path.Combine(DumpPath, collection.name, matname, def.name + ".png"), png);
+                    IOUtil.EnsureDirectoryExists(Path.Combine(baseDir, collection.name, matname));
+                    File.WriteAllBytes(Path.Combine(baseDir, collection.name, matname, def.name + ".png"), png);
                 }
                 else
                 {
@@ -85,8 +87,8 @@ public static class SpriteDumper
                     RenderTexture.ReleaseTemporary(rotated);
 
                     var png = finalTex.EncodeToPNG();
-                    IOUtil.EnsureDirectoryExists(Path.Combine(DumpPath, collection.name, matname));
-                    File.WriteAllBytes(Path.Combine(DumpPath, collection.name, matname, def.name + ".png"), png);
+                    IOUtil.EnsureDirectoryExists(Path.Combine(baseDir, collection.name, matname));
+                    File.WriteAllBytes(Path.Combine(baseDir, collection.name, matname, def.name + ".png"), png);
                 }
             }
 

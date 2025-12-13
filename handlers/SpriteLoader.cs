@@ -30,6 +30,7 @@ public static class SpriteLoader
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
+        bool hasCustomSpritesheets = false;
         foreach (var mat in collection.materials)
         {
             if (mat == null)
@@ -42,7 +43,10 @@ public static class SpriteLoader
             if (LoadedAtlases[collection.name].Add(matname))
             {
                 var unreadableTex = mat.mainTexture;
-                mat.mainTexture = FindSpritesheet(collection, matnameAbbr);
+                var sheetResult = FindSpritesheet(collection, matnameAbbr);
+                if (sheetResult.FromCustom)
+                    hasCustomSpritesheets = true;
+                mat.mainTexture = sheetResult.Texture;
                 if (!LoadedAtlasesTextures.ContainsKey(collection.name))
                     LoadedAtlasesTextures[collection.name] = new Dictionary<string, RenderTexture>();
                 LoadedAtlasesTextures[collection.name][matname] = mat.mainTexture as RenderTexture;
@@ -93,6 +97,9 @@ public static class SpriteLoader
             GL.PopMatrix();
             RenderTexture.active = previous;
         }
+
+        if (hasCustomSpritesheets)
+            SpriteDumper.DumpCollection(collection, true);
     }
 
     private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)
@@ -115,7 +122,7 @@ public static class SpriteLoader
         return null;
     }
 
-    private static RenderTexture FindSpritesheet(tk2dSpriteCollectionData collection, string materialName)
+    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName)
     {
         var files = Directory.GetFiles(AtlasLoadPath, $"{materialName}.png", SearchOption.AllDirectories)
             .Where(f => Path.GetDirectoryName(f).EndsWith(collection.name));
@@ -125,7 +132,7 @@ public static class SpriteLoader
             RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             Graphics.Blit(tex2d, rt);
             Object.Destroy(tex2d);
-            return rt;
+            return new SpritesheetResult { Texture = rt, FromCustom = true };
         }
 
         foreach (var packPath in Plugin.PluginPackPaths)
@@ -140,12 +147,13 @@ public static class SpriteLoader
                 RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
                 Graphics.Blit(tex2d, rt);
                 Object.Destroy(tex2d);
-                return rt;
+                return new SpritesheetResult { Texture = rt, FromCustom = true };
             }
         }
 
         var mat = collection.materials.FirstOrDefault(m => m.name.StartsWith(materialName + " ") || m.name == materialName);
-        return TexUtil.GetReadable(mat?.mainTexture);
+        var tex = TexUtil.GetReadable(mat?.mainTexture);
+        return new SpritesheetResult { Texture = tex, FromCustom = false };
     }
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
@@ -187,5 +195,11 @@ public static class SpriteLoader
         foreach (var collection in spriteCollections)
             LoadCollection(collection);
         Plugin.Logger.LogInfo($"Finished reloading sprites for scene {SceneManager.GetActiveScene().name}");
+    }
+
+    internal class SpritesheetResult
+    {
+        public RenderTexture Texture;
+        public bool FromCustom;
     }
 }
