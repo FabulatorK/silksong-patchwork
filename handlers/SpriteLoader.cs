@@ -98,7 +98,7 @@ public static class SpriteLoader
             RenderTexture.active = previous;
         }
 
-        if (hasCustomSpritesheets)
+        if (hasCustomSpritesheets && Plugin.Config.ConvertSpritesheets)
             SpriteDumper.DumpCollection(collection, true);
     }
 

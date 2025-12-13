@@ -7,6 +7,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<bool> _DumpSprites;
     public bool DumpSprites { get { return _DumpSprites.Value; } }
 
+    private readonly ConfigEntry<bool> _ConvertSpritesheets;
+    public bool ConvertSpritesheets { get { return _ConvertSpritesheets.Value; } }
+
     private readonly ConfigEntry<UnityEngine.KeyCode> _FullDumpKey = null;
     public UnityEngine.KeyCode FullDumpKey { get { return _FullDumpKey.Value; } }
 
@@ -54,6 +57,7 @@ public class PatchworkConfig
 
         _DumpSprites = config.Bind("Dumping", "DumpSprites", false, "Enable dumping of sprites");
         _DumpText = config.Bind("Dumping", "DumpText", false, "Enable dumping of text when the game starts.");
+        _ConvertSpritesheets = config.Bind("Dumping", "ConvertSpritesheets", false, "Automatically convert modded spritesheets to individual Patchwork-compatible PNGs.");
 
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
         _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
