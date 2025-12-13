@@ -164,6 +164,7 @@ public static class T2DHandler
 
             RenderTexture.active = previous;
             cam.targetTexture = null;
+            spriteGO.SetActive(false);
             Object.DestroyImmediate(rt);
             Object.DestroyImmediate(spriteGO);
             Object.DestroyImmediate(camGO);
