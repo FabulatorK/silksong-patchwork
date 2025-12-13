@@ -19,25 +19,28 @@ Thunderstore (and Gale) delete all asset folder inside the Patchwork folder when
 * Built-in sprite dumping functionality
 * Audio replacement supporting both sound effects and music
 * Cutscene replacement with no fuss - simple video file drag & drop
+* Text replacement for custom dialogue
 
 ### Planned features
 * Conditional sprites (e.g. different textures for Hornet depending on crest, health, etc.)
 * Ingame asset pack manager
-* Support for text replacements
 
 ## Configuration
 
-### Sprites
+### Dumping
 * `DumpSprites`: Enables sprite dumping, which saves sprites for any loaded scene into the "Patchwork/Dumps" folder. These files can be used to make new texture packs. DO NOT enable this during normal gameplay, as it slows down loading the game by a lot. If this is enabled, the mod will also let you dump textures from all scenes in the game by pressing the button configured under "Keybinds/FullDumpKey" (Default: F6)
+* `DumpText`: Enables text dumping, which dumps all text in the game in all languages into the "Patchwork/TextDumps" folder. DO NOT enable this during normal gameplay, as it slows down the game boot process by a lot.
 
-### Audio
+### GUI
 * `LogAudioDuration`: How long the name of a sound is shown in the log after being played, in seconds. (Default: 5)
 * `HideModdedAudioInLog`: On by default. If enabled, sounds which already have a modded file are omitted from the log. This makes it easier to find the names of specific sounds you want to mod.
+* `TextLogDuration`: How long the name of a text key is shown in the log after being requested by the game, in seconds. (Default: 10)
 
 ### Menu Hotkeys
 * `ShowAudioLog`: Keybind for showing the audio log window that logs the names of all sounds that are being played that Patchwork has access to. If you're adding custom files to the "Sounds" folder, you must name them exactly the same as shown in order for Patchwork to replace them. (Default: 1)
 * `ShowAudioList`: Keybind for showing the audio list, which lists all statically loaded sound effects. Can be used to find names of sounds which don't show up in the Audio Log. (Default: 2)
 * `ShowAnimationController`: Keybind for showing the animation controller, which lets you freeze individual objects, pause and play specific animations, and pick individual sprite images to be dumped and edited immediately. (Default: 3)
+* `ShowTextLog`: Keybind for showing the text log, which logs the sheet/key names of any text the game requests to be shown. (Default: 4)
 
 ### Animation Controller Hotkeys
 * `AnimationControllerPauseKey`: Toggles the "Paused" state on the currently selected object, freezing the animation and allowing for manual frame selection.
@@ -72,6 +75,25 @@ Thunderstore (and Gale) delete all asset folder inside the Patchwork folder when
 
 **NOTE:** Patchwork supports all [Unity-supported video formats.](https://docs.unity3d.com/Manual/VideoSources-FileCompatibility.html)
 
+## Text Replacement Guide
+Patchwork hooks directly into the Localization system of Silksong, so any text shown in the entire game is replaceable. The game uses a sheet-key-system for its text, and Patchwork lets you override individual pieces of text within that system through text files. The file structure is as follows:
+
+`Patchwork/Text/[Sheet]/[LANGUAGE].yml`
+
+Where "Sheet" is the name of the text sheet, and "LANGUAGE" is a 2-character uppercase identifier of the language the text is in. (For example: `Patchwork/Text/MainMenu/EN.yml` replaces text in the sheet titled `MainMenu` for the English language)
+
+The files themselves are simple YAML files and should always follow this structure:
+
+`[KEY]: "All text goes here."`
+
+Where "KEY" is the key of the text within the sheet. (Make sure not to include the `[]` brackets!)
+
+### Finding sheet & key names
+In order to find the sheet & key names of specific lines of text, you have two options:
+
+1. Enable the `DumpText` config option and start up the game once. You can disable it again afterwards. This dumps all text in the entire game into the `Patchwork/TextDumps` folder in the correct file and folder structure, so you can simply copy it from there.
+2. Open the Text Log ingame (Default Hotkey: 4) and cause the text you want to replace to be shown. The Text Log will show the text itself, as well as the sheet and key names in the format `Sheet.KEY`
+
 ## Publishing Packs on Thunderstore
 
 Patchwork is structured in a way that lets creators publish their packs as plugins on Thunderstore! In order to be automatically installed correctly when players download them, make sure to follow the following structure with your plugins:
@@ -88,6 +110,8 @@ YourName-PackName.zip
          |- Spritesheets
          |   \- <your files here...>
          |- Sounds
+         |   \- <your files here...>
+         |- Text
          |   \- <your files here...>
          \- Videos
              \- <your files here...>

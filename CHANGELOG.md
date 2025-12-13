@@ -1,3 +1,7 @@
+### v2.5.0
+* Added text replacement
+* Massive update to Texture2D handling, adding support for more textures & sprites
+
 ### v2.4.0
 * Implemented cutscene replacement support
 
