@@ -136,7 +136,11 @@ public static class T2DHandler
             var tempSpriteRenderer = spriteGO.AddComponent<SpriteRenderer>();
             tempSpriteRenderer.sprite = sprite;
             spriteGO.layer = renderLayer;
-            spriteGO.transform.position = Vector3.zero;
+            spriteGO.transform.position = new Vector3(
+                (sprite.pivot.x - sprite.rect.width / 2) / sprite.pixelsPerUnit,
+                (sprite.pivot.y - sprite.rect.height / 2) / sprite.pixelsPerUnit,
+                0
+            );
 
             GameObject camGO = new GameObject("TempCamera");
             Camera cam = camGO.AddComponent<Camera>();
