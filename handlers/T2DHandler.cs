@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Linq;
 using Patchwork.Util;
 using System.Collections.Generic;
+using UnityEngine.UI;
 
 namespace Patchwork.Handlers;
 
@@ -26,13 +27,32 @@ public static class T2DHandler
         InitializedSpriteRenderers.Add(__instance.GetInstanceID());
 
         if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
-            HandleDump(__instance, value);
+            HandleDump(value);
 
         // Check stack to avoid infinite loops
         var stackTrace = new System.Diagnostics.StackTrace();
         if (stackTrace.GetFrames().Any(f => f.GetMethod().Name == nameof(HandleLoad)))
             return;
         
+        HandleLoad(__instance, value);
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(Image), nameof(Image.sprite), MethodType.Setter)]
+    public static void SetImageSpritePostfix(Image __instance, Sprite value)
+    {
+        if (__instance == null || value == null)
+            return;
+        InitializedSpriteRenderers.Add(__instance.GetInstanceID());
+
+        if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
+            HandleDump(value);
+
+        // Check stack to avoid infinite loops
+        var stackTrace = new System.Diagnostics.StackTrace();
+        if (stackTrace.GetFrames().Any(f => f.GetMethod().Name == nameof(HandleLoad)))
+            return;
+
         HandleLoad(__instance, value);
     }
 
@@ -49,6 +69,18 @@ public static class T2DHandler
                 spriteRenderer.sprite = spriteRenderer.sprite;
             }
         }
+
+        foreach (var image in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        {
+            if (image == null || image.sprite == null)
+                continue;
+
+            if (!InitializedSpriteRenderers.Contains(image.GetInstanceID()))
+            {
+                InitializedSpriteRenderers.Add(image.GetInstanceID());
+                image.sprite = image.sprite;
+            }
+        }
     }
 
     public static void ReloadSpritesInScene()
@@ -59,6 +91,12 @@ public static class T2DHandler
             if (spriteRenderer == null || spriteRenderer.sprite == null)
                 continue;
             HandleLoad(spriteRenderer, spriteRenderer.sprite);
+        }
+        foreach (var image in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        {
+            if (image == null || image.sprite == null)
+                continue;
+            HandleLoad(image, image.sprite);
         }
     }
 
@@ -73,11 +111,18 @@ public static class T2DHandler
         }
     }
 
-    private static void HandleLoad(SpriteRenderer spriteRenderer, Sprite sprite)
+    private static void HandleLoad(object spriteContainer, Sprite sprite)
     {
+        var spriteSetter = spriteContainer.GetType().GetProperty("sprite").GetSetMethod();
+        if (spriteSetter == null)
+        {
+            Plugin.Logger.LogError($"T2DHandler: Could not find sprite setter for {spriteContainer.GetType().Name}");
+            return;
+        }
+
         if (LoadedT2DSprites.ContainsKey(sprite.name))
         {
-            spriteRenderer.sprite = LoadedT2DSprites[sprite.name];
+            spriteSetter.Invoke(spriteContainer, [LoadedT2DSprites[sprite.name]]);
             return;
         }
         
@@ -91,7 +136,7 @@ public static class T2DHandler
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
             newSprite.name = sprite.name;
             LoadedT2DSprites[sprite.name] = newSprite;
-            spriteRenderer.sprite = newSprite;
+            spriteSetter.Invoke(spriteContainer, [newSprite]);
 
             if(!SpriteAtlasMap.ContainsKey(sprite.texture.name))
                 SpriteAtlasMap[sprite.texture.name] = new HashSet<string>();
@@ -101,7 +146,7 @@ public static class T2DHandler
         {
             if (LoadedT2DSprites.ContainsKey(sprite.texture.name))
             {
-                spriteRenderer.sprite = LoadedT2DSprites[sprite.texture.name];
+                spriteSetter.Invoke(spriteContainer, [LoadedT2DSprites[sprite.texture.name]]);
                 return;
             }
             
@@ -112,11 +157,11 @@ public static class T2DHandler
             Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
             newSprite.name = sprite.name;
             LoadedT2DSprites[sprite.texture.name] = newSprite;
-            spriteRenderer.sprite = newSprite;
+            spriteSetter.Invoke(spriteContainer, [newSprite]);
         }
     }
 
-    private static void HandleDump(SpriteRenderer spriteRenderer, Sprite sprite)
+    private static void HandleDump(Sprite sprite)
     {
         if (sprite.texture.name.Contains("-BC7-") || sprite.texture.name.Contains("DXT5|BC3-"))
         {
