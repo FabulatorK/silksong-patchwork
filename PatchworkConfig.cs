@@ -49,6 +49,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
 
+    // GC every N scenes during full dump
+    private readonly ConfigEntry<int> _GCEveryNScenes;
+    public int GCEveryNScenes { get { return _GCEveryNScenes.Value; } }
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -69,5 +72,7 @@ public class PatchworkConfig
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");
         _AnimationControllerPrevFrameKey = config.Bind("Keybinds", "AnimationControllerPrevFrameKey", UnityEngine.KeyCode.Insert, "Key to go back one frame in the selected animator in the animation controller when paused.");
         _AnimationControllerFreezeKey = config.Bind("Keybinds", "AnimationControllerFreezeKey", UnityEngine.KeyCode.End, "Key to freeze/unfreeze the object of the selected animator in the animation controller.");
+
+        _GCEveryNScenes = config.Bind("Dumping", "GCEveryNScenes", 10, "Run garbage collection every N scenes during full dump. Lower = more stable but slower.");
     }
 }
