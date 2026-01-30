@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using HarmonyLib;
 using Patchwork;
 using Patchwork.Handlers;
 using Patchwork.Util;
+using Patchwork.GUI;
 using UnityEngine;
 
 [HarmonyPatch]
@@ -12,6 +14,15 @@ public static class AnimationController
 {
     private static Vector2 scrollPosition = Vector2.zero;
     private static Rect windowRect;
+    private static bool initialized = false;
+    // Constants at top of class (base sizes at 1080p)
+    private const float WindowWidthRatio = 0.33f;   // 1/3 of screen width
+    private const float WindowHeightRatio = 0.33f;  // 1/3 of screen height
+    private const float RightMargin = 10f;
+    private const float TopMargin = 10f;
+
+    private const float MinWidth = 300f;
+    private const float MinHeight = 200f;
 
     public static string SelectedAnimator { get; private set; } = null;
 
@@ -23,6 +34,13 @@ public static class AnimationController
     private static readonly Dictionary<string, bool> ShowAnimationDropdown = new Dictionary<string, bool>();
 
     private static readonly Dictionary<string, tk2dSpriteAnimator> Animators = new Dictionary<string, tk2dSpriteAnimator>();
+
+    private static string _animationSearchText = "";
+    private static Vector2 _animationDropdownScroll = Vector2.zero;
+    private const int MaxVisibleAnimations = 10;
+    private const float MinWindowWidth = 350f;
+    private const float MaxWindowWidth = 600f;
+    private const int MaxPathLength = 55;
 
     public static void RegisterAnimator(tk2dSpriteAnimator animator)
     {
@@ -195,13 +213,34 @@ public static class AnimationController
     #region GUI
     public static void DrawAnimationController()
     {
-        if (windowRect.width == 0)
-            windowRect = new Rect(Screen.width - Screen.width / 3 - 10, 10, Screen.width / 3, Screen.height / 3);
-        windowRect = GUILayout.Window(6971, windowRect, AnimationControllerWindow, "Patchwork Animation Controller", GUILayout.MinWidth(300), GUILayout.MinHeight(200));
-    }
+        if (!initialized || windowRect.width < 1)
+        {
+            float width = Mathf.Max(Screen.width * WindowWidthRatio, GUIHelper.Scaled(MinWidth));
+            float height = Mathf.Max(Screen.height * WindowHeightRatio, GUIHelper.Scaled(MinHeight));
+            windowRect = new Rect(
+                Screen.width - width - GUIHelper.Scaled(RightMargin),
+                GUIHelper.Scaled(TopMargin),
+                width,
+                height
+            );
+            initialized = true;
+        }
 
+        GUIHelper.ApplyScaledSkin();
+        windowRect = GUILayout.Window(
+            6972,
+            windowRect,
+            AnimationControllerWindow,
+            "Patchwork Animation Controller",
+            GUIHelper.WindowStyle,
+            GUILayout.MinWidth(GUIHelper.Scaled(MinWindowWidth)),
+            GUILayout.MaxWidth(GUIHelper.Scaled(MaxWindowWidth))
+        );
+    }
     private static void AnimationControllerWindow(int windowID)
     {
+        GUIHelper.Space(16); 
+        
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
         GUILayout.BeginVertical();
         foreach (var kvp in Animators)
@@ -225,26 +264,66 @@ public static class AnimationController
             else
                 GUI.contentColor = Color.white;
 
-            if (GUILayout.Button(name))
+            if (GUILayout.Button(name, GUIHelper.ButtonStyle))
                 SelectAnimator(animator);
+            
+            string fullPath = $"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}";
+            string displayPath = fullPath.Length > MaxPathLength 
+                ? "..." + fullPath.Substring(fullPath.Length - MaxPathLength + 3) 
+                : fullPath;
+
+            GUILayout.Label(displayPath, GUIHelper.LabelStyle);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
 
-            GUILayout.FlexibleSpace();
+            GUIHelper.Space(48);
 
             if (SelectedAnimator == name)
             {
                 GUILayout.BeginVertical();
-                if (GUILayout.Button(animator.CurrentClip.name + (ShowAnimationDropdown.GetValueOrDefault(name, false) ? " ▲" : " ▼")))
+                if (GUILayout.Button(animator.CurrentClip.name + (ShowAnimationDropdown.GetValueOrDefault(name, false) ? " ▲" : " ▼"), GUIHelper.ButtonStyle))
+                {
                     ShowAnimationDropdown[name] = !ShowAnimationDropdown.GetValueOrDefault(name, false);
+                    if (ShowAnimationDropdown[name])
+                    {
+                        _animationSearchText = "";  // Reset search when opening
+                        _animationDropdownScroll = Vector2.zero;
+                    }
+                }
+
                 if (ShowAnimationDropdown.GetValueOrDefault(name, false))
                 {
-                    foreach (var clip in animator.Library.clips)
+                    GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
+                    
+                    // Search field
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(60)));
+                    _animationSearchText = GUILayout.TextField(
+                        _animationSearchText, 
+                        GUIHelper.TextFieldStyle, 
+                        GUILayout.Width(GUIHelper.Scaled(280)),
+                        GUILayout.Height(GUIHelper.Scaled(32))
+                    );
+                    GUILayout.EndHorizontal();
+                    
+                    // Filter clips
+                    var filteredClips = animator.Library.clips
+                        .Where(c => !string.IsNullOrEmpty(c.name) && 
+                                    (string.IsNullOrEmpty(_animationSearchText) || 
+                                    c.name.ToLower().Contains(_animationSearchText.ToLower())))
+                        .ToList();
+                    
+                    // Show count
+                    GUILayout.Label($"{filteredClips.Count} of {animator.Library.clips.Length}", GUIHelper.LabelStyle);
+                    
+                    // Scrollable list
+                    _animationDropdownScroll = GUILayout.BeginScrollView(
+                        _animationDropdownScroll, 
+                        GUILayout.Height(GUIHelper.Scaled(MaxVisibleAnimations * 22)));
+                    
+                    foreach (var clip in filteredClips)
                     {
-                        if (string.IsNullOrEmpty(clip.name))
-                            continue;
-                        if (GUILayout.Button(clip.name))
+                        if (GUILayout.Button(clip.name, GUIHelper.ButtonStyle))
                         {
                             Paused = true;
                             animator.Pause();
@@ -255,17 +334,20 @@ public static class AnimationController
                             FrameChangeRequested = false;
                         }
                     }
+                    
+                    GUILayout.EndScrollView();
+                    GUILayout.EndVertical();
                 }
                 GUILayout.EndVertical();
             }
             else
-                GUILayout.Label(animator.CurrentClip.name);
+                GUILayout.Label(animator.CurrentClip.name, GUIHelper.LabelStyle);
 
             if (Paused && SelectedAnimator == name)
             {
                 Color temp = GUI.contentColor;
                 GUI.contentColor = Color.red;
-                GUILayout.Label("[PAUSED]");
+                GUILayout.Label("[PAUSED]", GUIHelper.LabelStyle);
                 GUI.contentColor = temp;
             }
 
@@ -273,15 +355,15 @@ public static class AnimationController
             {
                 Color temp = GUI.contentColor;
                 GUI.contentColor = Color.cyan;
-                GUILayout.Label("[FROZEN]");
+                GUILayout.Label("[FROZEN]", GUIHelper.LabelStyle);
                 GUI.contentColor = temp;
             }
-            GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]");
+            GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]", GUIHelper.LabelStyle);
             GUILayout.EndHorizontal();
 
             if (SelectedAnimator == name)
             {
-                if (GUILayout.Button("Edit Current Sprite"))
+                if (GUILayout.Button("Edit Current Sprite", GUIHelper.ButtonStyle))
                 {
                     string openPath = Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
                     if (File.Exists(openPath))
@@ -307,7 +389,7 @@ public static class AnimationController
         }
         GUILayout.EndVertical();
         GUILayout.EndScrollView();
-        GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        GUI.DragWindow(GUIHelper.DragRect);
     }
     #endregion
 }

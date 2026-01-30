@@ -10,16 +10,28 @@ public static class TextLog
 
     private static readonly int MaxPreviewLength = 50;
 
-    private static Rect windowRect = new Rect(Screen.width - 710, 10, 700, 400);
+    private static Rect windowRect;
+
+    private static bool initialized = false;
+
     private static Vector2 scrollPosition = Vector2.zero;
+
 
     public static void DrawTextLog()
     {
-        windowRect = GUILayout.Window(6971, windowRect, TextLogWindow, "Patchwork Text Log");
+        if (!initialized || windowRect.width < 1)
+        {
+            windowRect = GUIHelper.ScaledRect(10, 10, 700, 400); // or ScaledRectFromRight
+            initialized = true;
+        }
+        GUIHelper.ApplyScaledSkin();
+        windowRect = GUILayout.Window(6971, windowRect, TextLogWindow, "Patchwork Text Log", GUIHelper.WindowStyle, GUIHelper.WindowLayout(700, 400));
     }
 
     private static void TextLogWindow(int windowID)
     {
+        GUIHelper.Space(16); 
+
         TextLogEntries.RemoveAll(entry => entry.IsExpired());
 
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
@@ -31,7 +43,7 @@ public static class TextLog
             var color = new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.skin.label.fontSize = 14;
             UnityEngine.GUI.contentColor = color;
-            GUILayout.Label($"{entry.SheetName}.{entry.KeyName}:");
+            GUILayout.Label($"{entry.SheetName}.{entry.KeyName}:", GUIHelper.LabelStyle);
 
             GUILayout.FlexibleSpace();
 
@@ -39,17 +51,17 @@ public static class TextLog
             string textPreview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
             if (textPreview.Length > MaxPreviewLength)
                 textPreview = textPreview.Substring(0, MaxPreviewLength - 3) + "...";
-            GUILayout.Label(textPreview);
+            GUILayout.Label(textPreview, GUIHelper.LabelStyle);
             GUILayout.EndHorizontal();
         }
 
         if (TextLogEntries.Count == 0)
-            GUILayout.Label("No log entries.");
+            GUILayout.Label("No log entries.", GUIHelper.LabelStyle);
 
         GUILayout.EndVertical();
         GUILayout.EndScrollView();
 
-        UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
     public static void LogText(string sheet, string key, string text)
