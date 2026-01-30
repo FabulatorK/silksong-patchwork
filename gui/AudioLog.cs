@@ -10,15 +10,39 @@ public static class AudioLog
 {
     private static readonly Dictionary<string, AudioPlayEntry> AudioPlayLog = new();
 
-    private static Rect windowRect = new Rect(Screen.width - 310, 10, 300, 400);
+    // Base dimensions at 1080p - will be scaled automatically
+    private const float WindowWidth = 300f;
+    private const float WindowHeight = 400f;
+    private const float RightMargin = 10f;
+    private const float TopMargin = 10f;
+
+    private static Rect windowRect;
+    private static bool initialized = false;
 
     public static void DrawAudioLog()
     {
-        windowRect = GUILayout.Window(6969, windowRect, AudioLogWindow, "Patchwork Audio Log");
+        // Initialize or recalculate on resolution change
+        if (!initialized || windowRect.width < 1)
+        {
+            windowRect = GUIHelper.ScaledRectFromRight(RightMargin, TopMargin, WindowWidth, WindowHeight);
+            initialized = true;
+        }
+
+        GUIHelper.ApplyScaledSkin();
+        windowRect = GUILayout.Window(
+            6969, 
+            windowRect, 
+            AudioLogWindow, 
+            "Patchwork Audio Log",
+            GUIHelper.WindowStyle,
+            GUIHelper.WindowLayout(WindowWidth, WindowHeight)
+        );
     }
 
     private static void AudioLogWindow(int windowID)
     {
+        GUIHelper.Space(16); 
+        
         int shown = 0;
         List<AudioPlayEntry> sortedEntries = new(AudioPlayLog.Values);
         sortedEntries.Sort((a, b) => a.ClipName.CompareTo(b.ClipName));
@@ -38,7 +62,7 @@ public static class AudioLog
             var opacity = entry.GetOpacity();
             var color = new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.contentColor = color;
-            GUILayout.Label($"{entry.ClipName}");
+            GUILayout.Label(entry.ClipName, GUIHelper.LabelStyle);
             shown++;
         }
         if (shown == 0)
@@ -49,7 +73,7 @@ public static class AudioLog
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
 
-        UnityEngine.GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
     public static void LogAudio(AudioClip clip)
