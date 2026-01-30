@@ -103,7 +103,7 @@ public class Plugin : BaseUnityPlugin
             PluginPackPaths.Add(dir);
         });
     }
-
+    private static int _frameCounter = 0;
     private void Update()
     {
         if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
@@ -133,6 +133,7 @@ public class Plugin : BaseUnityPlugin
 
         AnimationController.Update();
 
+        if (++_frameCounter % 30 == 0)
         T2DHandler.CheckForUninitializedSprites();
     }
 
