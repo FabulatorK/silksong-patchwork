@@ -40,6 +40,8 @@ public class SpriteFileWatcher
 
     private void OnSpriteChanged(object sender, FileSystemEventArgs e)
     {
+        SpriteLoader.InvalidatePathCache();
+        
         string relativePath = Path.GetRelativePath(SpriteLoader.LoadPath, e.FullPath);
         string[] pathParts = relativePath.Split(Path.DirectorySeparatorChar);
 

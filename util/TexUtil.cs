@@ -16,6 +16,12 @@ public static class TexUtil
         RotateMaterial = new Material(RotateShader);
     }
 
+    /// <summary>
+    /// Creates a readable RenderTexture copy of the input texture.
+    /// ⚠️ CALLER MUST call RenderTexture.ReleaseTemporary() on the returned texture!
+    /// </summary>
+    /// <param name="tex">Source texture to copy</param>
+    /// <returns>Temporary RenderTexture that must be released by caller</returns>
     public static RenderTexture GetReadable(Texture tex)
     {
         RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
@@ -23,6 +29,12 @@ public static class TexUtil
         return rt;
     }
 
+    /// <summary>
+    /// Loads a Texture2D from a PNG file.
+    /// ⚠️ CALLER MUST call Object.Destroy() on the returned texture when done!
+    /// </summary>
+    /// <param name="path">Path to PNG file</param>
+    /// <returns>New Texture2D that must be destroyed by caller, or null if failed</returns>
     public static Texture2D LoadFromPNG(string path)
     {
         if (!File.Exists(path))
@@ -36,6 +48,7 @@ public static class TexUtil
         if (!tex.LoadImage(pngData))
         {
             Plugin.Logger.LogWarning($"LoadFromPNG: Failed to load image data from {path}");
+            Object.Destroy(tex); //Cleanup on failure
             return null;
         }
         return tex;
