@@ -21,14 +21,16 @@ public static class T2DHandler
     private static readonly HashSet<SpriteRenderer> KnownT2DSpriteRenderers = new();
     private static readonly HashSet<Image> KnownT2DImages = new();
     private static bool _enforcing = false;
-    private static bool _handling = false;
+    private static readonly HashSet<int> _handlingInstances = new();
 
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SpriteRenderer), nameof(SpriteRenderer.sprite), MethodType.Setter)]
     public static void SetSpritePostfix(SpriteRenderer __instance, Sprite value)
     {
-        if (_handling || _enforcing || __instance == null || value == null || __instance.gameObject.name == "TempSpriteRenderer")
+        if (_enforcing || __instance == null || value == null || __instance.gameObject.name == "TempSpriteRenderer")
+            return;
+        if (_handlingInstances.Contains(__instance.GetInstanceID()))
             return;
         TrackedSpriteNames[__instance.GetInstanceID()] = value.name;
 
@@ -42,7 +44,9 @@ public static class T2DHandler
     [HarmonyPatch(typeof(Image), nameof(Image.sprite), MethodType.Setter)]
     public static void SetImageSpritePostfix(Image __instance, Sprite value)
     {
-        if (_handling || _enforcing || __instance == null || value == null)
+        if (_enforcing || __instance == null || value == null)
+            return;
+        if (_handlingInstances.Contains(__instance.GetInstanceID()))
             return;
         TrackedSpriteNames[__instance.GetInstanceID()] = value.name;
 
@@ -246,17 +250,20 @@ public static class T2DHandler
 
     private static void HandleLoad(object spriteContainer, Sprite sprite)
     {
-        if (_handling)
+        int instanceId = spriteContainer is SpriteRenderer sr ? sr.GetInstanceID()
+                       : spriteContainer is Image img ? img.GetInstanceID()
+                       : spriteContainer.GetHashCode();
+        if (!_handlingInstances.Add(instanceId))
             return;
 
         var spriteSetter = spriteContainer.GetType().GetProperty("sprite").GetSetMethod();
         if (spriteSetter == null)
         {
             Plugin.Logger.LogError($"T2DHandler: Could not find sprite setter for {spriteContainer.GetType().Name}");
+            _handlingInstances.Remove(instanceId);
             return;
         }
 
-        _handling = true;
         try
         {
             if (LoadedT2DSprites.ContainsKey(sprite.name))
@@ -311,7 +318,7 @@ public static class T2DHandler
         }
         finally
         {
-            _handling = false;
+            _handlingInstances.Remove(instanceId);
         }
     }
 
