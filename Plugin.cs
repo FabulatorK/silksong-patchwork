@@ -170,6 +170,7 @@ public class Plugin : BaseUnityPlugin
         IOUtil.EnsureDirectoryExists(SpriteLoader.LoadPath);
         IOUtil.EnsureDirectoryExists(SpriteLoader.AtlasLoadPath);
         IOUtil.EnsureDirectoryExists(T2DHandler.T2DDumpPath);
+        IOUtil.EnsureDirectoryExists(T2DHandler.T2DAtlasLoadPath);
         IOUtil.EnsureDirectoryExists(AudioHandler.SoundFolder);
         IOUtil.EnsureDirectoryExists(VideoHandler.VideoLoadPath);
         IOUtil.EnsureDirectoryExists(DialogueHandler.TextDumpPath);

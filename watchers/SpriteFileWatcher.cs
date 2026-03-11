@@ -71,6 +71,16 @@ public class SpriteFileWatcher
         if (pathParts.Length < 2)
             return;
 
+        // T2D spritesheets: Spritesheets/T2D/{TextureName}.png
+        if (pathParts[^2] == "T2D")
+        {
+            string cleanTexName = Path.GetFileNameWithoutExtension(pathParts[^1]);
+            T2DHandler.InvalidateSpritesheet(cleanTexName);
+            Plugin.Logger.LogDebug($"Invalidated T2D spritesheet cache for {cleanTexName} due to: {e.ChangeType} {e.FullPath}");
+            ReloadT2DSprites = true;
+            return;
+        }
+
         string collectionName = pathParts[^2];
         string atlasName = Path.GetFileNameWithoutExtension(pathParts[^1]);
 
