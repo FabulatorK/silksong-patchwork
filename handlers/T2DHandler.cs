@@ -242,16 +242,22 @@ public static class T2DHandler
 
     public static void InvalidateSpritesheet(string texName)
     {
-        // texName may be a clean name or a raw/sanitized filename from the file watcher
+        // texName may be a clean name or a raw/sanitized filename from the file watcher.
+        // Since spritesheets are now cached by raw texture name, we need to find all
+        // cache entries whose clean name matches, so both Hornet atlases get invalidated
+        // when the user replaces a "Hornet.png" spritesheet.
         string cleanTexName = CleanTextureName(texName);
 
-        if (!LoadedT2DSpritesheets.TryGetValue(cleanTexName, out var sheetTex))
-            return;
+        // Remove all spritesheet cache entries that clean to the same name
+        foreach (var key in LoadedT2DSpritesheets.Keys.ToList())
+        {
+            if (CleanTextureName(key) != cleanTexName)
+                continue;
 
-        // Remove the spritesheet texture itself
-        if (sheetTex != null)
-            Object.Destroy(sheetTex);
-        LoadedT2DSpritesheets.Remove(cleanTexName);
+            if (LoadedT2DSpritesheets.TryGetValue(key, out var sheetTex) && sheetTex != null)
+                Object.Destroy(sheetTex);
+            LoadedT2DSpritesheets.Remove(key);
+        }
 
         // Invalidate all sprites that were created from this spritesheet
         // by finding atlas map entries whose clean name matches
@@ -688,18 +694,22 @@ public static class T2DHandler
 
     private static Texture2D FindT2DSpritesheet(string cleanTexName, string rawTexName = null)
     {
-        if (LoadedT2DSpritesheets.TryGetValue(cleanTexName, out var cached))
+        // Cache by raw texture name so identically-cleaned atlases (e.g. two
+        // different-resolution Hornet atlases) each get their own entry.
+        string cacheKey = rawTexName ?? cleanTexName;
+        if (LoadedT2DSpritesheets.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        // Build candidate filenames: clean name first, then raw/sanitized name for
-        // backwards compatibility with T2D customizer exports that use the full atlas name
-        var candidates = new List<string> { cleanTexName };
+        // Build candidate filenames: sanitized raw name first (unique per atlas),
+        // then clean name as a shared fallback for packs that only provide one sheet
+        var candidates = new List<string>();
         if (rawTexName != null)
         {
             string sanitized = SanitizeForFilesystem(rawTexName);
             if (sanitized != cleanTexName)
                 candidates.Add(sanitized);
         }
+        candidates.Add(cleanTexName);
 
         foreach (var candidate in candidates)
         {
@@ -709,7 +719,7 @@ public static class T2DHandler
                 var tex = TexUtil.LoadFromPNG(path);
                 if (tex != null)
                 {
-                    LoadedT2DSpritesheets[cleanTexName] = tex;
+                    LoadedT2DSpritesheets[cacheKey] = tex;
                     return tex;
                 }
             }
@@ -725,7 +735,7 @@ public static class T2DHandler
                     var tex = TexUtil.LoadFromPNG(packFile);
                     if (tex != null)
                     {
-                        LoadedT2DSpritesheets[cleanTexName] = tex;
+                        LoadedT2DSpritesheets[cacheKey] = tex;
                         return tex;
                     }
                 }
