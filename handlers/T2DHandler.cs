@@ -168,7 +168,7 @@ public static class T2DHandler
                 continue;
 
             string cleanTexName = CleanTextureName(original.texture.name);
-            Texture2D spritesheet = FindT2DSpritesheet(cleanTexName);
+            Texture2D spritesheet = FindT2DSpritesheet(cleanTexName, original.texture.name);
             if (spritesheet == null)
                 continue;
 
@@ -240,8 +240,11 @@ public static class T2DHandler
         }
     }
 
-    public static void InvalidateSpritesheet(string cleanTexName)
+    public static void InvalidateSpritesheet(string texName)
     {
+        // texName may be a clean name or a raw/sanitized filename from the file watcher
+        string cleanTexName = CleanTextureName(texName);
+
         if (!LoadedT2DSpritesheets.TryGetValue(cleanTexName, out var sheetTex))
             return;
 
@@ -359,7 +362,7 @@ public static class T2DHandler
                 }
 
                 // Fall back to T2D spritesheet if no individual sprite replacement exists
-                Texture2D spritesheet = FindT2DSpritesheet(cleanTexName);
+                Texture2D spritesheet = FindT2DSpritesheet(cleanTexName, sprite.texture.name);
                 if (spritesheet != null)
                 {
                     Sprite newSprite = CreateSpriteFromSpritesheet(spritesheet, sprite);
@@ -429,10 +432,18 @@ public static class T2DHandler
             }
         }
 
+        // Try clean name directory, then raw/sanitized name for T2D customizer compat
         LoadFromDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D", cleanTexName));
+        string sanitizedRaw = SanitizeForFilesystem(textureName);
+        if (sanitizedRaw != cleanTexName)
+            LoadFromDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D", sanitizedRaw));
 
         foreach (var packPath in Plugin.PluginPackPaths)
+        {
             LoadFromDirectory(Path.Combine(packPath, "Sprites", "T2D", cleanTexName));
+            if (sanitizedRaw != cleanTexName)
+                LoadFromDirectory(Path.Combine(packPath, "Sprites", "T2D", sanitizedRaw));
+        }
     }
 
     public static void PreloadAllT2DTextures()
@@ -491,7 +502,7 @@ public static class T2DHandler
                 continue;
 
             string cleanTexName = CleanTextureName(original.texture.name);
-            Texture2D spritesheet = FindT2DSpritesheet(cleanTexName);
+            Texture2D spritesheet = FindT2DSpritesheet(cleanTexName, original.texture.name);
             if (spritesheet == null)
                 continue;
 
@@ -675,32 +686,48 @@ public static class T2DHandler
         return null;
     }
 
-    private static Texture2D FindT2DSpritesheet(string cleanTexName)
+    private static Texture2D FindT2DSpritesheet(string cleanTexName, string rawTexName = null)
     {
         if (LoadedT2DSpritesheets.TryGetValue(cleanTexName, out var cached))
             return cached;
 
-        string path = Path.Combine(T2DAtlasLoadPath, cleanTexName + ".png");
-        if (File.Exists(path))
+        // Build candidate filenames: clean name first, then raw/sanitized name for
+        // backwards compatibility with T2D customizer exports that use the full atlas name
+        var candidates = new List<string> { cleanTexName };
+        if (rawTexName != null)
         {
-            var tex = TexUtil.LoadFromPNG(path);
-            if (tex != null)
+            string sanitized = SanitizeForFilesystem(rawTexName);
+            if (sanitized != cleanTexName)
+                candidates.Add(sanitized);
+        }
+
+        foreach (var candidate in candidates)
+        {
+            string path = Path.Combine(T2DAtlasLoadPath, candidate + ".png");
+            if (File.Exists(path))
             {
-                LoadedT2DSpritesheets[cleanTexName] = tex;
-                return tex;
+                var tex = TexUtil.LoadFromPNG(path);
+                if (tex != null)
+                {
+                    LoadedT2DSpritesheets[cleanTexName] = tex;
+                    return tex;
+                }
             }
         }
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
-            string packFile = Path.Combine(packPath, "Spritesheets", "T2D", cleanTexName + ".png");
-            if (File.Exists(packFile))
+            foreach (var candidate in candidates)
             {
-                var tex = TexUtil.LoadFromPNG(packFile);
-                if (tex != null)
+                string packFile = Path.Combine(packPath, "Spritesheets", "T2D", candidate + ".png");
+                if (File.Exists(packFile))
                 {
-                    LoadedT2DSpritesheets[cleanTexName] = tex;
-                    return tex;
+                    var tex = TexUtil.LoadFromPNG(packFile);
+                    if (tex != null)
+                    {
+                        LoadedT2DSpritesheets[cleanTexName] = tex;
+                        return tex;
+                    }
                 }
             }
         }
@@ -734,6 +761,11 @@ public static class T2DHandler
         return newSprite;
     }
 
+    private static string SanitizeForFilesystem(string textureName)
+    {
+        return textureName.Replace("|", "_");
+    }
+
     private static string CleanTextureName(string textureName)
     {
         if (textureName.Contains("-BC7-"))
@@ -742,9 +774,11 @@ public static class T2DHandler
             cleanName = string.Join("-", cleanName.Split('-').Take(cleanName.Split('-').Length - 1));
             return cleanName;
         }
-        if (textureName.Contains("DXT5|BC3-"))
+        // Handle both in-game name (DXT5|BC3-) and filesystem name (DXT5_BC3-)
+        if (textureName.Contains("DXT5|BC3-") || textureName.Contains("DXT5_BC3-"))
         {
-            string cleanName = textureName.Split(["DXT5|BC3-"], System.StringSplitOptions.None)[1];
+            string delimiter = textureName.Contains("DXT5|BC3-") ? "DXT5|BC3-" : "DXT5_BC3-";
+            string cleanName = textureName.Split([delimiter], System.StringSplitOptions.None)[1];
             cleanName = string.Join("-", cleanName.Split('-').Take(cleanName.Split('-').Length - 1));
             return cleanName;
         }
