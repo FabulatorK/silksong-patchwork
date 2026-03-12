@@ -366,25 +366,17 @@ public static class T2DHandler
 
     public static void ReloadSpritesInScene()
     {
-        // Destroy old individual sprite replacements
-        foreach (var sprite in LoadedT2DSprites.Values)
-        {
-            if (sprite != null && sprite.texture != null)
-                Object.Destroy(sprite.texture);
-            if (sprite != null)
-                Object.Destroy(sprite);
-        }
-        LoadedT2DSprites.Clear();
+        // Save old objects for deferred cleanup — do NOT destroy yet,
+        // because renderers still reference these sprites. Destroying
+        // now would leave renderers with null sprites, causing them to
+        // be skipped during the re-apply loop below.
+        var oldSprites = new List<Sprite>(LoadedT2DSprites.Values);
+        var oldTextures = new List<Texture2D>(PreloadedT2DTextures.Values);
 
-        foreach (var tex in PreloadedT2DTextures.Values)
-        {
-            if (tex != null)
-                Object.Destroy(tex);
-        }
+        // Clear caches (renderers still hold live references to old sprites)
+        LoadedT2DSprites.Clear();
         PreloadedT2DTextures.Clear();
         SpriteAtlasMap.Clear();
-
-        // Clear spritesheet tracking so textures get re-evaluated
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
@@ -402,6 +394,7 @@ public static class T2DHandler
         }
 
         // Re-apply individual sprite replacements to all renderers
+        // (renderers still have their old sprites, so sr.sprite != null)
         foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (spriteRenderer == null || spriteRenderer.sprite == null)
@@ -414,73 +407,57 @@ public static class T2DHandler
                 continue;
             HandleLoad(image, image.sprite);
         }
+
+        // NOW destroy old objects — renderers have been updated with new replacements
+        foreach (var sprite in oldSprites)
+        {
+            if (sprite != null && sprite.texture != null)
+                Object.Destroy(sprite.texture);
+            if (sprite != null)
+                Object.Destroy(sprite);
+        }
+        foreach (var tex in oldTextures)
+        {
+            if (tex != null)
+                Object.Destroy(tex);
+        }
     }
 
     public static void InvalidateSpritesheet(string texName)
     {
+        // NOTE: This may be called from the file watcher's background thread.
+        // Do NOT call Object.Destroy here — only clear caches.
+        // Actual object cleanup happens in ReloadSpritesInScene on the main thread.
         string cleanName = CleanTextureName(texName);
 
-        // Remove the spritesheet override so it gets re-read from disk
         SpritesheetOverrides.Remove(cleanName);
-
-        // Clear texture tracking so the texture gets re-evaluated
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
-        // Also invalidate any individual sprites that were associated with this atlas
         foreach (var kvp in SpriteAtlasMap.ToList())
         {
             if (CleanTextureName(kvp.Key) != cleanName)
                 continue;
 
             foreach (var spriteName in kvp.Value.ToList())
-            {
-                if (LoadedT2DSprites.TryGetValue(spriteName, out var sprite))
-                {
-                    if (sprite != null)
-                        Object.Destroy(sprite);
-                    LoadedT2DSprites.Remove(spriteName);
-                }
-            }
+                LoadedT2DSprites.Remove(spriteName);
         }
     }
 
     public static void InvalidateCache(string spriteName)
     {
-        if (LoadedT2DSprites.TryGetValue(spriteName, out var sprite))
-        {
-            if (sprite != null && sprite.texture != null)
-                Object.Destroy(sprite.texture);
-            if (sprite != null)
-                Object.Destroy(sprite);
-            LoadedT2DSprites.Remove(spriteName);
-        }
-
-        if (PreloadedT2DTextures.TryGetValue(spriteName, out var tex))
-        {
-            if (tex != null)
-                Object.Destroy(tex);
-            PreloadedT2DTextures.Remove(spriteName);
-        }
+        // NOTE: This is called from the file watcher's background thread.
+        // Do NOT call Object.Destroy here — only clear caches.
+        // Actual object cleanup happens in ReloadSpritesInScene on the main thread.
+        LoadedT2DSprites.Remove(spriteName);
+        PreloadedT2DTextures.Remove(spriteName);
 
         if (SpriteAtlasMap.TryGetValue(spriteName, out var atlasSprites))
         {
             foreach (var sprName in atlasSprites)
             {
-                if (LoadedT2DSprites.TryGetValue(sprName, out var atlasSprite))
-                {
-                    if (atlasSprite != null && atlasSprite.texture != null)
-                        Object.Destroy(atlasSprite.texture);
-                    if (atlasSprite != null)
-                        Object.Destroy(atlasSprite);
-                    LoadedT2DSprites.Remove(sprName);
-                }
-                if (PreloadedT2DTextures.TryGetValue(sprName, out var atlasTex))
-                {
-                    if (atlasTex != null)
-                        Object.Destroy(atlasTex);
-                    PreloadedT2DTextures.Remove(sprName);
-                }
+                LoadedT2DSprites.Remove(sprName);
+                PreloadedT2DTextures.Remove(sprName);
             }
             SpriteAtlasMap.Remove(spriteName);
         }
