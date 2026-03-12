@@ -391,7 +391,17 @@ public static class T2DHandler
         // Rebuild everything from disk
         BuildSpritesheetOverrides();
 
-        // Re-apply to all renderers
+        // Re-apply in-place texture swaps
+        if (SpritesheetOverrides.Count > 0)
+        {
+            foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
+            {
+                if (tex != null)
+                    TrySwapTexture(tex);
+            }
+        }
+
+        // Re-apply individual sprite replacements to all renderers
         foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (spriteRenderer == null || spriteRenderer.sprite == null)
