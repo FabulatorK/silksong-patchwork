@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BepInEx;
@@ -108,7 +108,8 @@ public class Plugin : BaseUnityPlugin
             PluginPackPaths.Add(dir);
         });
     }
-    private static int _frameCounter = 0;
+    private static float _t2dPollTimer = 0f;
+    private const float T2DPollInterval = 0.5f; // seconds
     private void Update()
     {
         if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
@@ -143,8 +144,12 @@ public class Plugin : BaseUnityPlugin
 
         AnimationController.Update();
 
-        if (++_frameCounter % 30 == 0)
-        T2DHandler.CheckForUninitializedSprites();
+        _t2dPollTimer += Time.deltaTime;
+        if (_t2dPollTimer >= T2DPollInterval)
+        {
+            _t2dPollTimer = 0f;
+            T2DHandler.CheckForUninitializedSprites();
+        }
     }
 
     private void LateUpdate()
