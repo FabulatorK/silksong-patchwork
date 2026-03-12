@@ -146,7 +146,8 @@ public static class T2DHandler
             if (!Directory.Exists(dir)) return;
             foreach (var file in Directory.GetFiles(dir, "*.png", SearchOption.TopDirectoryOnly))
             {
-                string name = Path.GetFileNameWithoutExtension(file);
+                string rawName = Path.GetFileNameWithoutExtension(file);
+                string name = CleanTextureName(rawName);
                 if (SpritesheetOverrides.ContainsKey(name)) continue;
 
                 try
