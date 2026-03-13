@@ -284,6 +284,21 @@ public static class T2DHandler
                 image.sprite = image.sprite;
             }
         }
+
+        // Catch particle system renderers that spawned after the scene sweep.
+        if (SpritesheetOverrides.Count > 0)
+        {
+            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+            {
+                if (psr == null) continue;
+                var mats = psr.sharedMaterials;
+                foreach (var mat in mats)
+                {
+                    if (mat != null && mat.mainTexture is Texture2D tex)
+                        TrySwapTexture(tex);
+                }
+            }
+        }
     }
 
     public static void EnforceT2DReplacements()
@@ -354,6 +369,24 @@ public static class T2DHandler
                 if (!SpriteAtlasMap.ContainsKey(texName))
                     SpriteAtlasMap[texName] = new HashSet<string>();
                 SpriteAtlasMap[texName].Add(original.name);
+            }
+        }
+
+        // Pass 2.5: Ensure particle system renderers pick up in-place texture swaps.
+        // ParticleSystemRenderer uses material textures (not Sprite objects), so it only
+        // needs the in-place swap. Unity may set particle materials internally without
+        // going through the C# Material.mainTexture setter we patch, so sweep explicitly.
+        if (SpritesheetOverrides.Count > 0)
+        {
+            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+            {
+                if (psr == null) continue;
+                var mats = psr.sharedMaterials;
+                foreach (var mat in mats)
+                {
+                    if (mat != null && mat.mainTexture is Texture2D tex)
+                        TrySwapTexture(tex);
+                }
             }
         }
 
@@ -456,6 +489,21 @@ public static class T2DHandler
             {
                 if (tex != null)
                     TrySwapTexture(tex);
+            }
+        }
+
+        // Re-apply in-place texture swaps to particle system renderers
+        if (SpritesheetOverrides.Count > 0)
+        {
+            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+            {
+                if (psr == null) continue;
+                var mats = psr.sharedMaterials;
+                foreach (var mat in mats)
+                {
+                    if (mat != null && mat.mainTexture is Texture2D tex)
+                        TrySwapTexture(tex);
+                }
             }
         }
 
