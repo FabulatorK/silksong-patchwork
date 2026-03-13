@@ -80,7 +80,12 @@ public static class T2DHandler
     public static void SetMaterialTexturePostfix(Texture value)
     {
         if (value is Texture2D tex)
+        {
             TrySwapTexture(tex);
+
+            if (Plugin.Config.DumpSprites && IsT2DTexture(tex.name))
+                DumpT2DAtlasTexture(tex);
+        }
     }
 
     // ================================================================
@@ -765,6 +770,83 @@ public static class T2DHandler
                 continue;
             if (IsT2DTexture(sprite.texture.name))
                 HandleDump(sprite);
+        }
+
+        DumpParticleTextures();
+    }
+
+    /// <summary>
+    /// Dumps T2D atlas textures used by ParticleSystemRenderers as full atlas PNGs.
+    /// Particle materials often reference T2D textures that have no corresponding
+    /// Sprite objects, so the normal Sprite-based dump path never sees them.
+    /// </summary>
+    private static void DumpParticleTextures()
+    {
+        HashSet<int> dumped = new();
+        foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+        {
+            if (psr == null) continue;
+            foreach (var mat in psr.sharedMaterials)
+            {
+                if (mat == null || mat.mainTexture is not Texture2D tex)
+                    continue;
+                if (!IsT2DTexture(tex.name))
+                    continue;
+                if (!dumped.Add(tex.GetInstanceID()))
+                    continue;
+
+                DumpT2DAtlasTexture(tex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dumps a T2D atlas texture as a full PNG, plus extracts any individual
+    /// Sprite frames that reference it.
+    /// </summary>
+    private static void DumpT2DAtlasTexture(Texture2D tex)
+    {
+        string cleanName = CleanTextureName(tex.name);
+        string saveDir = Path.Combine(T2DDumpPath, cleanName);
+        string atlasPath = Path.Combine(saveDir, "_atlas.png");
+
+        if (File.Exists(atlasPath))
+            return;
+
+        // Blit to a readable RenderTexture
+        RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
+        var previous = RenderTexture.active;
+        Texture2D readable = null;
+
+        try
+        {
+            Graphics.Blit(tex, rt);
+            RenderTexture.active = rt;
+            readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+            readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+            readable.Apply();
+
+            IOUtil.EnsureDirectoryExists(saveDir);
+            File.WriteAllBytes(atlasPath, readable.EncodeToPNG());
+            Plugin.Logger.LogInfo($"[T2D] Dumped particle atlas: '{cleanName}' ({tex.width}x{tex.height})");
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(rt);
+            if (readable != null) Object.Destroy(readable);
+        }
+
+        // Also dump any individual Sprite frames that reference this atlas
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (sprite == null || sprite.texture == null)
+                continue;
+            if (sprite.texture.GetInstanceID() != tex.GetInstanceID())
+                continue;
+            if (string.IsNullOrEmpty(sprite.name))
+                continue;
+            HandleDump(sprite);
         }
     }
 
