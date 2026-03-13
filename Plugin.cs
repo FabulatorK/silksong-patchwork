@@ -143,8 +143,10 @@ public class Plugin : BaseUnityPlugin
 
         AnimationController.Update();
 
-        if (++_frameCounter % 30 == 0)
-        T2DHandler.CheckForUninitializedSprites();
+        // Safety net: re-trigger setter for untracked sprites (lazy disk load path).
+        // The main enforcement in LateUpdate handles most cases every frame.
+        if (++_frameCounter % 120 == 0)
+            T2DHandler.CheckForUninitializedSprites();
     }
 
     private void LateUpdate()

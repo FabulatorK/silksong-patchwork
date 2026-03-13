@@ -295,24 +295,72 @@ public static class T2DHandler
 
     public static void EnforceT2DReplacements()
     {
+        if (LoadedT2DSprites.Count == 0 && PreloadedT2DTextures.Count == 0)
+            return;
+
         _enforcing = true;
         try
         {
-            KnownT2DSpriteRenderers.RemoveWhere(sr => sr == null);
-            foreach (var sr in KnownT2DSpriteRenderers)
+            // Sweep ALL active SpriteRenderers to catch newly-instantiated ones.
+            // Object.Instantiate copies sprite references at the native level,
+            // bypassing the C# property setter (and our Harmony postfix).
+            // Without this sweep, cloned renderers show vanilla sprites until
+            // CheckForUninitializedSprites runs (every 30 frames).
+            foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
             {
-                if (sr.sprite == null) continue;
-                if (LoadedT2DSprites.TryGetValue(sr.sprite.name, out var replacement) && sr.sprite != replacement)
-                    sr.sprite = replacement;
+                if (sr == null || sr.sprite == null) continue;
+                var sprite = sr.sprite;
+
+                if (LoadedT2DSprites.TryGetValue(sprite.name, out var replacement))
+                {
+                    if (sprite != replacement)
+                    {
+                        sr.sprite = replacement;
+                        KnownT2DSpriteRenderers.Add(sr);
+                    }
+                }
+                else if (PreloadedT2DTextures.TryGetValue(sprite.name, out var tex))
+                {
+                    var newSprite = Sprite.Create(tex,
+                        new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+                    newSprite.name = sprite.name;
+                    LoadedT2DSprites[sprite.name] = newSprite;
+                    PreloadedT2DTextures.Remove(sprite.name);
+                    sr.sprite = newSprite;
+                    KnownT2DSpriteRenderers.Add(sr);
+                }
             }
 
-            KnownT2DImages.RemoveWhere(img => img == null);
-            foreach (var img in KnownT2DImages)
+            foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
             {
-                if (img.sprite == null) continue;
-                if (LoadedT2DSprites.TryGetValue(img.sprite.name, out var replacement) && img.sprite != replacement)
-                    img.sprite = replacement;
+                if (img == null || img.sprite == null) continue;
+                var sprite = img.sprite;
+
+                if (LoadedT2DSprites.TryGetValue(sprite.name, out var replacement))
+                {
+                    if (sprite != replacement)
+                    {
+                        img.sprite = replacement;
+                        KnownT2DImages.Add(img);
+                    }
+                }
+                else if (PreloadedT2DTextures.TryGetValue(sprite.name, out var tex))
+                {
+                    var newSprite = Sprite.Create(tex,
+                        new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+                    newSprite.name = sprite.name;
+                    LoadedT2DSprites[sprite.name] = newSprite;
+                    PreloadedT2DTextures.Remove(sprite.name);
+                    img.sprite = newSprite;
+                    KnownT2DImages.Add(img);
+                }
             }
+
+            // Clean up destroyed references periodically
+            KnownT2DSpriteRenderers.RemoveWhere(sr => sr == null);
+            KnownT2DImages.RemoveWhere(img => img == null);
         }
         finally
         {
