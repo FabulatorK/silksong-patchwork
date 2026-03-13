@@ -37,8 +37,6 @@ public static class T2DHandler
     private static bool _enforcing = false;
     private static bool _handling = false;
 
-    // Diagnostic: tracks which particle textures we've already logged, so we log once per texture, not per frame.
-    private static readonly HashSet<int> DiagLoggedParticleTextures = new();
 
     // ================================================================
     //  Harmony patches — sprite/material setters
@@ -293,20 +291,6 @@ public static class T2DHandler
             }
         }
 
-        // Catch particle system renderers that spawned after the scene sweep.
-        if (SpritesheetOverrides.Count > 0)
-        {
-            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
-            {
-                if (psr == null) continue;
-                var mats = psr.sharedMaterials;
-                foreach (var mat in mats)
-                {
-                    if (mat != null && mat.mainTexture is Texture2D tex)
-                        TrySwapTexture(tex);
-                }
-            }
-        }
     }
 
     public static void EnforceT2DReplacements()
@@ -353,31 +337,6 @@ public static class T2DHandler
             }
         }
 
-        // DIAGNOSTIC: After the Texture2D sweep, check what particle renderers have.
-        // Logs once per unique texture. Remove after investigation.
-        foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
-        {
-            if (psr == null) continue;
-            foreach (var mat in psr.sharedMaterials)
-            {
-                if (mat == null || mat.mainTexture is not Texture2D ptex) continue;
-                if (!DiagLoggedParticleTextures.Add(ptex.GetInstanceID())) continue;
-
-                string status = ReplacedTextureIds.Contains(ptex.GetInstanceID()) ? "REPLACED"
-                    : SkippedTextureIds.Contains(ptex.GetInstanceID()) ? "SKIPPED (no override match)"
-                    : "NOT SEEN by Pass 1 sweep";
-                bool isT2D = IsT2DTexture(ptex.name);
-                string cleanName = isT2D ? CleanTextureName(ptex.name) : "(n/a)";
-                bool hasOverride = isT2D && SpritesheetOverrides.ContainsKey(cleanName);
-
-                Plugin.Logger.LogInfo(
-                    $"[T2D-DIAG] Particle texture: '{ptex.name}' | " +
-                    $"IsT2D={isT2D} | CleanName='{cleanName}' | " +
-                    $"HasOverride={hasOverride} | Status={status} | " +
-                    $"GO='{psr.gameObject.name}'");
-            }
-        }
-
         // Pass 2: Convert remaining preloaded individual textures into Sprites.
         if (PreloadedT2DTextures.Count > 0)
         {
@@ -402,24 +361,6 @@ public static class T2DHandler
                 if (!SpriteAtlasMap.ContainsKey(texName))
                     SpriteAtlasMap[texName] = new HashSet<string>();
                 SpriteAtlasMap[texName].Add(original.name);
-            }
-        }
-
-        // Pass 2.5: Ensure particle system renderers pick up in-place texture swaps.
-        // ParticleSystemRenderer uses material textures (not Sprite objects), so it only
-        // needs the in-place swap. Unity may set particle materials internally without
-        // going through the C# Material.mainTexture setter we patch, so sweep explicitly.
-        if (SpritesheetOverrides.Count > 0)
-        {
-            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
-            {
-                if (psr == null) continue;
-                var mats = psr.sharedMaterials;
-                foreach (var mat in mats)
-                {
-                    if (mat != null && mat.mainTexture is Texture2D tex)
-                        TrySwapTexture(tex);
-                }
             }
         }
 
@@ -511,7 +452,6 @@ public static class T2DHandler
         SpriteAtlasMap.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
-        DiagLoggedParticleTextures.Clear();
 
         // Rebuild everything from disk
         BuildSpritesheetOverrides();
@@ -523,21 +463,6 @@ public static class T2DHandler
             {
                 if (tex != null)
                     TrySwapTexture(tex);
-            }
-        }
-
-        // Re-apply in-place texture swaps to particle system renderers
-        if (SpritesheetOverrides.Count > 0)
-        {
-            foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
-            {
-                if (psr == null) continue;
-                var mats = psr.sharedMaterials;
-                foreach (var mat in mats)
-                {
-                    if (mat != null && mat.mainTexture is Texture2D tex)
-                        TrySwapTexture(tex);
-                }
             }
         }
 
@@ -801,17 +726,20 @@ public static class T2DHandler
                 HandleDump(sprite);
         }
 
-        DumpParticleTextures();
+        DumpStandaloneTextures();
     }
 
     /// <summary>
-    /// Dumps T2D atlas textures used by ParticleSystemRenderers as full atlas PNGs.
-    /// Particle materials often reference T2D textures that have no corresponding
-    /// Sprite objects, so the normal Sprite-based dump path never sees them.
+    /// Dumps standalone Texture2D assets (e.g. particle textures) that have no
+    /// corresponding Sprite objects and aren't T2D atlases. These are plain-named
+    /// textures like "rock_particles" or "soul_orb" that the Sprite-based dump
+    /// path never sees. Saved to Spritesheets/T2D/{textureName}.png.
     /// </summary>
-    private static void DumpParticleTextures()
+    private static void DumpStandaloneTextures()
     {
         HashSet<int> dumped = new();
+        string saveDirBase = Path.Combine(T2DDumpPath, "_standalone");
+
         foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
         {
             if (psr == null) continue;
@@ -819,12 +747,35 @@ public static class T2DHandler
             {
                 if (mat == null || mat.mainTexture is not Texture2D tex)
                     continue;
-                if (!IsT2DTexture(tex.name))
-                    continue;
                 if (!dumped.Add(tex.GetInstanceID()))
                     continue;
 
-                DumpT2DAtlasTexture(tex);
+                string savePath = Path.Combine(saveDirBase, tex.name + ".png");
+                if (File.Exists(savePath))
+                    continue;
+
+                RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
+                var previous = RenderTexture.active;
+                Texture2D readable = null;
+
+                try
+                {
+                    Graphics.Blit(tex, rt);
+                    RenderTexture.active = rt;
+                    readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+                    readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+                    readable.Apply();
+
+                    IOUtil.EnsureDirectoryExists(saveDirBase);
+                    File.WriteAllBytes(savePath, readable.EncodeToPNG());
+                    Plugin.Logger.LogInfo($"[T2D] Dumped standalone texture: '{tex.name}' ({tex.width}x{tex.height})");
+                }
+                finally
+                {
+                    RenderTexture.active = previous;
+                    RenderTexture.ReleaseTemporary(rt);
+                    if (readable != null) Object.Destroy(readable);
+                }
             }
         }
     }
