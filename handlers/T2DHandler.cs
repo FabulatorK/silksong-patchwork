@@ -37,6 +37,9 @@ public static class T2DHandler
     private static bool _enforcing = false;
     private static bool _handling = false;
 
+    // Diagnostic: tracks which particle textures we've already logged, so we log once per texture, not per frame.
+    private static readonly HashSet<int> DiagLoggedParticleTextures = new();
+
     // ================================================================
     //  Harmony patches — sprite/material setters
     // ================================================================
@@ -350,6 +353,31 @@ public static class T2DHandler
             }
         }
 
+        // DIAGNOSTIC: After the Texture2D sweep, check what particle renderers have.
+        // Logs once per unique texture. Remove after investigation.
+        foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+        {
+            if (psr == null) continue;
+            foreach (var mat in psr.sharedMaterials)
+            {
+                if (mat == null || mat.mainTexture is not Texture2D ptex) continue;
+                if (!DiagLoggedParticleTextures.Add(ptex.GetInstanceID())) continue;
+
+                string status = ReplacedTextureIds.Contains(ptex.GetInstanceID()) ? "REPLACED"
+                    : SkippedTextureIds.Contains(ptex.GetInstanceID()) ? "SKIPPED (no override match)"
+                    : "NOT SEEN by Pass 1 sweep";
+                bool isT2D = IsT2DTexture(ptex.name);
+                string cleanName = isT2D ? CleanTextureName(ptex.name) : "(n/a)";
+                bool hasOverride = isT2D && SpritesheetOverrides.ContainsKey(cleanName);
+
+                Plugin.Logger.LogInfo(
+                    $"[T2D-DIAG] Particle texture: '{ptex.name}' | " +
+                    $"IsT2D={isT2D} | CleanName='{cleanName}' | " +
+                    $"HasOverride={hasOverride} | Status={status} | " +
+                    $"GO='{psr.gameObject.name}'");
+            }
+        }
+
         // Pass 2: Convert remaining preloaded individual textures into Sprites.
         if (PreloadedT2DTextures.Count > 0)
         {
@@ -483,6 +511,7 @@ public static class T2DHandler
         SpriteAtlasMap.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
+        DiagLoggedParticleTextures.Clear();
 
         // Rebuild everything from disk
         BuildSpritesheetOverrides();
