@@ -37,6 +37,12 @@
 - [ ] Conditions: health, selected crest, equipped items, etc.
 - [ ] Condition configuration format TBD (likely per-sprite JSON or folder convention)
 
+### TintRenderer Investigation
+*"They tint sprites at runtime. We must understand this sorcery before we can subvert it."*
+- [ ] Investigate how TintRenderer works and interacts with sprite replacement
+- [ ] Determine if tint colors are applied post-replacement or need special handling
+- [ ] Check if TintRenderer conflicts with T2D in-place texture swaps
+
 ### Spritesheet Size Mismatch Handling
 *"The Hornet atlas dares to appear at multiple resolutions. We must accommodate this... insolence."*
 - [ ] Runtime textures for the same atlas name can appear at different sizes (e.g. Hornet: 4096x4096, 333x467, 650x429)
