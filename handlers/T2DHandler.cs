@@ -118,9 +118,10 @@ public static class T2DHandler
         {
             Plugin.Logger.LogWarning(
                 $"[T2D] Spritesheet size mismatch for '{cleanName}': " +
-                $"runtime texture is {tex.width}x{tex.height}, " +
+                $"runtime texture '{tex.name}' is {tex.width}x{tex.height}, " +
                 $"replacement PNG is {data.Width}x{data.Height}. " +
-                $"Skipping — ensure your spritesheet matches the original atlas dimensions.");
+                $"Skipping — ensure your spritesheet matches the original atlas dimensions. " +
+                $"(texture ID: {id})");
             SkippedTextureIds.Add(id);
             return false;
         }
@@ -778,54 +779,72 @@ public static class T2DHandler
     }
 
     /// <summary>
-    /// Dumps standalone Texture2D assets (e.g. particle textures) that have no
-    /// corresponding Sprite objects and aren't T2D atlases. These are plain-named
-    /// textures like "rock_particles" or "soul_orb" that the Sprite-based dump
-    /// path never sees. Saved to Spritesheets/T2D/{textureName}.png.
+    /// Dumps standalone Texture2D assets that have no corresponding Sprite objects
+    /// and aren't T2D atlases. Sweeps all loaded Texture2D objects in memory rather
+    /// than iterating specific renderer types, so nothing slips through the cracks.
+    /// Saved to Dumps/T2D/_standalone/{textureName}.png.
     /// </summary>
     private static void DumpStandaloneTextures()
     {
-        HashSet<int> dumped = new();
-        string saveDirBase = Path.Combine(T2DDumpPath, "_standalone");
-
-        foreach (var psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsSortMode.None))
+        // Collect texture IDs that are referenced by Sprite objects — these are
+        // already handled by the Sprite-based dump path and should be skipped.
+        HashSet<int> spriteTextureIds = new();
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
         {
-            if (psr == null) continue;
-            foreach (var mat in psr.sharedMaterials)
+            if (sprite != null && sprite.texture != null)
+                spriteTextureIds.Add(sprite.texture.GetInstanceID());
+        }
+
+        string saveDirBase = Path.Combine(T2DDumpPath, "_standalone");
+        int count = 0;
+
+        foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
+        {
+            if (tex == null || string.IsNullOrEmpty(tex.name))
+                continue;
+
+            // Skip T2D atlases — already dumped by HandleDump/DumpT2DAtlasTexture
+            if (IsT2DTexture(tex.name))
+                continue;
+
+            // Skip textures that back Sprite objects — dumped via DumpAllT2DSprites
+            if (spriteTextureIds.Contains(tex.GetInstanceID()))
+                continue;
+
+            // Skip Unity built-in and editor textures
+            if (tex.name.StartsWith("unity_") || tex.name.StartsWith("UI"))
+                continue;
+
+            string savePath = Path.Combine(saveDirBase, tex.name + ".png");
+            if (File.Exists(savePath))
+                continue;
+
+            RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            Texture2D readable = null;
+
+            try
             {
-                if (mat == null || mat.mainTexture is not Texture2D tex)
-                    continue;
-                if (!dumped.Add(tex.GetInstanceID()))
-                    continue;
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+                readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+                readable.Apply();
 
-                string savePath = Path.Combine(saveDirBase, tex.name + ".png");
-                if (File.Exists(savePath))
-                    continue;
-
-                RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
-                var previous = RenderTexture.active;
-                Texture2D readable = null;
-
-                try
-                {
-                    Graphics.Blit(tex, rt);
-                    RenderTexture.active = rt;
-                    readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
-                    readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
-                    readable.Apply();
-
-                    IOUtil.EnsureDirectoryExists(saveDirBase);
-                    File.WriteAllBytes(savePath, readable.EncodeToPNG());
-                    Plugin.Logger.LogInfo($"[T2D] Dumped standalone texture: '{tex.name}' ({tex.width}x{tex.height})");
-                }
-                finally
-                {
-                    RenderTexture.active = previous;
-                    RenderTexture.ReleaseTemporary(rt);
-                    if (readable != null) Object.Destroy(readable);
-                }
+                IOUtil.EnsureDirectoryExists(saveDirBase);
+                File.WriteAllBytes(savePath, readable.EncodeToPNG());
+                count++;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+                if (readable != null) Object.Destroy(readable);
             }
         }
+
+        if (count > 0)
+            Plugin.Logger.LogInfo($"[T2D] Dumped {count} standalone textures to {saveDirBase}");
     }
 
     /// <summary>

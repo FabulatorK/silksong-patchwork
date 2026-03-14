@@ -48,6 +48,9 @@
 - [ ] Runtime textures for the same atlas name can appear at different sizes (e.g. Hornet: 4096x4096, 333x467, 650x429)
 - [ ] Currently skipped with a warning when replacement PNG dimensions don't match
 - [ ] Investigate scaling replacement to match, or supporting multiple resolution variants
+- [ ] **Tracking**: Mismatch warning now logs full raw texture name and instance ID for cross-referencing
+- [ ] Catalogue all observed Hornet atlas resolutions from logs to determine if variants are scene-specific or LOD-based
+- [ ] Decide approach: multi-resolution replacement PNGs, runtime scaling, or both
 
 ---
 
@@ -71,6 +74,7 @@
 - [x] Replacement PNGs placed in `Spritesheets/T2D/{textureName}.png` (same as atlas spritesheets)
 - [x] Dump support via `DumpStandaloneTextures()` — outputs to `Dumps/T2D/_standalone/`
 - [x] No dedicated particle sweep needed — the global `Texture2D` sweep is sufficient
+- [x] Dump broadened: sweeps all `Resources.FindObjectsOfTypeAll<Texture2D>()` instead of only `ParticleSystemRenderer` materials
 
 ### Eager Loading System
 *"Every sprite, locked and loaded before the scene even knows what happened."*
