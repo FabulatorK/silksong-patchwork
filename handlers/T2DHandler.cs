@@ -31,6 +31,11 @@ public static class T2DHandler
     private static readonly Dictionary<string, Texture2D> PreloadedT2DTextures = new();
     private static readonly Dictionary<string, HashSet<string>> SpriteAtlasMap = new();
 
+    // Sprite names that are confirmed to belong to T2D atlas textures.
+    // Used to scope enforcement/loading — prevents replacing UI sprites
+    // that happen to share a name with a T2D replacement file.
+    private static readonly HashSet<string> ConfirmedT2DSpriteNames = new();
+
     private static readonly Dictionary<int, string> TrackedSpriteNames = new();
     private static readonly HashSet<SpriteRenderer> KnownT2DSpriteRenderers = new();
     private static readonly HashSet<Image> KnownT2DImages = new();
@@ -265,6 +270,10 @@ public static class T2DHandler
             int id = spriteRenderer.GetInstanceID();
             string currentName = spriteRenderer.sprite.name;
 
+            // Only re-trigger setter for sprites confirmed to be T2D-backed.
+            if (!ConfirmedT2DSpriteNames.Contains(currentName))
+                continue;
+
             bool nameChanged = !TrackedSpriteNames.TryGetValue(id, out string lastSprite) || lastSprite != currentName;
             bool replacementMissing = !nameChanged
                 && LoadedT2DSprites.TryGetValue(currentName, out var cached)
@@ -284,6 +293,10 @@ public static class T2DHandler
 
             int id = image.GetInstanceID();
             string currentName = image.sprite.name;
+
+            // Only re-trigger setter for sprites confirmed to be T2D-backed.
+            if (!ConfirmedT2DSpriteNames.Contains(currentName))
+                continue;
 
             bool nameChanged = !TrackedSpriteNames.TryGetValue(id, out string lastSprite) || lastSprite != currentName;
             bool replacementMissing = !nameChanged
@@ -317,6 +330,10 @@ public static class T2DHandler
                 if (sr == null || sr.sprite == null) continue;
                 var sprite = sr.sprite;
 
+                // Only enforce on sprites confirmed to be T2D-backed.
+                if (!ConfirmedT2DSpriteNames.Contains(sprite.name))
+                    continue;
+
                 if (LoadedT2DSprites.TryGetValue(sprite.name, out var replacement))
                 {
                     if (sprite != replacement)
@@ -342,6 +359,10 @@ public static class T2DHandler
             {
                 if (img == null || img.sprite == null) continue;
                 var sprite = img.sprite;
+
+                // Only enforce on sprites confirmed to be T2D-backed.
+                if (!ConfirmedT2DSpriteNames.Contains(sprite.name))
+                    continue;
 
                 if (LoadedT2DSprites.TryGetValue(sprite.name, out var replacement))
                 {
@@ -400,6 +421,9 @@ public static class T2DHandler
                     continue;
                 if (!IsT2DTexture(original.texture.name))
                     continue;
+
+                ConfirmedT2DSpriteNames.Add(original.name);
+
                 if (!PreloadedT2DTextures.TryGetValue(original.name, out var tex))
                     continue;
 
@@ -468,6 +492,10 @@ public static class T2DHandler
                 continue;
             if (!IsT2DTexture(original.texture.name))
                 continue;
+
+            // Register this sprite name as confirmed T2D so enforcement
+            // doesn't accidentally replace UI sprites with the same name.
+            ConfirmedT2DSpriteNames.Add(original.name);
 
             if (PreloadedT2DTextures.TryGetValue(original.name, out var tex))
             {
@@ -609,8 +637,11 @@ public static class T2DHandler
         _handling = true;
         try
         {
-            // Check for a cached individual sprite replacement
-            if (LoadedT2DSprites.TryGetValue(sprite.name, out var cached))
+            // Check for a cached individual sprite replacement.
+            // Gate on ConfirmedT2DSpriteNames to prevent replacing UI sprites
+            // that happen to share a name with a T2D replacement file.
+            if (ConfirmedT2DSpriteNames.Contains(sprite.name)
+                && LoadedT2DSprites.TryGetValue(sprite.name, out var cached))
             {
                 spriteSetter.Invoke(spriteContainer, [cached]);
                 TrackT2DContainer(spriteContainer);
@@ -619,6 +650,7 @@ public static class T2DHandler
 
             if (IsT2DTexture(sprite.texture.name))
             {
+                ConfirmedT2DSpriteNames.Add(sprite.name);
                 string cleanTexName = CleanTextureName(sprite.texture.name);
 
                 // Bulk-load all individual replacement textures for this atlas on first encounter

@@ -43,18 +43,16 @@
 - [ ] Determine if tint colors are applied post-replacement or need special handling
 - [ ] Check if TintRenderer conflicts with T2D in-place texture swaps
 
-### Shared Atlas Contamination (UI Vanishing Bug)
-*"Unity packs sprites from different systems into one atlas. Replace the atlas, lose the UI. Diabolical."*
-- [ ] **Root cause**: `TrySwapTexture` does `LoadImage()` which overwrites the entire atlas pixel data
-  - Unity can pack character sprites AND UI sprites (silk spool, bar, crests) into the same runtime atlas
-  - When a modder provides e.g. `Hornet.png` with only Hornet frames, UI sprite regions become transparent → they vanish
-  - The 4096x4096 "Hornet" atlas may contain the silk spool, equipment bar, and crest icons
-- [x] **Diagnostic**: `LogAtlasContents()` now logs ALL sprites sharing a replaced atlas so modders can see collateral damage
-- [ ] **Fix options** (prioritized):
-  1. Composite replacement: only overwrite sprite rect regions that the modder intends to change, preserve the rest
-  2. Allow modders to include all atlas sprites in their replacement PNG (requires atlas content documentation)
-  3. Per-sprite opt-out: let modders mark specific sprites as "do not replace" in a config
-- [ ] Use dump logs to catalogue which atlases are shared between game systems
+### UI Vanishing Bug (Fixed — Sprite Name Collision)
+*"The enforcement loop couldn't tell a UI sprite from a T2D sprite. Every frame, it replaced the wrong ones."*
+- [x] **Root cause**: NOT shared atlas contamination — the Hornet atlas contains only Hornet sprites (134 of them, confirmed via `LogAtlasContents`)
+- [x] **Actual root cause**: `EnforceT2DReplacements` (runs every `LateUpdate`) and `HandleLoad` looked up sprites by `sprite.name` in `LoadedT2DSprites`/`PreloadedT2DTextures` without checking if the sprite was actually T2D-backed
+  - If a UI `Image` sprite shared a name with any T2D replacement file, the enforcement loop would replace it every frame
+  - The replacement Sprite has wrong rect/dimensions → UI element renders as blank
+- [x] **Fix**: Added `ConfirmedT2DSpriteNames` HashSet — only sprites confirmed to be on T2D atlas textures (via `IsT2DTexture`) are eligible for replacement/enforcement
+  - Populated during `PreloadAllT2DTextures`, `ApplyT2DReplacementsInScene`, and `HandleLoad`
+  - Gates `EnforceT2DReplacements`, `CheckForUninitializedSprites`, and `HandleLoad` cached lookup
+- [x] **Diagnostic**: `LogAtlasContents()` logs ALL sprites sharing a replaced atlas for visibility
 
 ### Spritesheet Size Mismatch Handling
 *"The Hornet atlas dares to appear at multiple resolutions. We must accommodate this... insolence."*
