@@ -765,14 +765,26 @@ public static class T2DHandler
 
     public static void DumpAllT2DSprites()
     {
+        HashSet<int> dumpedTextureIds = new();
         foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
         {
             if (sprite == null || sprite.texture == null)
                 continue;
             if (string.IsNullOrEmpty(sprite.name) || string.IsNullOrEmpty(sprite.texture.name))
                 continue;
+
             if (IsT2DTexture(sprite.texture.name))
+            {
                 HandleDump(sprite);
+            }
+            else
+            {
+                // Non-T2D textures with Sprite objects (e.g. Particles_ash):
+                // dump the full texture once, keyed by texture instance ID.
+                if (!dumpedTextureIds.Add(sprite.texture.GetInstanceID()))
+                    continue;
+                HandleDump(sprite);
+            }
         }
 
         DumpStandaloneTextures();
@@ -815,7 +827,8 @@ public static class T2DHandler
             if (tex.name.StartsWith("unity_") || tex.name.StartsWith("UI"))
                 continue;
 
-            string savePath = Path.Combine(saveDirBase, tex.name + ".png");
+            string safeName = SanitizeForFilesystem(tex.name);
+            string savePath = Path.Combine(saveDirBase, safeName + ".png");
             if (File.Exists(savePath))
                 continue;
 
@@ -971,9 +984,12 @@ public static class T2DHandler
         }
         else
         {
-            string savePath = Path.Combine(T2DDumpPath, sprite.texture.name + ".png");
+            string safeName = SanitizeForFilesystem(sprite.texture.name);
+            string savePath = Path.Combine(T2DDumpPath, safeName + ".png");
             if (File.Exists(savePath))
                 return;
+
+            Plugin.Logger.LogInfo($"[T2D] Dumping non-atlas texture: '{sprite.texture.name}' -> {safeName}.png");
 
             RenderTexture spriteRT = null;
             Texture2D readableTex = null;
@@ -1012,7 +1028,11 @@ public static class T2DHandler
 
     private static string SanitizeForFilesystem(string textureName)
     {
-        return textureName.Replace("|", "_");
+        return textureName
+            .Replace("|", "_")
+            .Replace("/", "_")
+            .Replace("\\", "_")
+            .Replace(":", "_");
     }
 
     private static string CleanTextureName(string textureName)

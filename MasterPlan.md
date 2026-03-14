@@ -52,6 +52,17 @@
 - [ ] Catalogue all observed Hornet atlas resolutions from logs to determine if variants are scene-specific or LOD-based
 - [ ] Decide approach: multi-resolution replacement PNGs, runtime scaling, or both
 
+### Non-Atlas Texture Dump Gap (Fixed)
+*"Particles_ash hid in the cracks between atlas and standalone. No more."*
+- [x] **Problem**: Non-T2D textures with Sprite objects (e.g. `Particles_ash` at internal path `Assets/Sprites/Hero/Knight/death_v02`) were missed by both dump paths
+  - `DumpAllT2DSprites` only called `HandleDump` for `IsT2DTexture()` textures
+  - `DumpStandaloneTextures` skipped anything with Sprite references
+  - The `else` branch in `HandleDump` was effectively dead code
+- [x] **Fix**: `DumpAllT2DSprites` now also dumps non-T2D sprite-backed textures (one per texture instance ID)
+- [x] **Sanitization**: `SanitizeForFilesystem()` now strips `/`, `\`, `:` in addition to `|` for safe file paths
+- [x] **Logging**: Non-atlas texture dumps now log raw name → sanitized name mapping for modder discoverability
+- [ ] **Open question**: Should Patchwork support organizing replacements by internal asset path, or is flat `Sprites/T2D/{textureName}.png` sufficient?
+
 ---
 
 ## Phase 2: Accomplished
