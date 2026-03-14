@@ -133,6 +133,11 @@ public static class T2DHandler
                 $"[T2D] Spritesheet applied in-place: '{cleanName}' " +
                 $"(texture '{tex.name}', {tex.width}x{tex.height})");
 
+            // Log all sprites sharing this atlas so modders know what they're affecting.
+            // If UI sprites live on the same atlas, the modder needs to include them
+            // in their replacement PNG or they'll vanish.
+            LogAtlasContents(tex, cleanName);
+
             if (Plugin.Config.ConvertSpritesheets)
                 ConvertT2DSpritesheet(tex, cleanName);
 
@@ -1033,6 +1038,33 @@ public static class T2DHandler
             .Replace("/", "_")
             .Replace("\\", "_")
             .Replace(":", "_");
+    }
+
+    /// <summary>
+    /// Logs all Sprite objects that reference a given atlas texture.
+    /// Helps modders identify when a shared atlas contains sprites from
+    /// multiple systems (e.g. character animations + UI elements).
+    /// </summary>
+    private static void LogAtlasContents(Texture2D tex, string cleanName)
+    {
+        var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        var sharedSprites = new List<string>();
+
+        foreach (var sprite in sprites)
+        {
+            if (sprite == null || sprite.texture == null)
+                continue;
+            if (sprite.texture.GetInstanceID() != tex.GetInstanceID())
+                continue;
+            sharedSprites.Add($"{sprite.name} ({sprite.rect.width}x{sprite.rect.height})");
+        }
+
+        if (sharedSprites.Count > 0)
+        {
+            Plugin.Logger.LogInfo(
+                $"[T2D] Atlas '{cleanName}' contains {sharedSprites.Count} sprites: " +
+                string.Join(", ", sharedSprites));
+        }
     }
 
     private static string CleanTextureName(string textureName)

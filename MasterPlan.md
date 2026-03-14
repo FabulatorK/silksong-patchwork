@@ -43,6 +43,19 @@
 - [ ] Determine if tint colors are applied post-replacement or need special handling
 - [ ] Check if TintRenderer conflicts with T2D in-place texture swaps
 
+### Shared Atlas Contamination (UI Vanishing Bug)
+*"Unity packs sprites from different systems into one atlas. Replace the atlas, lose the UI. Diabolical."*
+- [ ] **Root cause**: `TrySwapTexture` does `LoadImage()` which overwrites the entire atlas pixel data
+  - Unity can pack character sprites AND UI sprites (silk spool, bar, crests) into the same runtime atlas
+  - When a modder provides e.g. `Hornet.png` with only Hornet frames, UI sprite regions become transparent → they vanish
+  - The 4096x4096 "Hornet" atlas may contain the silk spool, equipment bar, and crest icons
+- [x] **Diagnostic**: `LogAtlasContents()` now logs ALL sprites sharing a replaced atlas so modders can see collateral damage
+- [ ] **Fix options** (prioritized):
+  1. Composite replacement: only overwrite sprite rect regions that the modder intends to change, preserve the rest
+  2. Allow modders to include all atlas sprites in their replacement PNG (requires atlas content documentation)
+  3. Per-sprite opt-out: let modders mark specific sprites as "do not replace" in a config
+- [ ] Use dump logs to catalogue which atlases are shared between game systems
+
 ### Spritesheet Size Mismatch Handling
 *"The Hornet atlas dares to appear at multiple resolutions. We must accommodate this... insolence."*
 - [ ] Runtime textures for the same atlas name can appear at different sizes (e.g. Hornet: 4096x4096, 333x467, 650x429)
@@ -51,6 +64,7 @@
 - [ ] **Tracking**: Mismatch warning now logs full raw texture name and instance ID for cross-referencing
 - [ ] Catalogue all observed Hornet atlas resolutions from logs to determine if variants are scene-specific or LOD-based
 - [ ] Decide approach: multi-resolution replacement PNGs, runtime scaling, or both
+- [ ] **Note**: Smaller "Hornet" atlas instances (333x467, 650x429) may actually be UI atlases containing Hornet icons — investigate whether these are distinct from the main character atlas
 
 ### Non-Atlas Texture Dump Gap (Fixed)
 *"Particles_ash hid in the cracks between atlas and standalone. No more."*
