@@ -66,8 +66,12 @@
   - Mismatched atlases now also get `LogAtlasContents()` output for diagnostics
 - [x] **File layout**: Two ways to provide variants:
   - Flat: `Spritesheets/T2D/Hornet.png` (single size, as before)
+  - Raw names: `sactx-1-2048x2048-BC7-Hornet-5bdf1644.png` and `sactx-0-4096x4096-BC7-Hornet-5bdf1644.png` — both clean to "Hornet", stored as separate dimension variants
   - Subdirectory: `Spritesheets/T2D/Hornet/*.png` (multiple PNGs at different sizes)
   - Both approaches can coexist; duplicates at the same dimensions are skipped
+- [x] **Dump collision fix**: `DumpT2DAtlasTexture` now writes `_atlas_{W}x{H}.png` instead of `_atlas.png` — both Hornet atlases dump without overwriting each other
+- [x] **Convert collision fix**: `ConvertT2DSpritesheet` now outputs to `Converted/T2D/{name}/{W}x{H}/` subdirectories
+- [x] **LogAtlasContents** now includes texture dimensions and raw name for easy cross-referencing
 
 ### UI Vanishing Bug (Under Investigation)
 *"The silk spool and crests have gone missing. The culprit remains at large."*

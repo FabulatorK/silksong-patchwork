@@ -267,7 +267,10 @@ public static class T2DHandler
     /// </summary>
     private static void ConvertT2DSpritesheet(Texture2D atlas, string cleanName)
     {
-        string outDir = Path.Combine(SpriteDumper.ConvertPath, "T2D", cleanName);
+        // Include atlas dimensions in the output path to keep sprites from
+        // different-resolution atlases (e.g. Hornet 2048x2048 vs 4096x4096)
+        // in separate directories.
+        string outDir = Path.Combine(SpriteDumper.ConvertPath, "T2D", cleanName, $"{atlas.width}x{atlas.height}");
 
         // The atlas has already been overwritten in-place with the replacement PNG,
         // so it's now RGBA32 and readable. Blit to a RenderTexture for ReadPixels.
@@ -971,7 +974,10 @@ public static class T2DHandler
     {
         string cleanName = CleanTextureName(tex.name);
         string saveDir = Path.Combine(T2DDumpPath, cleanName);
-        string atlasPath = Path.Combine(saveDir, "_atlas.png");
+        // Include dimensions in the atlas filename to avoid collisions when
+        // multiple runtime atlases share the same clean name (e.g. Hornet
+        // at both 2048x2048 and 4096x4096).
+        string atlasPath = Path.Combine(saveDir, $"_atlas_{tex.width}x{tex.height}.png");
 
         if (File.Exists(atlasPath))
             return;
@@ -1160,7 +1166,8 @@ public static class T2DHandler
         if (sharedSprites.Count > 0)
         {
             Plugin.Logger.LogInfo(
-                $"[T2D] Atlas '{cleanName}' contains {sharedSprites.Count} sprites: " +
+                $"[T2D] Atlas '{cleanName}' ({tex.width}x{tex.height}, texture '{tex.name}') " +
+                $"contains {sharedSprites.Count} sprites: " +
                 string.Join(", ", sharedSprites));
         }
     }
