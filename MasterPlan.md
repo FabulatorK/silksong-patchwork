@@ -54,15 +54,29 @@
   - Gates `EnforceT2DReplacements`, `CheckForUninitializedSprites`, and `HandleLoad` cached lookup
 - [x] **Diagnostic**: `LogAtlasContents()` logs ALL sprites sharing a replaced atlas for visibility
 
-### Spritesheet Size Mismatch Handling
-*"The Hornet atlas dares to appear at multiple resolutions. We must accommodate this... insolence."*
-- [ ] Runtime textures for the same atlas name can appear at different sizes (e.g. Hornet: 4096x4096, 333x467, 650x429)
-- [ ] Currently skipped with a warning when replacement PNG dimensions don't match
-- [ ] Investigate scaling replacement to match, or supporting multiple resolution variants
-- [ ] **Tracking**: Mismatch warning now logs full raw texture name and instance ID for cross-referencing
-- [ ] Catalogue all observed Hornet atlas resolutions from logs to determine if variants are scene-specific or LOD-based
-- [ ] Decide approach: multi-resolution replacement PNGs, runtime scaling, or both
-- [ ] **Note**: Smaller "Hornet" atlas instances (333x467, 650x429) may actually be UI atlases containing Hornet icons — investigate whether these are distinct from the main character atlas
+### Spritesheet Multi-Resolution Support (Fixed)
+*"The Hornet atlas dares to appear at multiple resolutions. We now speak all its languages."*
+- [x] **Problem**: Two runtime atlases (`sactx-1-2048x2048-BC7-Hornet-*` and `sactx-0-4096x4096-BC7-Hornet-*`) both clean to "Hornet"
+  - `SpritesheetOverrides` was a flat dictionary — only one PNG per clean name, first wins
+  - The 4096x4096 atlas was always skipped (size mismatch)
+  - The 333x467 and 650x429 "sizes" were individual sprite rects on the 2048x2048 atlas, not separate atlases
+- [x] **Fix**: `SpritesheetOverrides` now stores `List<(byte[], int, int)>` per clean name — multiple resolution variants
+  - `TrySwapTexture` finds the variant matching runtime texture dimensions
+  - Mismatch warning now shows all available replacement sizes
+  - Mismatched atlases now also get `LogAtlasContents()` output for diagnostics
+- [x] **File layout**: Two ways to provide variants:
+  - Flat: `Spritesheets/T2D/Hornet.png` (single size, as before)
+  - Subdirectory: `Spritesheets/T2D/Hornet/*.png` (multiple PNGs at different sizes)
+  - Both approaches can coexist; duplicates at the same dimensions are skipped
+
+### UI Vanishing Bug (Under Investigation)
+*"The silk spool and crests have gone missing. The culprit remains at large."*
+- [x] **Not the Hornet atlas**: Log confirms all 134 sprites on the 2048x2048 Hornet atlas are Hornet-related (no UI sprites)
+- [x] **Not sprite name collision**: `ConfirmedT2DSpriteNames` whitelist added but didn't resolve the issue
+- [x] **Diagnostic added**: `SetImageSpritePostfix` now logs a warning if `TrySwapTexture` overwrites a texture backing a UI `Image` — this will identify if in-place atlas swap is hitting UI textures
+- [x] **Diagnostic added**: Mismatched atlases now also log their sprite contents — will reveal if 4096x4096 atlas contains UI sprites
+- [ ] **Next step**: Check log output for `[T2D-UI]` warnings and mismatched atlas contents to identify the actual cause
+- [ ] If UI textures are NOT being swapped, the issue may be external to Patchwork (scene setup, Canvas hierarchy, etc.)
 
 ### Non-Atlas Texture Dump Gap (Fixed)
 *"Particles_ash hid in the cracks between atlas and standalone. No more."*
