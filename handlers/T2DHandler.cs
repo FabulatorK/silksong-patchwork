@@ -267,10 +267,7 @@ public static class T2DHandler
     /// </summary>
     private static void ConvertT2DSpritesheet(Texture2D atlas, string cleanName)
     {
-        // Include atlas dimensions in the output path to keep sprites from
-        // different-resolution atlases (e.g. Hornet 2048x2048 vs 4096x4096)
-        // in separate directories.
-        string outDir = Path.Combine(SpriteDumper.ConvertPath, "T2D", cleanName, $"{atlas.width}x{atlas.height}");
+        string outDir = Path.Combine(SpriteDumper.ConvertPath, "T2D", cleanName);
 
         // The atlas has already been overwritten in-place with the replacement PNG,
         // so it's now RGBA32 and readable. Blit to a RenderTexture for ReadPixels.
