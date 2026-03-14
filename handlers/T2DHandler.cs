@@ -15,11 +15,11 @@ public static class T2DHandler
     public static string T2DAtlasLoadPath { get { return Path.Combine(SpriteLoader.AtlasLoadPath, "T2D"); } }
 
     // --- In-place spritesheet replacement (inspired by Customizer T2D) ---
-    // Keyed by clean texture name (e.g. "Hornet") → list of PNG variants at different sizes.
-    // Multiple atlases can share the same clean name at different resolutions (e.g.
-    // Hornet at 2048x2048 and 4096x4096). TrySwapTexture picks the variant matching
-    // the runtime texture dimensions.
-    private static readonly Dictionary<string, List<(byte[] PngData, int Width, int Height)>>
+    // Keyed by raw filename (without extension). At runtime, TrySwapTexture looks up
+    // by raw texture name first, then falls back to clean name. This naturally handles
+    // multiple atlases sharing the same clean name (e.g. sactx-1-2048x2048-BC7-Hornet-*
+    // and sactx-0-4096x4096-BC7-Hornet-* are simply two different keys).
+    private static readonly Dictionary<string, (byte[] PngData, int Width, int Height)>
         SpritesheetOverrides = new(System.StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<int> ReplacedTextureIds = new();
     private static readonly HashSet<int> SkippedTextureIds = new();
@@ -124,36 +124,25 @@ public static class T2DHandler
         if (ReplacedTextureIds.Contains(id) || SkippedTextureIds.Contains(id))
             return ReplacedTextureIds.Contains(id);
 
+        // Try raw texture name first (exact match), then fall back to clean name.
+        // This lets sactx-1-2048x2048-BC7-Hornet-* and sactx-0-4096x4096-BC7-Hornet-*
+        // each have their own replacement without colliding.
         string cleanName = CleanTextureName(tex.name);
-        if (!SpritesheetOverrides.TryGetValue(cleanName, out var variants))
+        if (!SpritesheetOverrides.TryGetValue(tex.name, out var data)
+            && !SpritesheetOverrides.TryGetValue(cleanName, out data))
         {
             SkippedTextureIds.Add(id);
             return false;
         }
 
-        // Find the variant matching this texture's dimensions.
-        (byte[] PngData, int Width, int Height) data = default;
-        foreach (var v in variants)
+        if (tex.width != data.Width || tex.height != data.Height)
         {
-            if (v.Width == tex.width && v.Height == tex.height)
-            {
-                data = v;
-                break;
-            }
-        }
-
-        if (data.PngData == null)
-        {
-            string availableSizes = string.Join(", ", variants.Select(v => $"{v.Width}x{v.Height}"));
             Plugin.Logger.LogWarning(
-                $"[T2D] No matching spritesheet for '{cleanName}': " +
+                $"[T2D] Spritesheet size mismatch for '{cleanName}': " +
                 $"runtime texture '{tex.name}' is {tex.width}x{tex.height}, " +
-                $"available replacement sizes: [{availableSizes}]. " +
-                $"(texture ID: {id})");
-
-            // Log atlas contents even for mismatches to help diagnose issues.
+                $"replacement PNG is {data.Width}x{data.Height}. " +
+                $"Skipping. (texture ID: {id})");
             LogAtlasContents(tex, cleanName);
-
             SkippedTextureIds.Add(id);
             return false;
         }
@@ -183,74 +172,37 @@ public static class T2DHandler
 
     /// <summary>
     /// Scans Spritesheets/T2D/ for PNG files and loads their raw bytes into SpritesheetOverrides.
-    /// Each file is decoded temporarily to record its dimensions for the size-match check.
-    /// Multiple PNGs can map to the same clean name at different sizes (e.g. Hornet at
-    /// 2048x2048 and 4096x4096). Also scans subdirectories named after the clean name
-    /// for additional resolution variants (e.g. Spritesheets/T2D/Hornet/*.png).
+    /// Each file is keyed by its raw filename (without extension). At runtime, TrySwapTexture
+    /// looks up by raw texture name first, then falls back to clean name — so files named
+    /// after the full sactx name naturally match their specific atlas, while a simple
+    /// "Hornet.png" matches any Hornet atlas as a convenience fallback.
     /// </summary>
     private static void BuildSpritesheetOverrides()
     {
         SpritesheetOverrides.Clear();
 
-        void AddVariant(string name, string file)
-        {
-            try
-            {
-                byte[] pngData = File.ReadAllBytes(file);
-                Texture2D temp = new(2, 2);
-                if (temp.LoadImage(pngData))
-                {
-                    if (!SpritesheetOverrides.TryGetValue(name, out var variants))
-                    {
-                        variants = new List<(byte[], int, int)>();
-                        SpritesheetOverrides[name] = variants;
-                    }
-
-                    // Skip if we already have a variant at this exact size.
-                    bool duplicate = false;
-                    foreach (var v in variants)
-                    {
-                        if (v.Width == temp.width && v.Height == temp.height)
-                        {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-
-                    if (!duplicate)
-                    {
-                        variants.Add((pngData, temp.width, temp.height));
-                        Plugin.Logger.LogInfo($"[T2D] Loaded spritesheet override: '{name}' ({temp.width}x{temp.height})");
-                    }
-                }
-                Object.Destroy(temp);
-            }
-            catch (System.Exception ex)
-            {
-                Plugin.Logger.LogWarning($"[T2D] Failed to load spritesheet '{file}': {ex.Message}");
-            }
-        }
-
         void ScanDirectory(string dir)
         {
             if (!Directory.Exists(dir)) return;
-
-            // Flat PNGs: Spritesheets/T2D/{name}.png
             foreach (var file in Directory.GetFiles(dir, "*.png", SearchOption.TopDirectoryOnly))
             {
                 string rawName = Path.GetFileNameWithoutExtension(file);
-                string name = CleanTextureName(rawName);
-                AddVariant(name, file);
-            }
+                if (SpritesheetOverrides.ContainsKey(rawName)) continue;
 
-            // Subdirectory variants: Spritesheets/T2D/{name}/*.png
-            // Allows multiple resolution variants for the same clean name.
-            foreach (var subDir in Directory.GetDirectories(dir))
-            {
-                string name = Path.GetFileName(subDir);
-                foreach (var file in Directory.GetFiles(subDir, "*.png", SearchOption.TopDirectoryOnly))
+                try
                 {
-                    AddVariant(name, file);
+                    byte[] pngData = File.ReadAllBytes(file);
+                    Texture2D temp = new(2, 2);
+                    if (temp.LoadImage(pngData))
+                    {
+                        SpritesheetOverrides[rawName] = (pngData, temp.width, temp.height);
+                        Plugin.Logger.LogInfo($"[T2D] Loaded spritesheet override: '{rawName}' ({temp.width}x{temp.height})");
+                    }
+                    Object.Destroy(temp);
+                }
+                catch (System.Exception ex)
+                {
+                    Plugin.Logger.LogWarning($"[T2D] Failed to load spritesheet '{file}': {ex.Message}");
                 }
             }
         }
@@ -651,7 +603,8 @@ public static class T2DHandler
         // Actual object cleanup happens in ReloadSpritesInScene on the main thread.
         string cleanName = CleanTextureName(texName);
 
-        SpritesheetOverrides.Remove(cleanName);
+        // Remove by raw name (the key used by BuildSpritesheetOverrides).
+        SpritesheetOverrides.Remove(texName);
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
