@@ -36,6 +36,10 @@ public static class T2DHandler
     // that happen to share a name with a T2D replacement file.
     private static readonly HashSet<string> ConfirmedT2DSpriteNames = new();
 
+    // Sprite names confirmed to have no replacement on disk.
+    // Prevents repeated filesystem scans for the same missing sprite.
+    private static readonly HashSet<string> NegativeSpriteCache = new();
+
     private static readonly Dictionary<int, string> TrackedSpriteNames = new();
     private static readonly HashSet<SpriteRenderer> KnownT2DSpriteRenderers = new();
     private static readonly HashSet<Image> KnownT2DImages = new();
@@ -550,6 +554,7 @@ public static class T2DHandler
         LoadedT2DSprites.Clear();
         PreloadedT2DTextures.Clear();
         SpriteAtlasMap.Clear();
+        NegativeSpriteCache.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
@@ -625,6 +630,7 @@ public static class T2DHandler
         // Actual object cleanup happens in ReloadSpritesInScene on the main thread.
         LoadedT2DSprites.Remove(spriteName);
         PreloadedT2DTextures.Remove(spriteName);
+        NegativeSpriteCache.Remove(spriteName);
 
         if (SpriteAtlasMap.TryGetValue(spriteName, out var atlasSprites))
         {
@@ -632,6 +638,7 @@ public static class T2DHandler
             {
                 LoadedT2DSprites.Remove(sprName);
                 PreloadedT2DTextures.Remove(sprName);
+                NegativeSpriteCache.Remove(sprName);
             }
             SpriteAtlasMap.Remove(spriteName);
         }
@@ -646,13 +653,6 @@ public static class T2DHandler
         if (_handling)
             return;
 
-        var spriteSetter = spriteContainer.GetType().GetProperty("sprite").GetSetMethod();
-        if (spriteSetter == null)
-        {
-            Plugin.Logger.LogError($"T2DHandler: Could not find sprite setter for {spriteContainer.GetType().Name}");
-            return;
-        }
-
         _handling = true;
         try
         {
@@ -662,7 +662,7 @@ public static class T2DHandler
             if (ConfirmedT2DSpriteNames.Contains(sprite.name)
                 && LoadedT2DSprites.TryGetValue(sprite.name, out var cached))
             {
-                spriteSetter.Invoke(spriteContainer, [cached]);
+                SetSprite(spriteContainer, cached);
                 TrackT2DContainer(spriteContainer);
                 return;
             }
@@ -687,7 +687,7 @@ public static class T2DHandler
                     LoadedT2DSprites[sprite.name] = newSprite;
                     PreloadedT2DTextures.Remove(sprite.name);
 
-                    spriteSetter.Invoke(spriteContainer, [newSprite]);
+                    SetSprite(spriteContainer, newSprite);
                     TrackT2DContainer(spriteContainer);
                     return;
                 }
@@ -697,23 +697,32 @@ public static class T2DHandler
             }
             else
             {
+                string texName = sprite.texture.name;
+
                 // Non-atlas textures: individual sprite replacement
-                if (LoadedT2DSprites.TryGetValue(sprite.texture.name, out var existing))
+                if (LoadedT2DSprites.TryGetValue(texName, out var existing))
                 {
-                    spriteSetter.Invoke(spriteContainer, [existing]);
+                    SetSprite(spriteContainer, existing);
                     TrackT2DContainer(spriteContainer);
                     return;
                 }
 
-                Texture2D spriteTex = FindT2DSprite(sprite.texture.name);
-                if (spriteTex == null)
+                // Skip filesystem lookup if we already know there's no replacement.
+                if (NegativeSpriteCache.Contains(texName))
                     return;
-                spriteTex.name = sprite.texture.name;
+
+                Texture2D spriteTex = FindT2DSprite(texName);
+                if (spriteTex == null)
+                {
+                    NegativeSpriteCache.Add(texName);
+                    return;
+                }
+                spriteTex.name = texName;
                 Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                 newSprite.name = sprite.name;
 
-                LoadedT2DSprites[sprite.texture.name] = newSprite;
-                spriteSetter.Invoke(spriteContainer, [newSprite]);
+                LoadedT2DSprites[texName] = newSprite;
+                SetSprite(spriteContainer, newSprite);
                 TrackT2DContainer(spriteContainer);
             }
         }
@@ -721,6 +730,17 @@ public static class T2DHandler
         {
             _handling = false;
         }
+    }
+
+    /// <summary>
+    /// Sets the sprite on the container directly by type cast. Avoids reflection.
+    /// </summary>
+    private static void SetSprite(object container, Sprite sprite)
+    {
+        if (container is SpriteRenderer sr)
+            sr.sprite = sprite;
+        else if (container is Image img)
+            img.sprite = sprite;
     }
 
     // ================================================================
