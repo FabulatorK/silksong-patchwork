@@ -39,6 +39,15 @@ public class Plugin : BaseUnityPlugin
         Config = new PatchworkConfig(base.Config);
         Logger.LogInfo($"Patchwork is loaded! Version: {MyPluginInfo.PLUGIN_VERSION}");
 
+        // Detect conflicting plugins that patch the same sprite hooks.
+        if (BepInEx.Bootstrap.Chainloader.PluginInfos.Keys.Any(
+                guid => guid.IndexOf("CustomizerT2D", System.StringComparison.OrdinalIgnoreCase) >= 0))
+        {
+            Logger.LogError(
+                "[Patchwork] CustomizerT2D detected! Both mods patch SpriteRenderer.sprite " +
+                "and will conflict. Remove CustomizerT2D.dll — Patchwork replaces its functionality.");
+        }
+
         FindPatchworkFolder();
         ScanPluginPacks();
 
