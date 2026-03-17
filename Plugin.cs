@@ -40,12 +40,24 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo($"Patchwork is loaded! Version: {MyPluginInfo.PLUGIN_VERSION}");
 
         // Detect conflicting plugins that patch the same sprite hooks.
-        if (BepInEx.Bootstrap.Chainloader.PluginInfos.Keys.Any(
-                guid => guid.IndexOf("CustomizerT2D", System.StringComparison.OrdinalIgnoreCase) >= 0))
+        foreach (var pluginInfo in BepInEx.Bootstrap.Chainloader.PluginInfos)
         {
-            Logger.LogError(
-                "[Patchwork] CustomizerT2D detected! Both mods patch SpriteRenderer.sprite " +
-                "and will conflict. Remove CustomizerT2D.dll — Patchwork replaces its functionality.");
+            string guid = pluginInfo.Key;
+            string name = pluginInfo.Value?.Metadata?.Name ?? guid;
+
+            // Check both GUID and display name for known conflicts.
+            bool isConflict =
+                guid.IndexOf("Customizer", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf("Customizer", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (isConflict)
+            {
+                Logger.LogError(
+                    $"[Patchwork] Conflicting plugin detected: '{name}' (GUID: {guid}). " +
+                    $"Both mods patch sprite hooks and will conflict, causing broken " +
+                    $"sprite loading and enemy AI issues. Remove this plugin — " +
+                    $"Patchwork replaces Customizer's functionality.");
+            }
         }
 
         FindPatchworkFolder();
