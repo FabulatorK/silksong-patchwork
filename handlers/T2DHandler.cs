@@ -46,6 +46,14 @@ public static class T2DHandler
     private static bool _enforcing = false;
     private static bool _handling = false;
 
+    /// <summary>
+    /// True when any T2D replacement data exists (spritesheets or individual sprites).
+    /// Gates all expensive per-frame sweeps so Patchwork is near-zero-cost when no T2D
+    /// assets are loaded.
+    /// </summary>
+    public static bool HasT2DReplacements =>
+        SpritesheetOverrides.Count > 0 || PreloadedT2DTextures.Count > 0 || LoadedT2DSprites.Count > 0;
+
 
     // ================================================================
     //  Harmony patches — sprite/material setters
@@ -57,13 +65,17 @@ public static class T2DHandler
     {
         if (_handling || _enforcing || __instance == null || value == null || __instance.gameObject.name == "TempSpriteRenderer")
             return;
+
+        if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && value.texture != null && !string.IsNullOrEmpty(value.texture.name))
+            HandleDump(value);
+
+        if (!HasT2DReplacements)
+            return;
+
         TrackedSpriteNames[__instance.GetInstanceID()] = value.name;
 
         if (value.texture != null)
             TrySwapTexture(value.texture);
-
-        if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
-            HandleDump(value);
 
         HandleLoad(__instance, value);
     }
@@ -74,6 +86,13 @@ public static class T2DHandler
     {
         if (_handling || _enforcing || __instance == null || value == null)
             return;
+
+        if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && value.texture != null && !string.IsNullOrEmpty(value.texture.name))
+            HandleDump(value);
+
+        if (!HasT2DReplacements)
+            return;
+
         TrackedSpriteNames[__instance.GetInstanceID()] = value.name;
 
         if (value.texture != null)
@@ -91,9 +110,6 @@ public static class T2DHandler
             }
         }
 
-        if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && !string.IsNullOrEmpty(value.texture.name))
-            HandleDump(value);
-
         HandleLoad(__instance, value);
     }
 
@@ -101,6 +117,9 @@ public static class T2DHandler
     [HarmonyPatch(typeof(Material), nameof(Material.mainTexture), MethodType.Setter)]
     public static void SetMaterialTexturePostfix(Texture value)
     {
+        if (!HasT2DReplacements)
+            return;
+
         if (value is Texture2D tex)
         {
             TrySwapTexture(tex);
@@ -284,6 +303,9 @@ public static class T2DHandler
 
     public static void CheckForUninitializedSprites()
     {
+        if (!HasT2DReplacements)
+            return;
+
         foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (spriteRenderer == null || spriteRenderer.sprite == null)
@@ -336,7 +358,7 @@ public static class T2DHandler
 
     public static void EnforceT2DReplacements()
     {
-        if (LoadedT2DSprites.Count == 0 && PreloadedT2DTextures.Count == 0)
+        if (!HasT2DReplacements)
             return;
 
         _enforcing = true;
@@ -465,6 +487,10 @@ public static class T2DHandler
         }
 
         // Pass 3: Apply individual sprite replacements to active renderers/images.
+        // Skip the full scene sweep when no T2D replacements are loaded.
+        if (!HasT2DReplacements)
+            return;
+
         foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (sr == null || sr.sprite == null)
@@ -650,7 +676,7 @@ public static class T2DHandler
 
     private static void HandleLoad(object spriteContainer, Sprite sprite)
     {
-        if (_handling)
+        if (_handling || !HasT2DReplacements)
             return;
 
         _handling = true;
