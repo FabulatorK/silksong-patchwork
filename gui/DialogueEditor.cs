@@ -79,6 +79,33 @@ public static class DialogueEditor
         }
     }
 
+    /// <summary>
+    /// Selects an entry by sheet and key, opening it for editing.
+    /// If the entry hasn't been tracked yet, it is created with the provided text.
+    /// </summary>
+    public static void SelectEntry(string sheet, string key, string currentText = null)
+    {
+        string lookupKey = $"{sheet}|{key}";
+        if (!EntryLookup.TryGetValue(lookupKey, out var entry))
+        {
+            // Entry not tracked yet — create it so we can select it
+            entry = new DialogueEntry
+            {
+                Sheet = sheet,
+                Key = key,
+                CurrentText = currentText ?? "",
+                LastSeen = DateTime.Now
+            };
+            Entries.Add(entry);
+            EntryLookup[lookupKey] = entry;
+        }
+
+        selectedEntry = entry;
+        editText = entry.CurrentText;
+        hasUnsavedChanges = false;
+        searchText = "";
+    }
+
     private static void DrawWindow(int windowID)
     {
         GUIHelper.Space(16);
