@@ -337,7 +337,7 @@ public static class DialogueEditor
             entry.CurrentText = text;
             hasUnsavedChanges = false;
 
-            SetStatus($"Saved {entry.Sheet}.{entry.Key} — live preview applied");
+            SetStatus($"Saved {entry.Sheet}.{entry.Key} — re-trigger dialogue to see");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor saved: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
@@ -392,7 +392,7 @@ public static class DialogueEditor
             DialogueHandler.InvalidateCache(entry.Sheet, lang);
             Language.SwitchLanguage(lang);
 
-            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key} — reverted in-game");
+            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key} — re-trigger dialogue to see");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor deleted override: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
