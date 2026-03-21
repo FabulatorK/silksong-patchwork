@@ -85,9 +85,9 @@ public class DialogueHandler
     }
 
     /// <summary>
-    /// Force-refreshes all on-screen text by re-switching to the current language.
-    /// This causes the game's localization system to re-request all text keys,
-    /// which hits our postfix and picks up updated .yml files from disk.
+    /// Clears caches and re-switches to the current language so the game's
+    /// localization system re-requests text keys on next access. Static UI
+    /// labels update immediately; active dialogue boxes update on re-trigger.
     /// </summary>
     public static void Reload()
     {

@@ -36,6 +36,13 @@ public static class DialogueEditor
 
     private const string SearchFieldControlName = "Patchwork.DialogueEditor.Search";
 
+    // Text tags available for insertion (see wiki: Text-Tags)
+    private static readonly string[] TextTags =
+    {
+        "<page>", "<hpage>", "<br>",
+        "<page=S>", "<page=T>", "<page=L>", "<page=B>", "<page=M>"
+    };
+
     public static void Draw()
     {
         if (!initialized || windowRect.width < 1)
@@ -218,6 +225,22 @@ public static class DialogueEditor
 
             GUIHelper.Space(4);
 
+            // Tag insertion buttons
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(38)));
+            foreach (var tag in TextTags)
+            {
+                if (GUILayout.Button(tag, GUIHelper.ButtonStyle, GUIHelper.Height(20)))
+                {
+                    editText += tag;
+                    hasUnsavedChanges = true;
+                }
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUIHelper.Space(4);
+
             // Action buttons
             GUILayout.BeginHorizontal();
 
@@ -314,7 +337,7 @@ public static class DialogueEditor
             entry.CurrentText = text;
             hasUnsavedChanges = false;
 
-            SetStatus($"Saved {entry.Sheet}.{entry.Key} — live preview applied");
+            SetStatus($"Saved {entry.Sheet}.{entry.Key} — re-trigger dialogue to see");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor saved: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
@@ -369,7 +392,7 @@ public static class DialogueEditor
             DialogueHandler.InvalidateCache(entry.Sheet, lang);
             Language.SwitchLanguage(lang);
 
-            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key} — reverted in-game");
+            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key} — re-trigger dialogue to see");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor deleted override: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
