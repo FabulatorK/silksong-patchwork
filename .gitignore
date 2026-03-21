@@ -2,3 +2,5 @@
 /obj
 Directory.Build.targets
 local.targets
+MasterPlan.md
+session-journal.md

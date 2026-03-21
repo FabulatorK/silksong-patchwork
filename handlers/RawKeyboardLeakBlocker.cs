@@ -2,7 +2,6 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using Patchwork.GUI;
-using UnityEngine;
 using UnityEngine.InputSystem.Controls;
 
 namespace Patchwork.Handlers;
