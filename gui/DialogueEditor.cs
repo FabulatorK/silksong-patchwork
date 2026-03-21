@@ -142,11 +142,11 @@ public static class DialogueEditor
 
         // Top bar: search + clear
         GUILayout.BeginHorizontal();
-        GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(55)));
+        GUILayout.Label("Search:", GUIHelper.LabelStyle, GUIHelper.Width(55));
         searchText = GUIHelper.TextField(
             SearchFieldControlName,
             searchText,
-            GUILayout.Width(GUIHelper.Scaled(300)),
+            GUIHelper.Width(300),
             GUIHelper.Height(24)
         );
 
@@ -260,7 +260,7 @@ public static class DialogueEditor
 
             // Tag insertion buttons
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(38)));
+            GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUIHelper.Width(38));
             foreach (var tag in TextTags)
             {
                 if (GUILayout.Button(tag, TagButtonStyle, GUIHelper.Height(20)))
@@ -283,13 +283,13 @@ public static class DialogueEditor
                 hasUnsavedChanges ? "Save *" : "Save",
                 GUIHelper.ButtonStyle,
                 GUIHelper.Height(26),
-                GUILayout.Width(GUIHelper.Scaled(80))))
+                GUIHelper.Width(80)))
             {
                 SaveEntry(selectedEntry, editText);
             }
 
             if (GUILayout.Button("Revert", GUIHelper.ButtonStyle, GUIHelper.Height(26),
-                GUILayout.Width(GUIHelper.Scaled(80))))
+                GUIHelper.Width(80)))
             {
                 editText = selectedEntry.CurrentText;
                 hasUnsavedChanges = false;

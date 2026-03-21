@@ -313,11 +313,11 @@ public static class AnimationController
                     
                     // Search field
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(60)));
+                    GUILayout.Label("Search:", GUIHelper.LabelStyle, GUIHelper.Width(60));
                     _animationSearchText = GUIHelper.TextField(
                         _animationSearchText,
-                        GUILayout.Width(GUIHelper.Scaled(280)),
-                        GUILayout.Height(GUIHelper.Scaled(32))
+                        GUIHelper.Width(280),
+                        GUIHelper.Height(32)
                     );
                     GUILayout.EndHorizontal();
                     
@@ -333,8 +333,8 @@ public static class AnimationController
                     
                     // Scrollable list
                     _animationDropdownScroll = GUILayout.BeginScrollView(
-                        _animationDropdownScroll, 
-                        GUILayout.Height(GUIHelper.Scaled(MaxVisibleAnimations * 22)));
+                        _animationDropdownScroll,
+                        GUIHelper.Height(MaxVisibleAnimations * 22));
                     
                     foreach (var clip in filteredClips)
                     {
