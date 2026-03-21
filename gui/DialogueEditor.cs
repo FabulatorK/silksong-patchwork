@@ -35,6 +35,7 @@ public static class DialogueEditor
     private static float statusTime;
 
     private const string SearchFieldControlName = "Patchwork.DialogueEditor.Search";
+    private const string EditAreaControlName = "Patchwork.DialogueEditor.EditArea";
 
     // Text tags available for insertion (see wiki: Text-Tags)
     private static readonly string[] TextTags =
@@ -42,6 +43,28 @@ public static class DialogueEditor
         "<page>", "<hpage>", "<br>",
         "<page=S>", "<page=T>", "<page=L>", "<page=B>", "<page=M>"
     };
+
+    // Tag button style with richText disabled so <page>, <br> etc. render literally
+    private static GUIStyle _tagButtonStyle;
+    private static GUIStyle TagButtonStyle
+    {
+        get
+        {
+            int fontSize = GUIHelper.FontSize(12);
+            if (_tagButtonStyle == null || _tagButtonStyle.fontSize != fontSize)
+            {
+                _tagButtonStyle = new GUIStyle(GUIHelper.ButtonStyle)
+                {
+                    richText = false,
+                    fontSize = fontSize
+                };
+            }
+            return _tagButtonStyle;
+        }
+    }
+
+    // Cursor position tracking for tag insertion
+    private static int lastCursorIndex;
 
     public static void Draw()
     {
@@ -210,6 +233,7 @@ public static class DialogueEditor
             );
 
             string newText = GUIHelper.TextArea(
+                EditAreaControlName,
                 editText,
                 GUILayout.ExpandWidth(true),
                 GUILayout.ExpandHeight(true)
@@ -221,6 +245,15 @@ public static class DialogueEditor
                 hasUnsavedChanges = true;
             }
 
+            // Track cursor position while the edit area has focus
+            if (UnityEngine.GUI.GetNameOfFocusedControl() == EditAreaControlName)
+            {
+                var editor = (TextEditor)GUIUtility.GetStateObject(
+                    typeof(TextEditor), GUIUtility.keyboardControl);
+                if (editor != null)
+                    lastCursorIndex = editor.cursorIndex;
+            }
+
             GUILayout.EndScrollView();
 
             GUIHelper.Space(4);
@@ -230,9 +263,11 @@ public static class DialogueEditor
             GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(38)));
             foreach (var tag in TextTags)
             {
-                if (GUILayout.Button(tag, GUIHelper.ButtonStyle, GUIHelper.Height(20)))
+                if (GUILayout.Button(tag, TagButtonStyle, GUIHelper.Height(20)))
                 {
-                    editText += tag;
+                    int insertPos = Mathf.Clamp(lastCursorIndex, 0, editText.Length);
+                    editText = editText.Insert(insertPos, tag);
+                    lastCursorIndex = insertPos + tag.Length;
                     hasUnsavedChanges = true;
                 }
             }
