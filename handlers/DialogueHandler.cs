@@ -15,6 +15,36 @@ public class DialogueHandler
 
     public static Dictionary<string, Dictionary<string, Dictionary<string, string>>> TextCache = [];
 
+    // Tracks which user-override keys were actually requested by the game.
+    // Key: "lang|sheet|key" — populated in GetTextPostfix when a match is found.
+    private static readonly HashSet<string> RequestedOverrideKeys = new();
+    // All user-override keys loaded from disk, for stale-key detection.
+    private static readonly HashSet<string> AllOverrideKeys = new();
+    public static int StaleKeyCount { get; private set; }
+
+    // Read-only stats for GUI
+    public static int CachedSheetCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var lang in TextCache.Values)
+                count += lang.Count;
+            return count;
+        }
+    }
+    public static int CachedKeyCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var lang in TextCache.Values)
+                foreach (var sheet in lang.Values)
+                    count += sheet.Count;
+            return count;
+        }
+    }
+
     public static void DumpText()
     {
         string initialLang = Language.CurrentLanguage().ToString();
@@ -54,6 +84,25 @@ public class DialogueHandler
         }
     }
 
+    /// <summary>
+    /// Force-refreshes all on-screen text by re-switching to the current language.
+    /// This causes the game's localization system to re-request all text keys,
+    /// which hits our postfix and picks up updated .yml files from disk.
+    /// </summary>
+    public static void Reload()
+    {
+        // Clear entire cache and tracking sets so everything is re-read from disk
+        TextCache.Clear();
+        RequestedOverrideKeys.Clear();
+        AllOverrideKeys.Clear();
+        StaleKeyCount = 0;
+
+        // Re-switch to the current language to trigger the game's text refresh
+        string currentLang = Language.CurrentLanguage().ToString();
+        Language.SwitchLanguage(currentLang);
+        Plugin.Logger.LogInfo("[Patchwork] Text hot-reload: cleared cache and re-switched language to force refresh.");
+    }
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -70,9 +119,13 @@ public class DialogueHandler
         if (!TextCache[lang].ContainsKey(sheetTitle))
             TextCache[lang][sheetTitle] = LoadTextSheet(sheetTitle, lang);
         if (TextCache[lang][sheetTitle].ContainsKey(key))
+        {
             __result = TextCache[lang][sheetTitle][key];
+            RequestedOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
+        }
 
         TextLog.LogText(sheetTitle, key, __result);
+        DialogueEditor.TrackText(sheetTitle, key, __result);
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang)
@@ -85,7 +138,46 @@ public class DialogueHandler
             foreach (var kvp in packSheetData)
                 sheetData[kvp.Key] = kvp.Value;
         }
+
+        // Register all user-override keys for stale-key detection
+        foreach (var key in sheetData.Keys)
+            AllOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
+
         return sheetData;
+    }
+
+    /// <summary>
+    /// Checks for user-override keys that were loaded from disk but never requested
+    /// by the game, and logs warnings. Call after the game has had a chance to request
+    /// text (e.g., on scene load or after Reload).
+    /// </summary>
+    public static void CheckForStaleKeys()
+    {
+        int staleCount = 0;
+        foreach (var compositeKey in AllOverrideKeys)
+        {
+            if (RequestedOverrideKeys.Contains(compositeKey))
+                continue;
+
+            var parts = compositeKey.Split('|', 3);
+            string lang = parts[0];
+            string sheet = parts[1];
+            string key = parts[2];
+
+            // Only warn for the current language to avoid noise
+            string currentLang = Language.CurrentLanguage().ToString();
+            if (lang != currentLang)
+                continue;
+
+            Plugin.Logger.LogWarning(
+                $"[Patchwork] Text override key \"{key}\" in sheet \"{sheet}\" ({lang}) " +
+                $"was never requested by the game — key may have been renamed by a game update. " +
+                $"Consider re-dumping text with DumpText enabled.");
+            staleCount++;
+        }
+        StaleKeyCount = staleCount;
+        if (staleCount > 0)
+            Plugin.Logger.LogWarning($"[Patchwork] {staleCount} stale text override key(s) detected. These overrides are not being applied.");
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang, string basePath)

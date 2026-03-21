@@ -16,20 +16,6 @@ public static class AudioHandler
 
     private static readonly Dictionary<string, AudioClip> LoadedClips = new();
 
-    // Sound names confirmed to have no valid replacement on disk.
-    // Prevents repeated filesystem scans and failed load attempts.
-    private static readonly HashSet<string> NegativeAudioCache = new();
-
-    // File extensions Unity can actually decode, mapped to AudioType.
-    private static readonly Dictionary<string, AudioType> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { ".wav", AudioType.WAV },
-        { ".ogg", AudioType.OGGVORBIS },
-        { ".mp3", AudioType.MPEG },
-        { ".aiff", AudioType.AIFF },
-        { ".aif", AudioType.AIFF },
-    };
-
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -128,53 +114,30 @@ public static class AudioHandler
     public static void InvalidateCache(string soundName)
     {
         LoadedClips.Remove(soundName);
-        NegativeAudioCache.Remove(soundName);
     }
+
+    public static int CachedClipCount => LoadedClips.Count;
 
     public static AudioClip LoadAudioClip(string soundName)
     {
-        if (NegativeAudioCache.Contains(soundName))
+        string path = GetSoundPath(soundName);
+        if (string.IsNullOrEmpty(path))
             return null;
 
         if (LoadedClips.TryGetValue(soundName, out var cachedClip))
             return cachedClip;
 
-        string path = GetSoundPath(soundName);
-        if (string.IsNullOrEmpty(path))
-        {
-            NegativeAudioCache.Add(soundName);
-            return null;
-        }
-
-        string ext = Path.GetExtension(path);
-        if (!SupportedExtensions.TryGetValue(ext, out var audioType))
-        {
-            Plugin.Logger.LogWarning(
-                $"[Patchwork] Unsupported audio format '{ext}' for '{soundName}' at {path}. " +
-                $"Supported formats: {string.Join(", ", SupportedExtensions.Keys)}");
-            NegativeAudioCache.Add(soundName);
-            return null;
-        }
-
         string url = "file:///" + Uri.EscapeUriString(path.Replace("\\", "/"));
-        var request = UnityWebRequestMultimedia.GetAudioClip(url, audioType);
+        var request = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.UNKNOWN);
         var operation = request.SendWebRequest();
         while (!operation.isDone) { }
         if (request.result != UnityWebRequest.Result.Success)
         {
             Plugin.Logger.LogError($"[Patchwork] Failed to load audio clip from {path}: {request.error}");
-            NegativeAudioCache.Add(soundName);
             return null;
         }
 
         AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
-        if (clip == null)
-        {
-            Plugin.Logger.LogError($"[Patchwork] Audio clip loaded but content was null: {path}");
-            NegativeAudioCache.Add(soundName);
-            return null;
-        }
-
         clip.name = "PATCHWORK_" + soundName;
         LoadedClips[soundName] = clip;
         return clip;

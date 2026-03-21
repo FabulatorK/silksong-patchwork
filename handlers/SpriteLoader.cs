@@ -18,6 +18,20 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
+    // Read-only stats for GUI
+    public static int LoadedCollectionCount => LoadedAtlases.Count;
+    public static int LoadedSpriteCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var col in LoadedSprites.Values)
+                foreach (var mat in col.Values)
+                    count += mat.Count;
+            return count;
+        }
+    }
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -26,7 +40,10 @@ public static class SpriteLoader
         );
     }
 
-    private static void InitPostfix(tk2dSpriteCollectionData __instance) => LoadCollection(__instance);
+    private static void InitPostfix(tk2dSpriteCollectionData __instance)
+    {
+        LoadCollection(__instance);
+    }
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
@@ -35,7 +52,7 @@ public static class SpriteLoader
         {
             if (mat == null)
                 continue;
-            
+
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
             if (!LoadedAtlases.ContainsKey(collection.name))
@@ -190,11 +207,16 @@ public static class SpriteLoader
     
     public static void Reload()
     {
-        Plugin.Logger.LogInfo($"Reloading sprites for scene {SceneManager.GetActiveScene().name}");
+        Plugin.Logger.LogInfo($"[tk2d-Reload] Starting sprite reload for scene {SceneManager.GetActiveScene().name}. " +
+            $"Pre-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
+            $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
         var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
+        Plugin.Logger.LogInfo($"[tk2d-Reload] Found {spriteCollections.Length} sprite collections to process");
         foreach (var collection in spriteCollections)
             LoadCollection(collection);
-        Plugin.Logger.LogInfo($"Finished reloading sprites for scene {SceneManager.GetActiveScene().name}");
+        Plugin.Logger.LogInfo($"[tk2d-Reload] Finished reload. " +
+            $"Post-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
+            $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
     }
 
     internal class SpritesheetResult

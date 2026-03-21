@@ -129,7 +129,7 @@ public static class AnimationController
     #region Functionality
     public static void Update()
     {
-        if (Input.GetKeyDown(Plugin.Config.AnimationControllerPauseKey) && SelectedAnimator != null)
+        if (!GUIHelper.IsTextFieldFocused && Input.GetKeyDown(Plugin.Config.AnimationControllerPauseKey) && SelectedAnimator != null)
         {
             Paused = !Paused;
             if (Animators.TryGetValue(SelectedAnimator, out var animator))
@@ -141,7 +141,7 @@ public static class AnimationController
             }
         }
 
-        if (Input.GetKeyDown(Plugin.Config.AnimationControllerFreezeKey) && SelectedAnimator != null)
+        if (!GUIHelper.IsTextFieldFocused && Input.GetKeyDown(Plugin.Config.AnimationControllerFreezeKey) && SelectedAnimator != null)
         {
             Frozen = !Frozen;
             if (Animators.TryGetValue(SelectedAnimator, out var animator))
@@ -150,7 +150,7 @@ public static class AnimationController
 
         if (Paused && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var selectedAnimator))
         {
-            if (Input.GetKeyDown(Plugin.Config.AnimationControllerNextFrameKey))
+            if (!GUIHelper.IsTextFieldFocused && Input.GetKeyDown(Plugin.Config.AnimationControllerNextFrameKey))
             {
                 int nextFrame = selectedAnimator.CurrentFrame + 1;
                 if (nextFrame >= selectedAnimator.CurrentClip.frames.Length)
@@ -160,7 +160,7 @@ public static class AnimationController
                 selectedAnimator.UpdateAnimation(Time.deltaTime);
                 FrameChangeRequested = false;
             }
-            if (Input.GetKeyDown(Plugin.Config.AnimationControllerPrevFrameKey))
+            if (!GUIHelper.IsTextFieldFocused && Input.GetKeyDown(Plugin.Config.AnimationControllerPrevFrameKey))
             {
                 int prevFrame = selectedAnimator.CurrentFrame - 1;
                 if (prevFrame < 0)
@@ -175,24 +175,40 @@ public static class AnimationController
         if (Frozen && SelectedAnimator != null && Animators.TryGetValue(SelectedAnimator, out var frozenAnimator))
             frozenAnimator.gameObject.transform.position = FrozenPosition;
 
+        // Cleanup sweep: remove dead/inactive animators.
+        // For the selected animator, tolerate transient invalid states (e.g. null CurrentClip
+        // or out-of-range CurrentFrame during animation transitions like turning around).
+        // These resolve within a few frames — removing eagerly causes the UI to "unhook".
         for (int i = 0; i < Animators.Count; i++)
         {
             var kvp = new List<KeyValuePair<string, tk2dSpriteAnimator>>(Animators)[i];
             string name = kvp.Key;
             tk2dSpriteAnimator checkAnimator = kvp.Value;
 
-            if (checkAnimator == null || checkAnimator.gameObject == null || !checkAnimator.gameObject.activeSelf || checkAnimator.CurrentClip == null)
+            // Truly dead: native object destroyed or GameObject gone
+            if (checkAnimator == null || checkAnimator.gameObject == null)
             {
                 Animators.Remove(name);
                 if (SelectedAnimator == name)
                     SelectedAnimator = null;
                 continue;
             }
-            if (checkAnimator.CurrentFrame < 0 || checkAnimator.CurrentFrame >= checkAnimator.CurrentClip.frames.Length)
+
+            // Inactive GameObject — remove non-selected, skip selected (may reactivate)
+            if (!checkAnimator.gameObject.activeSelf)
             {
-                Animators.Remove(name);
-                if (SelectedAnimator == name)
-                    SelectedAnimator = null;
+                if (SelectedAnimator != name)
+                    Animators.Remove(name);
+                continue;
+            }
+
+            // Transient animation state (null clip, out-of-range frame) — only remove non-selected
+            if (checkAnimator.CurrentClip == null ||
+                checkAnimator.CurrentFrame < 0 ||
+                checkAnimator.CurrentFrame >= checkAnimator.CurrentClip.frames.Length)
+            {
+                if (SelectedAnimator != name)
+                    Animators.Remove(name);
                 continue;
             }
         }
@@ -298,9 +314,8 @@ public static class AnimationController
                     // Search field
                     GUILayout.BeginHorizontal();
                     GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(60)));
-                    _animationSearchText = GUILayout.TextField(
-                        _animationSearchText, 
-                        GUIHelper.TextFieldStyle, 
+                    _animationSearchText = GUIHelper.TextField(
+                        _animationSearchText,
                         GUILayout.Width(GUIHelper.Scaled(280)),
                         GUILayout.Height(GUIHelper.Scaled(32))
                     );
@@ -363,6 +378,7 @@ public static class AnimationController
 
             if (SelectedAnimator == name)
             {
+                GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Edit Current Sprite", GUIHelper.ButtonStyle))
                 {
                     string openPath = Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
@@ -385,6 +401,26 @@ public static class AnimationController
                         }
                     }
                 }
+
+                if (GUILayout.Button("Dump Animation Sprites", GUIHelper.ButtonStyle))
+                {
+                    var clip = animator.CurrentClip;
+                    int dumped = 0;
+                    for (int f = 0; f < clip.frames.Length; f++)
+                    {
+                        var frame = clip.frames[f];
+                        var frameCollection = frame.spriteCollection;
+                        if (frameCollection == null || frame.spriteId < 0 || frame.spriteId >= frameCollection.spriteDefinitions.Length)
+                            continue;
+                        var frameDef = frameCollection.spriteDefinitions[frame.spriteId];
+                        if (string.IsNullOrEmpty(frameDef.name))
+                            continue;
+                        SpriteDumper.DumpSingleSprite(frameDef, frameCollection);
+                        dumped++;
+                    }
+                    Plugin.Logger.LogInfo($"[AnimCtrl] Dumped {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteDumper.DumpPath}");
+                }
+                GUILayout.EndHorizontal();
             }
         }
         GUILayout.EndVertical();

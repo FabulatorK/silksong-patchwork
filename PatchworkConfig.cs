@@ -46,6 +46,15 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowTextLog;
     public UnityEngine.KeyCode ShowTextLogKey { get { return _ShowTextLog.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowSkinStatus;
+    public UnityEngine.KeyCode ShowSkinStatusKey { get { return _ShowSkinStatus.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDevProfiler;
+    public UnityEngine.KeyCode ShowDevProfilerKey { get { return _ShowDevProfiler.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDialogueEditor;
+    public UnityEngine.KeyCode ShowDialogueEditorKey { get { return _ShowDialogueEditor.Value; } }
+
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
 
@@ -67,6 +76,9 @@ public class PatchworkConfig
         _ShowAudioList = config.Bind("Keybinds", "ShowAudioList", UnityEngine.KeyCode.Alpha2, "Key to toggle the audio list display.");
         _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
         _ShowTextLog = config.Bind("Keybinds", "ShowTextLog", UnityEngine.KeyCode.Alpha4, "Key to toggle the text log display.");
+        _ShowSkinStatus = config.Bind("Keybinds", "ShowSkinStatus", UnityEngine.KeyCode.Alpha5, "Key to toggle the skin status overlay.");
+        _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler overlay.");
+        _ShowDialogueEditor = config.Bind("Keybinds", "ShowDialogueEditor", UnityEngine.KeyCode.Alpha7, "Key to toggle the in-game dialogue editor.");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");
