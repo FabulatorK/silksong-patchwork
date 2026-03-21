@@ -306,14 +306,15 @@ public static class DialogueEditor
 
             File.WriteAllLines(filePath, lines);
 
-            // Invalidate cache so the change takes effect
+            // Invalidate cache and force the game to re-request all text
             DialogueHandler.InvalidateCache(entry.Sheet, lang);
+            Language.SwitchLanguage(lang);
 
             // Update the entry's current text
             entry.CurrentText = text;
             hasUnsavedChanges = false;
 
-            SetStatus($"Saved {entry.Sheet}.{entry.Key}");
+            SetStatus($"Saved {entry.Sheet}.{entry.Key} — live preview applied");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor saved: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
@@ -366,8 +367,9 @@ public static class DialogueEditor
                 File.Delete(filePath);
 
             DialogueHandler.InvalidateCache(entry.Sheet, lang);
+            Language.SwitchLanguage(lang);
 
-            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key}");
+            SetStatus($"Deleted override for {entry.Sheet}.{entry.Key} — reverted in-game");
             Plugin.Logger.LogInfo($"[Patchwork] Dialogue editor deleted override: {entry.Sheet}.{entry.Key} ({lang})");
         }
         catch (Exception ex)
