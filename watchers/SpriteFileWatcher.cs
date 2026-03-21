@@ -11,8 +11,8 @@ public class SpriteFileWatcher
     public FileSystemWatcher SpriteWatcher;
     public FileSystemWatcher AtlasWatcher;
 
-    public static bool ReloadSprites = false;
-    public static bool ReloadT2DSprites = false;
+    public static volatile bool ReloadSprites;
+    public static volatile bool ReloadT2DSprites;
 
     public SpriteFileWatcher()
     {
@@ -48,10 +48,10 @@ public class SpriteFileWatcher
         if (pathParts[^2] == "T2D" || (pathParts.Length >= 3 && pathParts[^3] == "T2D"))
         {
             string spriteName = Path.GetFileNameWithoutExtension(pathParts[^1]);
-            // Extract atlas name when file is inside T2D/{atlasName}/{sprite}.png
             string atlasName = (pathParts.Length >= 3 && pathParts[^3] == "T2D") ? pathParts[^2] : null;
             Plugin.Logger.LogInfo($"[FileWatcher] → T2D sprite change detected: atlas='{atlasName}', sprite='{spriteName}', setting ReloadT2DSprites=true");
-            T2DHandler.InvalidateCache(spriteName, atlasName);
+            // Cache invalidation deferred to ReloadSpritesInScene on the main thread
+            // to avoid dictionary corruption from concurrent access.
             ReloadT2DSprites = true;
             return;
         }
@@ -87,8 +87,9 @@ public class SpriteFileWatcher
         if (pathParts[^2] == "T2D")
         {
             string cleanTexName = Path.GetFileNameWithoutExtension(pathParts[^1]);
-            T2DHandler.InvalidateSpritesheet(cleanTexName);
             Plugin.Logger.LogInfo($"[FileWatcher] → T2D spritesheet change: '{cleanTexName}', setting ReloadT2DSprites=true");
+            // Cache invalidation deferred to ReloadSpritesInScene on the main thread
+            // to avoid dictionary corruption from concurrent access.
             ReloadT2DSprites = true;
             return;
         }

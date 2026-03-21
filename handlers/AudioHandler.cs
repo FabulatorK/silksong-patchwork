@@ -64,6 +64,11 @@ public static class AudioHandler
 
     public static void Reload()
     {
+        // Clear cache so clips are re-read from disk.
+        // Old AudioClip objects remain alive on any AudioSource still referencing them;
+        // they will be replaced below and eventually collected.
+        LoadedClips.Clear();
+
         foreach (var source in Resources.FindObjectsOfTypeAll<AudioSource>())
         {
             LoadAudio(source);
