@@ -36,6 +36,13 @@ public static class DialogueEditor
 
     private const string SearchFieldControlName = "Patchwork.DialogueEditor.Search";
 
+    // Text tags available for insertion (see wiki: Text-Tags)
+    private static readonly string[] TextTags =
+    {
+        "<page>", "<hpage>", "<br>",
+        "<page=S>", "<page=T>", "<page=L>", "<page=B>", "<page=M>"
+    };
+
     public static void Draw()
     {
         if (!initialized || windowRect.width < 1)
@@ -215,6 +222,22 @@ public static class DialogueEditor
             }
 
             GUILayout.EndScrollView();
+
+            GUIHelper.Space(4);
+
+            // Tag insertion buttons
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(38)));
+            foreach (var tag in TextTags)
+            {
+                if (GUILayout.Button(tag, GUIHelper.ButtonStyle, GUIHelper.Height(20)))
+                {
+                    editText += tag;
+                    hasUnsavedChanges = true;
+                }
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             GUIHelper.Space(4);
 
