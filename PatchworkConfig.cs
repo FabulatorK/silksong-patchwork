@@ -58,6 +58,12 @@ public class PatchworkConfig
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
 
+    private readonly ConfigEntry<int> _TextLogMaxVisible;
+    public int TextLogMaxVisible { get { return _TextLogMaxVisible.Value; } }
+
+    private readonly ConfigEntry<int> _AudioLogMaxVisible;
+    public int AudioLogMaxVisible { get { return _AudioLogMaxVisible.Value; } }
+
     // GC every N scenes during full dump
     private readonly ConfigEntry<int> _GCEveryNScenes;
     public int GCEveryNScenes { get { return _GCEveryNScenes.Value; } }
@@ -65,7 +71,9 @@ public class PatchworkConfig
     {
         _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
         _HideModdedAudioInLog = config.Bind("GUI", "HideModdedAudioInLog", true, "Hide modded audio clips from the audio log.");
-        _TextLogDuration = config.Bind("GUI", "TextLogDuration", 10.0, "Duration (in seconds) to keep text log entries visible.");
+        _TextLogDuration = config.Bind("GUI", "TextLogDuration", 10.0, "Duration (in seconds) for bumped log entries to fade out after leaving the visible slots.");
+        _TextLogMaxVisible = config.Bind("GUI", "TextLogMaxVisible", 15, "Number of latest text log entries always visible. Entries beyond this fade out over TextLogDuration seconds. (Range: 5-50)");
+        _AudioLogMaxVisible = config.Bind("GUI", "AudioLogMaxVisible", 15, "Number of latest audio log entries always visible. Entries beyond this fade out over LogAudioDuration seconds. (Range: 5-50)");
 
         _DumpSprites = config.Bind("Dumping", "DumpSprites", false, "Enable dumping of sprites");
         _DumpText = config.Bind("Dumping", "DumpText", false, "Enable dumping of text when the game starts.");
