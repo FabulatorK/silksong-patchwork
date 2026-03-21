@@ -153,6 +153,9 @@ public static class DevProfiler
         GUIHelper.Space(8);
         SectionHeader("Patchwork Assets");
         Label($"Audio clips cached: {AudioHandler.CachedClipCount}");
+        Label($"Text sheets cached: {DialogueHandler.CachedSheetCount} ({DialogueHandler.CachedKeyCount} keys)");
+        if (DialogueHandler.StaleKeyCount > 0)
+            ColorLabel($"  \u26A0 {DialogueHandler.StaleKeyCount} stale text key(s)", Color.yellow);
         Label($"Plugin packs: {Plugin.PluginPackPaths.Count}");
 
         // List pack paths
@@ -178,6 +181,9 @@ public static class DevProfiler
 
         if (GUILayout.Button("Reload Audio", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             AudioHandler.Reload();
+
+        if (GUILayout.Button("Reload Text", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
+            DialogueHandler.Reload();
 
         if (GUILayout.Button("Log Scene Hierarchy", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             LogSceneHierarchy();
