@@ -8,7 +8,7 @@ namespace Patchwork.GUI;
 
 public static class AudioLog
 {
-    private static readonly Dictionary<string, AudioPlayEntry> AudioPlayLog = new();
+    private static readonly List<AudioPlayEntry> AudioPlayEntries = new();
 
     // Base dimensions at 1080p - will be scaled automatically
     private const float WindowWidth = 300f;
@@ -30,9 +30,9 @@ public static class AudioLog
 
         GUIHelper.ApplyScaledSkin();
         windowRect = GUILayout.Window(
-            6969, 
-            windowRect, 
-            AudioLogWindow, 
+            6969,
+            windowRect,
+            AudioLogWindow,
             "Patchwork Audio Log",
             GUIHelper.WindowStyle,
             GUIHelper.WindowLayout(WindowWidth, WindowHeight)
@@ -41,25 +41,43 @@ public static class AudioLog
 
     private static void AudioLogWindow(int windowID)
     {
-        GUIHelper.Space(16); 
-        
-        int shown = 0;
-        List<AudioPlayEntry> sortedEntries = new(AudioPlayLog.Values);
-        sortedEntries.Sort((a, b) => a.ClipName.CompareTo(b.ClipName));
+        GUIHelper.Space(16);
 
-        GUILayout.BeginVertical();
-        foreach (var entry in sortedEntries)
+        int maxVisible = Mathf.Clamp(Plugin.Config.AudioLogMaxVisible, 5, 50);
+        double fadeDuration = Plugin.Config.LogAudioDuration;
+
+        // Remove fully faded overflow entries
+        for (int i = AudioPlayEntries.Count - 1; i >= maxVisible; i--)
         {
-            if (entry.IsExpired())
-            {
-                AudioPlayLog.Remove(entry.ClipName);
-                continue;
-            }
+            if (AudioPlayEntries[i].IsFadedOut(fadeDuration))
+                AudioPlayEntries.RemoveAt(i);
+        }
+
+        // Mark overflow entries that just got bumped
+        for (int i = maxVisible; i < AudioPlayEntries.Count; i++)
+        {
+            if (AudioPlayEntries[i].BumpedTime == null)
+                AudioPlayEntries[i].BumpedTime = DateTime.Now;
+        }
+
+        // Clear bumped time for entries that scrolled back into visible range
+        for (int i = 0; i < Math.Min(maxVisible, AudioPlayEntries.Count); i++)
+        {
+            AudioPlayEntries[i].BumpedTime = null;
+        }
+
+        int shown = 0;
+        GUILayout.BeginVertical();
+        for (int i = 0; i < AudioPlayEntries.Count; i++)
+        {
+            var entry = AudioPlayEntries[i];
 
             if (Plugin.Config.HideModdedAudioInLog && File.Exists(Path.Combine(AudioHandler.SoundFolder, entry.ClipName + ".wav")))
                 continue;
 
-            var opacity = entry.GetOpacity();
+            bool isVisible = i < maxVisible;
+            float opacity = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
+
             var color = new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.contentColor = color;
             GUILayout.Label(entry.ClipName, GUIHelper.LabelStyle);
@@ -78,24 +96,45 @@ public static class AudioLog
 
     public static void LogAudio(AudioClip clip)
     {
-        AudioPlayLog[clip.name] = new AudioPlayEntry
+        string cleanName = clip.name.Replace("PATCHWORK_", "");
+
+        // Remove existing entry for this clip so it moves to the top
+        var existing = AudioPlayEntries.Find(e => e.ClipName == cleanName);
+        if (existing != null)
+            AudioPlayEntries.Remove(existing);
+
+        // Insert at front so newest is always on top
+        AudioPlayEntries.Insert(0, new AudioPlayEntry
         {
-            ClipName = clip.name.Replace("PATCHWORK_", ""),
-            StartTime = DateTime.Now
-        };
+            ClipName = cleanName,
+            StartTime = DateTime.Now,
+            BumpedTime = null
+        });
     }
-    
+
     public static void ClearLog()
     {
-        AudioPlayLog.Clear();
+        AudioPlayEntries.Clear();
     }
 
     internal class AudioPlayEntry
     {
         public string ClipName;
         public DateTime StartTime;
+        public DateTime? BumpedTime;
 
-        public float GetOpacity() => 1.0f - (float)((DateTime.Now - StartTime).TotalSeconds / Plugin.Config.LogAudioDuration);
-        public bool IsExpired() => DateTime.Now >= StartTime.AddSeconds(Plugin.Config.LogAudioDuration);
+        public float GetFadeOpacity(double fadeDuration)
+        {
+            if (BumpedTime == null) return 1.0f;
+            var elapsed = (DateTime.Now - BumpedTime.Value).TotalSeconds;
+            if (elapsed >= fadeDuration) return 0.0f;
+            return 1.0f - (float)(elapsed / fadeDuration);
+        }
+
+        public bool IsFadedOut(double fadeDuration)
+        {
+            if (BumpedTime == null) return false;
+            return (DateTime.Now - BumpedTime.Value).TotalSeconds >= fadeDuration;
+        }
     }
 }

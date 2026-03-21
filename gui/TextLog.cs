@@ -21,7 +21,7 @@ public static class TextLog
     {
         if (!initialized || windowRect.width < 1)
         {
-            windowRect = GUIHelper.ScaledRect(10, 10, 700, 400); // or ScaledRectFromRight
+            windowRect = GUIHelper.ScaledRect(10, 10, 700, 400);
             initialized = true;
         }
         GUIHelper.ApplyScaledSkin();
@@ -30,18 +30,41 @@ public static class TextLog
 
     private static void TextLogWindow(int windowID)
     {
-        GUIHelper.Space(16); 
+        GUIHelper.Space(16);
 
-        TextLogEntries.RemoveAll(entry => entry.IsExpired());
+        int maxVisible = Mathf.Clamp(Plugin.Config.TextLogMaxVisible, 5, 50);
+        double fadeDuration = Plugin.Config.TextLogDuration;
+
+        // Remove fully faded overflow entries
+        for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)
+        {
+            if (TextLogEntries[i].IsFadedOut(fadeDuration))
+                TextLogEntries.RemoveAt(i);
+        }
+
+        // Mark overflow entries that just got bumped
+        for (int i = maxVisible; i < TextLogEntries.Count; i++)
+        {
+            if (TextLogEntries[i].BumpedTime == null)
+                TextLogEntries[i].BumpedTime = DateTime.Now;
+        }
+
+        // Clear bumped time for entries that scrolled back into visible range
+        for (int i = 0; i < Math.Min(maxVisible, TextLogEntries.Count); i++)
+        {
+            TextLogEntries[i].BumpedTime = null;
+        }
 
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
         GUILayout.BeginVertical();
-        foreach (var entry in TextLogEntries)
+        for (int i = 0; i < TextLogEntries.Count; i++)
         {
+            var entry = TextLogEntries[i];
+            bool isVisible = i < maxVisible;
+            float opacity = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
+
             GUILayout.BeginHorizontal();
-            var opacity = entry.GetOpacity();
             var color = new Color(1.0f, 1.0f, 1.0f, opacity);
-            UnityEngine.GUI.skin.label.fontSize = 14;
             UnityEngine.GUI.contentColor = color;
             GUILayout.Label($"{entry.SheetName}.{entry.KeyName}:", GUIHelper.LabelStyle);
 
@@ -70,15 +93,17 @@ public static class TextLog
         if (existingEntry != null)
             TextLogEntries.Remove(existingEntry);
 
-        TextLogEntries.Add(new TextLogEntry
+        // Insert at front so newest is always on top
+        TextLogEntries.Insert(0, new TextLogEntry
         {
             SheetName = sheet,
             KeyName = key,
             Text = text,
-            LogTime = DateTime.Now
+            LogTime = DateTime.Now,
+            BumpedTime = null
         });
     }
-    
+
     public static void ClearLog()
     {
         TextLogEntries.Clear();
@@ -90,20 +115,24 @@ public static class TextLog
         public string KeyName;
         public string Text;
         public DateTime LogTime;
+        public DateTime? BumpedTime;
 
-        public float GetOpacity()
+        /// <summary>
+        /// Opacity for entries that have been bumped out of the visible slots.
+        /// Fades from 1.0 to 0.0 over fadeDuration seconds since BumpedTime.
+        /// </summary>
+        public float GetFadeOpacity(double fadeDuration)
         {
-            var elapsed = (DateTime.Now - LogTime).TotalSeconds;
-            if (elapsed >= Plugin.Config.TextLogDuration)
-                return 0.2f; // Minimum opacity
-            float opacityRange = 1.0f - 0.2f;
-            return 1.0f - (float)(elapsed / Plugin.Config.TextLogDuration) * opacityRange;
+            if (BumpedTime == null) return 1.0f;
+            var elapsed = (DateTime.Now - BumpedTime.Value).TotalSeconds;
+            if (elapsed >= fadeDuration) return 0.0f;
+            return 1.0f - (float)(elapsed / fadeDuration);
         }
 
-        public bool IsExpired()
+        public bool IsFadedOut(double fadeDuration)
         {
-            var elapsed = (DateTime.Now - LogTime).TotalSeconds;
-            return elapsed >= Plugin.Config.TextLogDuration;
+            if (BumpedTime == null) return false;
+            return (DateTime.Now - BumpedTime.Value).TotalSeconds >= fadeDuration;
         }
     }
 }
