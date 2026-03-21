@@ -104,6 +104,8 @@ public class Plugin : BaseUnityPlugin
         SpriteLoader.ApplyPatches(harmony);
         VideoHandler.ApplyPatches(harmony);
         GUIHelper.InitInputBlocking();
+        
+        RawKeyboardLeakBlocker.ApplyPatches(harmony);
 
         StartCoroutine(AwakeDelayed(harmony));
     }

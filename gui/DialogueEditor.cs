@@ -34,6 +34,8 @@ public static class DialogueEditor
     private static string statusMessage = "";
     private static float statusTime;
 
+    private const string SearchFieldControlName = "Patchwork.DialogueEditor.Search";
+
     public static void Draw()
     {
         if (!initialized || windowRect.width < 1)
@@ -85,10 +87,12 @@ public static class DialogueEditor
         GUILayout.BeginHorizontal();
         GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(55)));
         searchText = GUIHelper.TextField(
+            SearchFieldControlName,
             searchText,
             GUILayout.Width(GUIHelper.Scaled(300)),
-            GUILayout.Height(GUIHelper.Scaled(32))
+            GUIHelper.Height(24)
         );
+
         GUILayout.FlexibleSpace();
         if (GUILayout.Button("Clear", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
         {
