@@ -519,6 +519,8 @@ public static class T2DHandler
         {
             if (!Directory.Exists(t2dRoot))
                 return;
+
+            // Structured path: T2D/[AtlasName]/[SpriteName].png
             var atlasDirs = Directory.GetDirectories(t2dRoot);
             foreach (var atlasDir in atlasDirs)
             {
@@ -535,6 +537,19 @@ public static class T2DHandler
                     if (tex != null)
                         PreloadedT2DTextures[key] = tex;
                 }
+            }
+
+            // Flat path: T2D/[SpriteName].png — keyed by sprite name only,
+            // acts as a fallback when no atlas-qualified match exists.
+            foreach (var file in Directory.GetFiles(t2dRoot, "*.png"))
+            {
+                string spriteName = Path.GetFileNameWithoutExtension(file);
+                if (PreloadedT2DTextures.ContainsKey(spriteName) || LoadedT2DSprites.ContainsKey(spriteName))
+                    continue;
+
+                Texture2D tex = TexUtil.LoadFromPNG(file);
+                if (tex != null)
+                    PreloadedT2DTextures[spriteName] = tex;
             }
         }
 
@@ -557,7 +572,17 @@ public static class T2DHandler
 
             string cleanTexName = CleanTextureName(original.texture.name);
             string key = SpriteKey(cleanTexName, original.name);
-            if (PreloadedT2DTextures.TryGetValue(key, out var tex))
+
+            // Try atlas-qualified key first, then fall back to plain sprite name
+            // (supports flat T2D/[SpriteName].png layout)
+            string matchedKey = null;
+            Texture2D tex = null;
+            if (PreloadedT2DTextures.TryGetValue(key, out tex))
+                matchedKey = key;
+            else if (PreloadedT2DTextures.TryGetValue(original.name, out tex))
+                matchedKey = original.name;
+
+            if (matchedKey != null)
             {
                 // Ensure the replacement texture carries the original atlas name
                 // so enforcement can recover the composite key later.
@@ -568,8 +593,9 @@ public static class T2DHandler
                     new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
                 newSprite.name = original.name;
 
+                // Always store under the atlas-qualified key for consistent lookup
                 LoadedT2DSprites[key] = newSprite;
-                PreloadedT2DTextures.Remove(key);
+                PreloadedT2DTextures.Remove(matchedKey);
 
                 string texName = original.texture.name;
                 if (!SpriteAtlasMap.ContainsKey(texName))
@@ -781,8 +807,17 @@ public static class T2DHandler
                 if (!SpriteAtlasMap.ContainsKey(sprite.texture.name))
                     PreloadT2DAtlasTextures(sprite.texture.name, cleanTexName);
 
-                // Individual sprites take priority over spritesheets
-                if (PreloadedT2DTextures.TryGetValue(key, out var spriteTex))
+                // Individual sprites take priority over spritesheets.
+                // Try atlas-qualified key first, then fall back to plain sprite name
+                // (supports flat T2D/[SpriteName].png layout).
+                Texture2D spriteTex = null;
+                string matchedKey = null;
+                if (PreloadedT2DTextures.TryGetValue(key, out spriteTex))
+                    matchedKey = key;
+                else if (PreloadedT2DTextures.TryGetValue(sprite.name, out spriteTex))
+                    matchedKey = sprite.name;
+
+                if (spriteTex != null)
                 {
                     // Ensure the replacement texture carries the original atlas name
                     // so enforcement can recover the composite key later.
@@ -793,8 +828,9 @@ public static class T2DHandler
                         new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                     newSprite.name = sprite.name;
 
+                    // Always store under the atlas-qualified key for consistent lookup
                     LoadedT2DSprites[key] = newSprite;
-                    PreloadedT2DTextures.Remove(key);
+                    PreloadedT2DTextures.Remove(matchedKey);
 
                     SetSprite(spriteContainer, newSprite);
                     TrackT2DContainer(spriteContainer);
