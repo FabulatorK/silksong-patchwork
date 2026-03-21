@@ -63,19 +63,21 @@ public static class TextLog
             bool isVisible = i < maxVisible;
             float opacity = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
 
-            GUILayout.BeginHorizontal();
             var color = new Color(1.0f, 1.0f, 1.0f, opacity);
             UnityEngine.GUI.contentColor = color;
-            GUILayout.Label($"{entry.SheetName}.{entry.KeyName}:", GUIHelper.LabelStyle);
 
-            GUILayout.FlexibleSpace();
-
-            UnityEngine.GUI.contentColor = new Color(0.8f, 0.8f, 0.8f, opacity);
             string textPreview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
             if (textPreview.Length > MaxPreviewLength)
                 textPreview = textPreview.Substring(0, MaxPreviewLength - 3) + "...";
-            GUILayout.Label(textPreview, GUIHelper.LabelStyle);
-            GUILayout.EndHorizontal();
+
+            string label = $"{entry.SheetName}.{entry.KeyName}: {textPreview}";
+
+            // Clickable entry — opens in Dialogue Editor
+            if (GUILayout.Button(label, GUIHelper.LabelStyle))
+            {
+                DialogueEditor.SelectEntry(entry.SheetName, entry.KeyName, entry.Text);
+                Plugin.ShowDialogueEditor = true;
+            }
         }
 
         if (TextLogEntries.Count == 0)
