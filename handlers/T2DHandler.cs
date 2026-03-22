@@ -666,7 +666,7 @@ public static class T2DHandler
         // Re-apply individual sprite replacements to all renderers
         // (renderers still have their old sprites, so sr.sprite != null)
         int srCount = 0, srLoaded = 0;
-        foreach (var spriteRenderer in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        foreach (var spriteRenderer in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
         {
             if (spriteRenderer == null || spriteRenderer.sprite == null)
                 continue;
@@ -677,7 +677,7 @@ public static class T2DHandler
                 srLoaded++;
         }
         int imgCount = 0, imgLoaded = 0;
-        foreach (var image in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        foreach (var image in Resources.FindObjectsOfTypeAll<Image>())
         {
             if (image == null || image.sprite == null)
                 continue;
