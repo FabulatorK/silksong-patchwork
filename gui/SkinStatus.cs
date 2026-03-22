@@ -61,11 +61,11 @@ public static class SkinStatus
 
         // Search field
         GUILayout.BeginHorizontal();
-        GUILayout.Label("Search:", GUIHelper.LabelStyle, GUILayout.Width(GUIHelper.Scaled(60)));
+        GUILayout.Label("Search:", GUIHelper.LabelStyle, GUIHelper.Width(60));
         searchText = GUIHelper.TextField(
             searchText,
-            GUILayout.Width(GUIHelper.Scaled(280)),
-            GUILayout.Height(GUIHelper.Scaled(32))
+            GUIHelper.Width(280),
+            GUIHelper.Height(32)
         );
         GUILayout.EndHorizontal();
 

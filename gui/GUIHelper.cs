@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -203,10 +204,13 @@ public static class GUIHelper
         GUILayout.Space(Scaled(basePixels));
     }
 
-    public static GUILayoutOption LabelWidth(float baseWidth)
+    public static GUILayoutOption Width(float baseWidth)
     {
         return GUILayout.Width(Scaled(baseWidth));
     }
+
+    /// <summary>Alias for Width(). Prefer Width() in new code.</summary>
+    public static GUILayoutOption LabelWidth(float baseWidth) => Width(baseWidth);
 
     public static GUILayoutOption Height(float baseHeight)
     {

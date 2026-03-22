@@ -86,7 +86,7 @@ public static class AudioLog
         if (shown == 0)
         {
             UnityEngine.GUI.contentColor = Color.yellow;
-            GUILayout.Label("No audio played recently.");
+            GUILayout.Label("No audio played recently.", GUIHelper.LabelStyle);
         }
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
