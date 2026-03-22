@@ -405,7 +405,7 @@ public static class AnimationController
                     }
                 }
 
-                if (GUILayout.Button("Dump Animation Sprites", GUIHelper.ButtonStyle))
+                if (GUILayout.Button("Edit All Animation Sprites", GUIHelper.ButtonStyle))
                 {
                     var clip = animator.CurrentClip;
                     int dumped = 0;
@@ -418,10 +418,25 @@ public static class AnimationController
                         var frameDef = frameCollection.spriteDefinitions[frame.spriteId];
                         if (string.IsNullOrEmpty(frameDef.name))
                             continue;
+                        string matname = frameDef.material.name.Split(' ')[0];
+                        string loadPath = Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname, frameDef.name + ".png");
+                        if (File.Exists(loadPath))
+                        {
+                            dumped++;
+                            continue;
+                        }
                         SpriteDumper.DumpSingleSprite(frameDef, frameCollection);
+                        string dumpPath = Path.Combine(SpriteDumper.DumpPath, frameCollection.name, matname, frameDef.name + ".png");
+                        if (!File.Exists(dumpPath))
+                        {
+                            Plugin.Logger.LogError($"Failed to dump sprite: {frameCollection.name}/{matname}/{frameDef.name}");
+                            continue;
+                        }
+                        IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname));
+                        File.Copy(dumpPath, loadPath, true);
                         dumped++;
                     }
-                    Plugin.Logger.LogInfo($"[AnimCtrl] Dumped {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteDumper.DumpPath}");
+                    Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
                 }
                 GUILayout.EndHorizontal();
             }
