@@ -124,8 +124,13 @@ public class DialogueHandler
             RequestedOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
         }
 
-        TextLog.LogText(sheetTitle, key, __result);
-        DialogueEditor.TrackText(sheetTitle, key, __result);
+        // Only log/track when the respective GUI panels are open to avoid
+        // per-request allocations (closure, TextLogEntry, string interpolation)
+        // on every Language.Get call — hundreds of times per frame in UI-heavy scenes.
+        if (Plugin.ShowTextLog)
+            TextLog.LogText(sheetTitle, key, __result);
+        if (Plugin.ShowDialogueEditor)
+            DialogueEditor.TrackText(sheetTitle, key, __result);
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang)

@@ -34,6 +34,7 @@ public static class AnimationController
     private static readonly Dictionary<string, bool> ShowAnimationDropdown = new Dictionary<string, bool>();
 
     private static readonly Dictionary<string, tk2dSpriteAnimator> Animators = new Dictionary<string, tk2dSpriteAnimator>();
+    private static readonly List<string> _removeKeys = new(); // reused each frame to avoid allocations
 
     private static string _animationSearchText = "";
     private static Vector2 _animationDropdownScroll = Vector2.zero;
@@ -179,16 +180,16 @@ public static class AnimationController
         // For the selected animator, tolerate transient invalid states (e.g. null CurrentClip
         // or out-of-range CurrentFrame during animation transitions like turning around).
         // These resolve within a few frames — removing eagerly causes the UI to "unhook".
-        for (int i = 0; i < Animators.Count; i++)
+        _removeKeys.Clear();
+        foreach (var kvp in Animators)
         {
-            var kvp = new List<KeyValuePair<string, tk2dSpriteAnimator>>(Animators)[i];
             string name = kvp.Key;
             tk2dSpriteAnimator checkAnimator = kvp.Value;
 
             // Truly dead: native object destroyed or GameObject gone
             if (checkAnimator == null || checkAnimator.gameObject == null)
             {
-                Animators.Remove(name);
+                _removeKeys.Add(name);
                 if (SelectedAnimator == name)
                     SelectedAnimator = null;
                 continue;
@@ -198,7 +199,7 @@ public static class AnimationController
             if (!checkAnimator.gameObject.activeSelf)
             {
                 if (SelectedAnimator != name)
-                    Animators.Remove(name);
+                    _removeKeys.Add(name);
                 continue;
             }
 
@@ -208,10 +209,12 @@ public static class AnimationController
                 checkAnimator.CurrentFrame >= checkAnimator.CurrentClip.frames.Length)
             {
                 if (SelectedAnimator != name)
-                    Animators.Remove(name);
+                    _removeKeys.Add(name);
                 continue;
             }
         }
+        foreach (var key in _removeKeys)
+            Animators.Remove(key);
     }
 
     private static void SelectAnimator(tk2dSpriteAnimator animator)
