@@ -8,7 +8,7 @@ public class TextFileWatcher
     public FileSystemWatcher TextWatcher;
     public List<FileSystemWatcher> PackWatchers = new();
 
-    public static bool ReloadText = false;
+    public static volatile bool ReloadText;
 
     public TextFileWatcher()
     {
@@ -39,9 +39,9 @@ public class TextFileWatcher
 
     private void OnTextChanged(object sender, FileSystemEventArgs e)
     {
-        string sheet = new DirectoryInfo(Path.GetDirectoryName(e.FullPath)).Name;
-        string lang = Path.GetFileNameWithoutExtension(e.FullPath);
-        DialogueHandler.InvalidateCache(sheet, lang);
+        Plugin.Logger.LogInfo($"[FileWatcher] Text file event: {e.ChangeType} — {e.FullPath}");
+        // Cache invalidation deferred to Reload on the main thread
+        // to avoid dictionary corruption from concurrent access.
         ReloadText = true;
     }
 }

@@ -7,7 +7,7 @@ public class AudioFileWatcher
 {
     public FileSystemWatcher AudioWatcher;
 
-    public static bool ReloadAudio = false;
+    public static volatile bool ReloadAudio;
 
     public AudioFileWatcher()
     {
@@ -25,8 +25,9 @@ public class AudioFileWatcher
 
     private void OnAudioChanged(object sender, FileSystemEventArgs e)
     {
-        string filename = Path.GetFileNameWithoutExtension(e.FullPath);
-        AudioHandler.InvalidateCache(filename);
+        Plugin.Logger.LogInfo($"[FileWatcher] Audio file event: {e.ChangeType} — {e.FullPath}");
+        // Cache invalidation deferred to Reload on the main thread
+        // to avoid dictionary corruption from concurrent access.
         ReloadAudio = true;
     }
 }
