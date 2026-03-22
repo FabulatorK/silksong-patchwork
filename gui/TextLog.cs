@@ -7,6 +7,7 @@ namespace Patchwork.GUI;
 public static class TextLog
 {
     private static readonly List<TextLogEntry> TextLogEntries = new();
+    private static readonly Dictionary<string, TextLogEntry> TextLogLookup = new();
 
     private static readonly int MaxPreviewLength = 50;
 
@@ -91,24 +92,35 @@ public static class TextLog
 
     public static void LogText(string sheet, string key, string text)
     {
-        var existingEntry = TextLogEntries.Find(entry => entry.SheetName == sheet && entry.KeyName == key);
-        if (existingEntry != null)
-            TextLogEntries.Remove(existingEntry);
-
-        // Insert at front so newest is always on top
-        TextLogEntries.Insert(0, new TextLogEntry
+        string lookupKey = $"{sheet}|{key}";
+        if (TextLogLookup.TryGetValue(lookupKey, out var existingEntry))
         {
-            SheetName = sheet,
-            KeyName = key,
-            Text = text,
-            LogTime = DateTime.Now,
-            BumpedTime = null
-        });
+            // Move existing entry to front — update in place, no new allocation
+            TextLogEntries.Remove(existingEntry);
+            existingEntry.Text = text;
+            existingEntry.LogTime = DateTime.Now;
+            existingEntry.BumpedTime = null;
+            TextLogEntries.Insert(0, existingEntry);
+        }
+        else
+        {
+            var entry = new TextLogEntry
+            {
+                SheetName = sheet,
+                KeyName = key,
+                Text = text,
+                LogTime = DateTime.Now,
+                BumpedTime = null
+            };
+            TextLogEntries.Insert(0, entry);
+            TextLogLookup[lookupKey] = entry;
+        }
     }
 
     public static void ClearLog()
     {
         TextLogEntries.Clear();
+        TextLogLookup.Clear();
     }
 
     internal class TextLogEntry

@@ -121,31 +121,41 @@ public static class SpriteLoader
 
     private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)
     {
-        var files = Directory.GetFiles(LoadPath, $"{spriteName}.png", SearchOption.AllDirectories)
-            .Where(f => Path.GetDirectoryName(f).EndsWith(Path.Combine(collectionName, materialName)));
-        if (files.Any())
-            return TexUtil.LoadFromPNG(files.First());
+        string suffix = Path.Combine(collectionName, materialName);
+        string match = FindFileWithSuffix(LoadPath, $"{spriteName}.png", suffix);
+        if (match != null)
+            return TexUtil.LoadFromPNG(match);
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
-            if (!Directory.Exists(Path.Combine(packPath, "Sprites")))
+            string packSpritesDir = Path.Combine(packPath, "Sprites");
+            if (!Directory.Exists(packSpritesDir))
                 continue;
-            var packFiles = Directory.GetFiles(Path.Combine(packPath, "Sprites"), $"{spriteName}.png", SearchOption.AllDirectories)
-                .Where(f => Path.GetDirectoryName(f).EndsWith(Path.Combine(collectionName, materialName)));
-            if (packFiles.Any())
-                return TexUtil.LoadFromPNG(packFiles.First());
+            match = FindFileWithSuffix(packSpritesDir, $"{spriteName}.png", suffix);
+            if (match != null)
+                return TexUtil.LoadFromPNG(match);
         }
 
         return null;
     }
 
+    private static string FindFileWithSuffix(string searchDir, string searchPattern, string dirSuffix)
+    {
+        var files = Directory.GetFiles(searchDir, searchPattern, SearchOption.AllDirectories);
+        foreach (var f in files)
+        {
+            if (Path.GetDirectoryName(f).EndsWith(dirSuffix))
+                return f;
+        }
+        return null;
+    }
+
     private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName)
     {
-        var files = Directory.GetFiles(AtlasLoadPath, $"{materialName}.png", SearchOption.AllDirectories)
-            .Where(f => Path.GetDirectoryName(f).EndsWith(collection.name));
-        if (files.Any())
+        string match = FindFileWithSuffix(AtlasLoadPath, $"{materialName}.png", collection.name);
+        if (match != null)
         {
-            var tex2d = TexUtil.LoadFromPNG(files.First());
+            var tex2d = TexUtil.LoadFromPNG(match);
             RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             Graphics.Blit(tex2d, rt);
             Object.Destroy(tex2d);
@@ -154,13 +164,13 @@ public static class SpriteLoader
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
-            if(!Directory.Exists(Path.Combine(packPath, "Spritesheets")))
+            string packSheetsDir = Path.Combine(packPath, "Spritesheets");
+            if (!Directory.Exists(packSheetsDir))
                 continue;
-            var packFiles = Directory.GetFiles(Path.Combine(packPath, "Spritesheets"), $"{materialName}.png", SearchOption.AllDirectories)
-                .Where(f => Path.GetDirectoryName(f).EndsWith(collection.name));
-            if (packFiles.Any())
+            match = FindFileWithSuffix(packSheetsDir, $"{materialName}.png", collection.name);
+            if (match != null)
             {
-                var tex2d = TexUtil.LoadFromPNG(packFiles.First());
+                var tex2d = TexUtil.LoadFromPNG(match);
                 RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
                 Graphics.Blit(tex2d, rt);
                 Object.Destroy(tex2d);

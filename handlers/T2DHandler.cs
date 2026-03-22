@@ -46,6 +46,13 @@ public static class T2DHandler
     private static bool _enforcing = false;
     private static bool _handling = false;
 
+    // Cached delegates to avoid per-frame closure allocations in RemoveWhere
+    private static readonly System.Predicate<SpriteRenderer> _srNullPredicate = sr => sr == null;
+    private static readonly System.Predicate<Image> _imgNullPredicate = img => img == null;
+
+    // Cache for CleanTextureName results — avoids repeated string splits in per-frame enforcement
+    private static readonly Dictionary<string, string> CleanTextureNameCache = new();
+
     /// <summary>
     /// True when any T2D replacement data exists (spritesheets or individual sprites).
     /// Gates all expensive per-frame sweeps so Patchwork is near-zero-cost when no T2D
@@ -429,9 +436,9 @@ public static class T2DHandler
                 }
             }
 
-            // Clean up destroyed references periodically
-            KnownT2DSpriteRenderers.RemoveWhere(sr => sr == null);
-            KnownT2DImages.RemoveWhere(img => img == null);
+            // Clean up destroyed references periodically (cached delegates to avoid per-frame closure allocations)
+            KnownT2DSpriteRenderers.RemoveWhere(_srNullPredicate);
+            KnownT2DImages.RemoveWhere(_imgNullPredicate);
         }
         finally
         {
@@ -631,6 +638,7 @@ public static class T2DHandler
         NegativeSpriteCache.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
+        CleanTextureNameCache.Clear();
 
         // Rebuild everything from disk — PreloadAllT2DTextures handles both
         // spritesheet overrides AND individual sprite PNG scanning + eager Sprite creation.
@@ -1247,19 +1255,30 @@ public static class T2DHandler
 
     private static string CleanTextureName(string textureName)
     {
+        if (CleanTextureNameCache.TryGetValue(textureName, out var cached))
+            return cached;
+
+        string result = CleanTextureNameUncached(textureName);
+        CleanTextureNameCache[textureName] = result;
+        return result;
+    }
+
+    private static string CleanTextureNameUncached(string textureName)
+    {
+        string delimiter = null;
         if (textureName.Contains("-BC7-"))
-        {
-            string cleanName = textureName.Split(["-BC7-"], System.StringSplitOptions.None)[1];
-            cleanName = string.Join("-", cleanName.Split('-').Take(cleanName.Split('-').Length - 1));
-            return cleanName;
-        }
-        if (textureName.Contains("DXT5|BC3-") || textureName.Contains("DXT5_BC3-"))
-        {
-            string delimiter = textureName.Contains("DXT5|BC3-") ? "DXT5|BC3-" : "DXT5_BC3-";
-            string cleanName = textureName.Split([delimiter], System.StringSplitOptions.None)[1];
-            cleanName = string.Join("-", cleanName.Split('-').Take(cleanName.Split('-').Length - 1));
-            return cleanName;
-        }
-        return textureName;
+            delimiter = "-BC7-";
+        else if (textureName.Contains("DXT5|BC3-"))
+            delimiter = "DXT5|BC3-";
+        else if (textureName.Contains("DXT5_BC3-"))
+            delimiter = "DXT5_BC3-";
+
+        if (delimiter == null)
+            return textureName;
+
+        string afterDelimiter = textureName.Split([delimiter], System.StringSplitOptions.None)[1];
+        // Strip trailing segment (hash/id) — everything after the last '-'
+        int lastDash = afterDelimiter.LastIndexOf('-');
+        return lastDash > 0 ? afterDelimiter.Substring(0, lastDash) : afterDelimiter;
     }
 }
