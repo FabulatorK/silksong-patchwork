@@ -10,10 +10,10 @@ public static class SpriteUtil
     {
         Vector2[] uvs = def.uvs;
 
-        int xMin = (int)(uvs.Min(uv => uv.x) * tex.width);
-        int xMax = (int)(uvs.Max(uv => uv.x) * tex.width);
-        int yMin = (int)(uvs.Min(uv => uv.y) * tex.height);
-        int yMax = (int)(uvs.Max(uv => uv.y) * tex.height);
+        int xMin= Mathf.FloorToInt(uvs.Min(uv => uv.x) * tex.width + 0.25f);
+        int xMax=Mathf.CeilToInt(uvs.Max(uv=>uv.x) * tex.width - 0.25f);
+        int yMin= Mathf.FloorToInt(uvs.Min(uv => uv.y) * tex.height + 0.25f);
+        int yMax = Mathf.CeilToInt(uvs.Max(uv => uv.y) * tex.height - 0.25f);
         int width = math.min(xMax - xMin, tex.width);
         int height = math.min(yMax - yMin, tex.height);
 
