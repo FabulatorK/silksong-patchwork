@@ -1,4 +1,5 @@
 using System.IO;
+using Patchwork.Handlers;
 
 namespace Patchwork.Watchers;
 
