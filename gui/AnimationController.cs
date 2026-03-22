@@ -438,16 +438,20 @@ public static class AnimationController
                     }
                     Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
 
-                    // Open the folder containing the sprites
-                    var firstFrame = clip.frames[0];
-                    var firstCollection = firstFrame.spriteCollection;
-                    if (firstCollection != null && firstFrame.spriteId >= 0 && firstFrame.spriteId < firstCollection.spriteDefinitions.Length)
+                    // Open all sprites in the default image editor
+                    for (int f2 = 0; f2 < clip.frames.Length; f2++)
                     {
-                        var firstDef = firstCollection.spriteDefinitions[firstFrame.spriteId];
-                        string firstMatname = firstDef.material.name.Split(' ')[0];
-                        string folder = Path.Combine(SpriteLoader.LoadPath, firstCollection.name, firstMatname);
-                        if (Directory.Exists(folder))
-                            Process.Start(folder);
+                        var openFrame = clip.frames[f2];
+                        var openCollection = openFrame.spriteCollection;
+                        if (openCollection == null || openFrame.spriteId < 0 || openFrame.spriteId >= openCollection.spriteDefinitions.Length)
+                            continue;
+                        var openDef = openCollection.spriteDefinitions[openFrame.spriteId];
+                        if (string.IsNullOrEmpty(openDef.name))
+                            continue;
+                        string openMatname = openDef.material.name.Split(' ')[0];
+                        string openPath = Path.Combine(SpriteLoader.LoadPath, openCollection.name, openMatname, openDef.name + ".png");
+                        if (File.Exists(openPath))
+                            Process.Start(openPath);
                     }
                 }
                 GUILayout.EndHorizontal();
