@@ -437,6 +437,22 @@ public static class AnimationController
                         dumped++;
                     }
                     Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
+
+                    // Open all sprites in the default image editor
+                    for (int f2 = 0; f2 < clip.frames.Length; f2++)
+                    {
+                        var openFrame = clip.frames[f2];
+                        var openCollection = openFrame.spriteCollection;
+                        if (openCollection == null || openFrame.spriteId < 0 || openFrame.spriteId >= openCollection.spriteDefinitions.Length)
+                            continue;
+                        var openDef = openCollection.spriteDefinitions[openFrame.spriteId];
+                        if (string.IsNullOrEmpty(openDef.name))
+                            continue;
+                        string openMatname = openDef.material.name.Split(' ')[0];
+                        string openPath = Path.Combine(SpriteLoader.LoadPath, openCollection.name, openMatname, openDef.name + ".png");
+                        if (File.Exists(openPath))
+                            Process.Start(openPath);
+                    }
                 }
                 GUILayout.EndHorizontal();
             }
