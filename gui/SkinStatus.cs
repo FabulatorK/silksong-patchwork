@@ -75,8 +75,8 @@ public static class SkinStatus
         // --- Overview ---
         SectionHeader("Overview");
         Label($"tk2d sprites loaded: {SpriteLoader.LoadedSpriteCount} in {SpriteLoader.LoadedCollectionCount} collections");
-        Label($"T2D spritesheets: {T2DHandler.SpritesheetOverrideCount}");
-        Label($"T2D sprites: {T2DHandler.LoadedT2DSpriteCount} loaded, {T2DHandler.PreloadedT2DTextureCount} pending");
+        Label($"T2D spritesheets: {T2DLoader.SpritesheetOverrideCount}");
+        Label($"T2D sprites: {T2DLoader.LoadedT2DSpriteCount} loaded, {T2DLoader.PreloadedT2DTextureCount} pending");
         Label($"Audio clips: {AudioHandler.CachedClipCount}");
         Label($"Video overrides: {VideoHandler.VideoFileMap.Count(kv => kv.Value != null)}");
         Label($"Text sheets: {DialogueHandler.CachedSheetCount} ({DialogueHandler.CachedKeyCount} keys)");
@@ -196,11 +196,11 @@ public static class SkinStatus
         foreach (var packPath in Plugin.PluginPackPaths)
             ScanPngFiles(Path.Combine(packPath, "Sprites", "T2D"), t2d);
         // T2D spritesheet overrides
-        ScanPngFiles(T2DHandler.T2DAtlasLoadPath, t2d);
+        ScanPngFiles(T2DLoader.AtlasLoadPath, t2d);
 
-        var loadedT2DNames = new HashSet<string>(T2DHandler.LoadedT2DSpriteNames);
-        var pendingT2DNames = new HashSet<string>(T2DHandler.PreloadedT2DTextureNames);
-        var sheetNames = new HashSet<string>(T2DHandler.SpritesheetOverrideNames);
+        var loadedT2DNames = new HashSet<string>(T2DLoader.LoadedT2DSpriteNames);
+        var pendingT2DNames = new HashSet<string>(T2DLoader.PreloadedT2DTextureNames);
+        var sheetNames = new HashSet<string>(T2DLoader.SpritesheetOverrideNames);
         foreach (var f in t2d)
         {
             if (loadedT2DNames.Contains(f.Name) || sheetNames.Contains(f.Name))

@@ -4,7 +4,7 @@ using HarmonyLib;
 using Patchwork.GUI;
 using UnityEngine.InputSystem.Controls;
 
-namespace Patchwork.Handlers;
+namespace Patchwork.Util;
 
 internal static class RawKeyboardLeakBlocker
 {

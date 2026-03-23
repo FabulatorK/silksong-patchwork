@@ -81,15 +81,15 @@ public class Plugin : BaseUnityPlugin
                 var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
                 foreach (var collection in spriteCollections)
                     SpriteDumper.DumpCollection(collection);
-                T2DHandler.DumpAllT2DSprites();
+                T2DDumper.DumpAllT2DSprites();
                 SceneTraverser.OnDumpCompleted();
                 Logger.LogInfo($"Finished dumping sprites for scene {scene.name}");
             };
         }
 
-        T2DHandler.PreloadAllT2DTextures();
+        T2DLoader.PreloadAllTextures();
 
-        SceneManager.sceneLoaded += (scene, mode) => T2DHandler.ApplyT2DReplacementsInScene();
+        SceneManager.sceneLoaded += (scene, mode) => T2DLoader.ApplyReplacementsInScene();
 
         SceneManager.sceneLoaded += (scene, mode) => AudioHandler.Reload();
 
@@ -182,7 +182,7 @@ public class Plugin : BaseUnityPlugin
         {
             Logger.LogInfo("[Update] ReloadT2DSprites flag set — triggering T2DHandler.ReloadSpritesInScene()");
             SpriteFileWatcher.ReloadT2DSprites = false;
-            T2DHandler.ReloadSpritesInScene();
+            T2DLoader.ReloadSpritesInScene();
         }
 
         if (AudioFileWatcher.ReloadAudio)
@@ -204,14 +204,14 @@ public class Plugin : BaseUnityPlugin
         // This uses FindObjectsByType which is expensive, so run it every 30 frames (~0.5s)
         // rather than every frame. LateUpdate enforcement only re-checks tracked renderers.
         if (++_frameCounter % 30 == 0)
-            T2DHandler.CheckForUninitializedSprites();
+            T2DLoader.CheckForUninitializedSprites();
 
         DevProfiler.EndUpdateTiming();
     }
 
     private void LateUpdate()
     {
-        T2DHandler.EnforceT2DReplacements();
+        T2DLoader.EnforceT2DReplacements();
     }
 
     private void OnDestroy()
@@ -244,8 +244,8 @@ public class Plugin : BaseUnityPlugin
         IOUtil.EnsureDirectoryExists(SpriteDumper.DumpPath);
         IOUtil.EnsureDirectoryExists(SpriteLoader.LoadPath);
         IOUtil.EnsureDirectoryExists(SpriteLoader.AtlasLoadPath);
-        IOUtil.EnsureDirectoryExists(T2DHandler.T2DDumpPath);
-        IOUtil.EnsureDirectoryExists(T2DHandler.T2DAtlasLoadPath);
+        IOUtil.EnsureDirectoryExists(T2DDumper.DumpPath);
+        IOUtil.EnsureDirectoryExists(T2DLoader.AtlasLoadPath);
         IOUtil.EnsureDirectoryExists(AudioHandler.SoundFolder);
         IOUtil.EnsureDirectoryExists(VideoHandler.VideoLoadPath);
         IOUtil.EnsureDirectoryExists(DialogueHandler.TextDumpPath);

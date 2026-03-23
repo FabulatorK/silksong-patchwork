@@ -1,42 +1,39 @@
-namespace Patchwork.Handlers;
+using System.Collections.Generic;
 
-public static partial class T2DHandler
+namespace Patchwork.Util;
+
+public static class T2DUtil
 {
-    // ================================================================
-    //  Name utilities
-    // ================================================================
+    private static readonly Dictionary<string, string> _cleanNameCache = new();
 
-    private static bool IsT2DTexture(string textureName)
-    {
-        return textureName.Contains("-BC7-") || textureName.Contains("DXT5|BC3-");
-    }
+    public static bool IsT2DTexture(string textureName)
+        => textureName.Contains("-BC7-") || textureName.Contains("DXT5|BC3-");
 
     /// <summary>
     /// Builds a composite key from atlas clean name and sprite name.
     /// Prevents collisions when different atlases contain sprites with the same name
     /// (e.g. "Moss Grub" in both journal_enemy_icons and journal_enemy_images).
     /// </summary>
-    private static string SpriteKey(string cleanTexName, string spriteName)
+    public static string SpriteKey(string cleanTexName, string spriteName)
         => $"{cleanTexName}/{spriteName}";
 
-    private static string SanitizeForFilesystem(string textureName)
-    {
-        return textureName
+    public static string SanitizeForFilesystem(string textureName)
+        => textureName
             .Replace("|", "_")
             .Replace("/", "_")
             .Replace("\\", "_")
             .Replace(":", "_");
-    }
 
-    private static string CleanTextureName(string textureName)
+    public static string CleanTextureName(string textureName)
     {
-        if (CleanTextureNameCache.TryGetValue(textureName, out var cached))
+        if (_cleanNameCache.TryGetValue(textureName, out var cached))
             return cached;
-
         string result = CleanTextureNameUncached(textureName);
-        CleanTextureNameCache[textureName] = result;
+        _cleanNameCache[textureName] = result;
         return result;
     }
+
+    public static void ClearCleanNameCache() => _cleanNameCache.Clear();
 
     private static string CleanTextureNameUncached(string textureName)
     {
