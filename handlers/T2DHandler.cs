@@ -497,18 +497,19 @@ public static class T2DHandler
             }
         }
 
-        // Pass 3: Apply individual sprite replacements to active renderers/images.
-        // Skip the full scene sweep when no T2D replacements are loaded.
+        // Pass 3: Apply individual sprite replacements to all renderers/images (including inactive).
+        // Uses Resources.FindObjectsOfTypeAll to ensure nothing is missed at scene load,
+        // at the cost of a longer load. Skip entirely when no T2D replacements are loaded.
         if (!HasT2DReplacements)
             return;
 
-        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
         {
             if (sr == null || sr.sprite == null)
                 continue;
             HandleLoad(sr, sr.sprite);
         }
-        foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
         {
             if (img == null || img.sprite == null)
                 continue;
@@ -798,18 +799,22 @@ public static class T2DHandler
                 string cleanTexName = CleanTextureName(sprite.texture.name);
                 string key = SpriteKey(cleanTexName, sprite.name);
 
+                // Confirm this sprite as T2D (gates against UI sprites sharing a name
+                // with a T2D replacement file). IsT2DTexture already passed above, so
+                // any sprite reaching here is from a genuine T2D atlas.
+                ConfirmedT2DSpriteNames.Add(sprite.name);
+
                 // Check for a cached individual sprite replacement.
-                // Gate on ConfirmedT2DSpriteNames to prevent replacing UI sprites
-                // that happen to share a name with a T2D replacement file.
-                if (ConfirmedT2DSpriteNames.Contains(sprite.name)
-                    && LoadedT2DSprites.TryGetValue(key, out var cached))
+                // This must come AFTER the confirm-add above: the eager pass in
+                // PreloadAllT2DTextures may have already created the LoadedT2DSprites
+                // entry before this renderer was first seen, so we must not gate on
+                // a prior ConfirmedT2DSpriteNames check or the replacement is silently missed.
+                if (LoadedT2DSprites.TryGetValue(key, out var cached))
                 {
                     SetSprite(spriteContainer, cached);
                     TrackT2DContainer(spriteContainer);
                     return;
                 }
-
-                ConfirmedT2DSpriteNames.Add(sprite.name);
 
                 // Bulk-load all individual replacement textures for this atlas on first encounter
                 if (!SpriteAtlasMap.ContainsKey(sprite.texture.name))
