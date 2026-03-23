@@ -4,18 +4,31 @@ using Patchwork.Util;
 
 namespace Patchwork.Handlers;
 
-public static partial class T2DHandler
+/// <summary>
+/// In-place spritesheet replacement for T2D textures (Customizer T2D approach).
+/// Partial of T2DLoader — spritesheet state and methods live here.
+/// </summary>
+public static partial class T2DLoader
 {
+    // Keyed by raw filename (without extension). TrySwapTexture looks up by raw texture name
+    // first, then falls back to clean name — so two atlases sharing the same clean name
+    // (e.g. sactx-1-2048x2048-BC7-Hornet-* and sactx-0-4096x4096-BC7-Hornet-*)
+    // each get their own replacement without colliding.
+    private static readonly System.Collections.Generic.Dictionary<string, (byte[] PngData, int Width, int Height)>
+        SpritesheetOverrides = new(System.StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<int> ReplacedTextureIds = new();
+    private static readonly HashSet<int> SkippedTextureIds = new();
+
     // ================================================================
-    //  In-place texture swap (the Customizer T2D approach)
+    //  In-place texture swap
     // ================================================================
 
     /// <summary>
-    /// Attempts to replace a Texture2D's pixel data in-place using a spritesheet override.
-    /// Same texture object, new pixels. All sprites referencing this texture automatically
+    /// Replaces a Texture2D's pixel data in-place using a spritesheet override.
+    /// Same texture object, new pixels — all sprites referencing it automatically
     /// display the new art without any rect/pivot changes.
     /// </summary>
-    private static bool TrySwapTexture(Texture2D tex)
+    internal static bool TrySwapTexture(Texture2D tex)
     {
         if (tex == null)
             return false;
@@ -24,10 +37,7 @@ public static partial class T2DHandler
         if (ReplacedTextureIds.Contains(id) || SkippedTextureIds.Contains(id))
             return ReplacedTextureIds.Contains(id);
 
-        // Try raw texture name first (exact match), then fall back to clean name.
-        // This lets sactx-1-2048x2048-BC7-Hornet-* and sactx-0-4096x4096-BC7-Hornet-*
-        // each have their own replacement without colliding.
-        string cleanName = CleanTextureName(tex.name);
+        string cleanName = T2DUtil.CleanTextureName(tex.name);
         if (!SpritesheetOverrides.TryGetValue(tex.name, out var data)
             && !SpritesheetOverrides.TryGetValue(cleanName, out data))
         {
@@ -54,7 +64,7 @@ public static partial class T2DHandler
                 $"(texture '{tex.name}', {tex.width}x{tex.height})");
 
             if (Plugin.Config.ConvertSpritesheets)
-                ConvertT2DSpritesheet(tex, cleanName);
+                ConvertSpritesheet(tex, cleanName);
 
             return true;
         }
@@ -97,7 +107,7 @@ public static partial class T2DHandler
             }
         }
 
-        ScanDirectory(T2DAtlasLoadPath);
+        ScanDirectory(AtlasLoadPath);
         foreach (var packPath in Plugin.PluginPackPaths)
             ScanDirectory(Path.Combine(packPath, "Spritesheets", "T2D"));
     }
@@ -107,7 +117,7 @@ public static partial class T2DHandler
     /// Uses sprite.rect from original sprites to extract each frame from the
     /// replacement atlas texture, saving to Converted/T2D/{cleanName}/.
     /// </summary>
-    private static void ConvertT2DSpritesheet(Texture2D atlas, string cleanName)
+    private static void ConvertSpritesheet(Texture2D atlas, string cleanName)
     {
         string outDir = Path.Combine(SpriteDumper.ConvertPath, "T2D", cleanName);
 

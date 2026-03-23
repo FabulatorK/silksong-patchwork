@@ -5,11 +5,13 @@ using Patchwork.Util;
 
 namespace Patchwork.Handlers;
 
-public static partial class T2DHandler
+/// <summary>
+/// Handles dumping of T2D (TextureAtlas2D) sprites and atlases to individual PNG files.
+/// Mirrors the structure of SpriteDumper.
+/// </summary>
+public static class T2DDumper
 {
-    // ================================================================
-    //  Dumping
-    // ================================================================
+    public static string DumpPath => Path.Combine(SpriteDumper.DumpPath, "T2D");
 
     public static void DumpAllT2DSprites()
     {
@@ -25,7 +27,7 @@ public static partial class T2DHandler
             if (string.IsNullOrEmpty(sprite.name) || string.IsNullOrEmpty(sprite.texture.name))
                 continue;
 
-            if (IsT2DTexture(sprite.texture.name))
+            if (T2DUtil.IsT2DTexture(sprite.texture.name))
             {
                 HandleDump(sprite);
             }
@@ -49,7 +51,7 @@ public static partial class T2DHandler
     /// </summary>
     private static void DumpStandaloneTextures(HashSet<int> spriteTextureIds)
     {
-        string saveDirBase = Path.Combine(T2DDumpPath, "_standalone");
+        string saveDirBase = Path.Combine(DumpPath, "_standalone");
         bool dirCreated = false;
         int count = 0;
 
@@ -57,14 +59,14 @@ public static partial class T2DHandler
         {
             if (tex == null || string.IsNullOrEmpty(tex.name))
                 continue;
-            if (IsT2DTexture(tex.name))
+            if (T2DUtil.IsT2DTexture(tex.name))
                 continue;
             if (spriteTextureIds.Contains(tex.GetInstanceID()))
                 continue;
             if (tex.name.StartsWith("unity_") || tex.name.StartsWith("UI"))
                 continue;
 
-            string safeName = SanitizeForFilesystem(tex.name);
+            string safeName = T2DUtil.SanitizeForFilesystem(tex.name);
             string savePath = Path.Combine(saveDirBase, safeName + ".png");
             if (File.Exists(savePath))
                 continue;
@@ -101,10 +103,10 @@ public static partial class T2DHandler
     /// Dumps a T2D atlas texture as a full PNG, plus extracts any individual
     /// Sprite frames that reference it.
     /// </summary>
-    private static void DumpT2DAtlasTexture(Texture2D tex)
+    public static void DumpAtlasTexture(Texture2D tex)
     {
-        string cleanName = CleanTextureName(tex.name);
-        string saveDir = Path.Combine(T2DDumpPath, cleanName);
+        string cleanName = T2DUtil.CleanTextureName(tex.name);
+        string saveDir = Path.Combine(DumpPath, cleanName);
         // Include dimensions in the atlas filename to avoid collisions when
         // multiple runtime atlases share the same clean name (e.g. Hornet
         // at both 2048x2048 and 4096x4096).
@@ -113,7 +115,6 @@ public static partial class T2DHandler
         if (File.Exists(atlasPath))
             return;
 
-        // Blit to a readable RenderTexture
         RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
         var previous = RenderTexture.active;
         Texture2D readable = null;
@@ -150,12 +151,12 @@ public static partial class T2DHandler
         }
     }
 
-    private static void HandleDump(Sprite sprite)
+    public static void HandleDump(Sprite sprite)
     {
-        if (IsT2DTexture(sprite.texture.name))
+        if (T2DUtil.IsT2DTexture(sprite.texture.name))
         {
-            string cleanName = CleanTextureName(sprite.texture.name);
-            string saveDir = Path.Combine(T2DDumpPath, cleanName);
+            string cleanName = T2DUtil.CleanTextureName(sprite.texture.name);
+            string saveDir = Path.Combine(DumpPath, cleanName);
             IOUtil.EnsureDirectoryExists(saveDir);
             string savePath = Path.Combine(saveDir, sprite.name + ".png");
 
@@ -205,8 +206,7 @@ public static partial class T2DHandler
                 spriteTex.Apply();
                 RenderTexture.active = previous;
 
-                byte[] pngData = spriteTex.EncodeToPNG();
-                File.WriteAllBytes(savePath, pngData);
+                File.WriteAllBytes(savePath, spriteTex.EncodeToPNG());
             }
             finally
             {
@@ -224,8 +224,8 @@ public static partial class T2DHandler
         }
         else
         {
-            string safeName = SanitizeForFilesystem(sprite.texture.name);
-            string savePath = Path.Combine(T2DDumpPath, safeName + ".png");
+            string safeName = T2DUtil.SanitizeForFilesystem(sprite.texture.name);
+            string savePath = Path.Combine(DumpPath, safeName + ".png");
             if (File.Exists(savePath))
                 return;
 
@@ -244,8 +244,7 @@ public static partial class T2DHandler
                 readableTex.Apply();
                 RenderTexture.active = previous;
 
-                byte[] pngData = readableTex.EncodeToPNG();
-                File.WriteAllBytes(savePath, pngData);
+                File.WriteAllBytes(savePath, readableTex.EncodeToPNG());
             }
             finally
             {
