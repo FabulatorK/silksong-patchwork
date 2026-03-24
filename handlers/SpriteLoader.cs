@@ -18,6 +18,10 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
+    // Original game textures, stored before the first replacement so reloads can restore them.
+    // Keyed by collection name → material name.  Never cleared across reloads.
+    private static readonly Dictionary<string, Dictionary<string, Texture>> _originalTextures = new();
+
     // Read-only stats for GUI
     public static int LoadedCollectionCount => LoadedAtlases.Count;
     public static int LoadedSpriteCount
@@ -60,7 +64,18 @@ public static class SpriteLoader
             if (LoadedAtlases[collection.name].Add(matname))
             {
                 var unreadableTex = mat.mainTexture;
-                var sheetResult = FindSpritesheet(collection, matnameAbbr);
+
+                // Persist the game's original texture so it can be used as the base on
+                // future reloads — even after a previous load has overwritten mat.mainTexture
+                // with one of our RenderTextures.
+                if (!_originalTextures.TryGetValue(collection.name, out var origMap))
+                    _originalTextures[collection.name] = origMap = new();
+                if (!(unreadableTex is RenderTexture))
+                    origMap[matname] = unreadableTex;          // fresh game texture — update
+                else if (!origMap.ContainsKey(matname))
+                    origMap[matname] = unreadableTex;          // already overwritten; best-effort
+
+                var sheetResult = FindSpritesheet(collection, matnameAbbr, origMap[matname]);
                 if (sheetResult.FromCustom)
                     hasCustomSpritesheets = true;
                 mat.mainTexture = sheetResult.Texture;
@@ -150,7 +165,7 @@ public static class SpriteLoader
         return null;
     }
 
-    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName)
+    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName, Texture originalTex)
     {
         string match = FindFileWithSuffix(AtlasLoadPath, $"{materialName}.png", collection.name);
         if (match != null)
@@ -178,8 +193,9 @@ public static class SpriteLoader
             }
         }
 
-        var mat = collection.materials.FirstOrDefault(m => m.name.StartsWith(materialName + " ") || m.name == materialName);
-        var tex = TexUtil.GetReadable(mat?.mainTexture);
+        // No custom sheet — rebuild from the original game texture so that disabling a pack
+        // actually restores the vanilla sprites rather than perpetuating a stale RenderTexture.
+        var tex = TexUtil.GetReadable(originalTex);
         return new SpritesheetResult { Texture = tex, FromCustom = false };
     }
 

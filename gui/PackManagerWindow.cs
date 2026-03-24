@@ -119,7 +119,11 @@ public static class PackManagerWindow
             GUILayout.BeginHorizontal();
             {
                 // Enable / disable button
-                if (GUILayout.Button(pack.IsEnabled ? "ON" : "OFF", GUIHelper.ButtonStyle, GUIHelper.Width(40)))
+                if (pack.IsEnabled)
+                    UnityEngine.GUI.contentColor = new Color(0.3f, 1f, 0.3f);
+                bool clicked = GUILayout.Button(pack.IsEnabled ? "ON" : "OFF", GUIHelper.ButtonStyle, GUIHelper.Width(40));
+                UnityEngine.GUI.contentColor = Color.white;
+                if (clicked)
                 {
                     EnsureStaged();
                     _staged[i].IsEnabled = !pack.IsEnabled;

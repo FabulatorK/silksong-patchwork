@@ -15,6 +15,10 @@ public static class AudioHandler
 
     private static readonly Dictionary<string, AudioClip> LoadedClips = new();
 
+    // Original game clips keyed by AudioSource instance ID, stored before we first replace them.
+    // Never cleared — lets Reload() restore the vanilla clip when a pack is disabled.
+    private static readonly Dictionary<int, AudioClip> _originalClips = new();
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -63,14 +67,30 @@ public static class AudioHandler
 
     public static void Reload()
     {
-        // Clear cache so clips are re-read from disk.
-        // Old AudioClip objects remain alive on any AudioSource still referencing them;
-        // they will be replaced below and eventually collected.
+        // Clear cache so clips are re-read from disk on this reload pass.
         LoadedClips.Clear();
 
         foreach (var source in Resources.FindObjectsOfTypeAll<AudioSource>())
         {
-            LoadAudio(source);
+            if (source == null) continue;
+
+            if (source.clip != null)
+            {
+                string clipName = source.clip.name.Replace("PATCHWORK_", "");
+                AudioClip replacement = LoadAudioClip(clipName);
+                if (replacement != null)
+                {
+                    LoadedClips[clipName] = replacement;
+                    source.clip = replacement;
+                }
+                else if (source.clip.name.StartsWith("PATCHWORK_"))
+                {
+                    // No active pack covers this sound anymore — restore the vanilla clip.
+                    if (_originalClips.TryGetValue(source.GetInstanceID(), out var orig) && orig != null)
+                        source.clip = orig;
+                }
+            }
+
             AudioList.LogAudio(source);
         }
     }
@@ -80,6 +100,11 @@ public static class AudioHandler
         if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name))
             return;
         string clipName = source.clip.name.Replace("PATCHWORK_", "");
+
+        // Remember the vanilla clip before we first overwrite it.
+        int id = source.GetInstanceID();
+        if (!source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
+            _originalClips[id] = source.clip;
 
         if (LoadedClips.ContainsKey(clipName))
         {
