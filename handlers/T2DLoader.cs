@@ -526,16 +526,20 @@ public static partial class T2DLoader
             $"{_preloadedTextures.Count} preloaded textures, " +
             $"{_loadedSprites.Count} eagerly loaded sprites");
 
-        // Re-apply in-place texture swaps
-        if (SpritesheetOverrides.Count > 0)
+        // Re-apply in-place texture swaps; also restore vanilla pixels for any texture whose
+        // pack was just disabled (HasStoredOriginals is true while any originals are pending).
+        if (SpritesheetOverrides.Count > 0 || HasStoredOriginals)
         {
-            int swapCount = 0;
+            int swapCount = 0, restoreCount = 0;
             foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
             {
-                if (tex != null && TrySwapTexture(tex))
+                if (tex == null) continue;
+                if (TrySwapTexture(tex))
                     swapCount++;
+                else if (TryRestoreTexture(tex))
+                    restoreCount++;
             }
-            Plugin.Logger.LogInfo($"[T2D-Reload] Swapped {swapCount} textures via spritesheets");
+            Plugin.Logger.LogInfo($"[T2D-Reload] Swapped {swapCount} textures via spritesheets, restored {restoreCount} to vanilla");
         }
 
         // Re-apply individual sprite replacements to all renderers

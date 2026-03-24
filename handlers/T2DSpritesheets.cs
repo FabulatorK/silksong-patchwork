@@ -20,6 +20,14 @@ public static partial class T2DLoader
     private static readonly HashSet<int> ReplacedTextureIds = new();
     private static readonly HashSet<int> SkippedTextureIds = new();
 
+    // Original pixel data (PNG bytes) captured before the first in-place overwrite.
+    // Keyed by tex.name (runtime texture name).  Never cleared — used to restore vanilla
+    // pixels when a pack is disabled.
+    private static readonly Dictionary<string, byte[]> _originalTextureData =
+        new(System.StringComparer.OrdinalIgnoreCase);
+
+    internal static bool HasStoredOriginals => _originalTextureData.Count > 0;
+
     // ================================================================
     //  In-place texture swap
     // ================================================================
@@ -55,6 +63,14 @@ public static partial class T2DLoader
                 $"Skipping. (texture ID: {id})");
             SkippedTextureIds.Add(id);
             return false;
+        }
+
+        // Capture original pixel data before the first overwrite so we can restore it later.
+        if (!_originalTextureData.ContainsKey(tex.name))
+        {
+            byte[] original = CaptureTextureAsPng(tex);
+            if (original != null)
+                _originalTextureData[tex.name] = original;
         }
 
         if (tex.LoadImage(data.PngData))
@@ -173,5 +189,60 @@ public static partial class T2DLoader
             RenderTexture.active = previous;
             RenderTexture.ReleaseTemporary(rt);
         }
+    }
+
+    // ================================================================
+    //  Original-texture capture and restore
+    // ================================================================
+
+    /// <summary>
+    /// Captures a (potentially unreadable) Texture2D to PNG bytes via a RenderTexture blit.
+    /// Returns null on failure.
+    /// </summary>
+    private static byte[] CaptureTextureAsPng(Texture2D tex)
+    {
+        if (tex == null) return null;
+        try
+        {
+            RenderTexture rt = RenderTexture.GetTemporary(
+                tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            Graphics.Blit(tex, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+            readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+            readable.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            byte[] png = readable.EncodeToPNG();
+            Object.Destroy(readable);
+            return png;
+        }
+        catch (System.Exception ex)
+        {
+            Plugin.Logger.LogWarning($"[T2D] Failed to capture original for '{tex.name}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Restores the vanilla pixel data for a texture that was previously replaced in-place.
+    /// Returns true if a restore was performed.
+    /// </summary>
+    internal static bool TryRestoreTexture(Texture2D tex)
+    {
+        if (tex == null || !_originalTextureData.TryGetValue(tex.name, out var png))
+            return false;
+
+        if (tex.LoadImage(png))
+        {
+            Plugin.Logger.LogInfo($"[T2D] Restored vanilla pixels for '{tex.name}'");
+            // Remove so re-enabling the pack can capture fresh original data next time.
+            _originalTextureData.Remove(tex.name);
+            return true;
+        }
+
+        Plugin.Logger.LogWarning($"[T2D] LoadImage failed while restoring '{tex.name}'");
+        return false;
     }
 }
