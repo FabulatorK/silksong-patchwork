@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Patchwork.Handlers;
 using Patchwork.Util;
 using Patchwork.Watchers;
 
