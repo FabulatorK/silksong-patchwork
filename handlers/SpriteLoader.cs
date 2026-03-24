@@ -220,6 +220,9 @@ public static class SpriteLoader
         Plugin.Logger.LogInfo($"[tk2d-Reload] Starting sprite reload for scene {SceneManager.GetActiveScene().name}. " +
             $"Pre-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
             $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
+        LoadedAtlases.Clear();
+        LoadedAtlasesTextures.Clear();
+        LoadedSprites.Clear();
         var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
         Plugin.Logger.LogInfo($"[tk2d-Reload] Found {spriteCollections.Length} sprite collections to process");
         foreach (var collection in spriteCollections)
