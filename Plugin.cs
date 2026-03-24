@@ -101,6 +101,8 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => DialogueHandler.CheckForStaleKeys();
 
+        SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
+
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
         AudioHandler.ApplyPatches(harmony);

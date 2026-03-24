@@ -216,6 +216,7 @@ public static partial class T2DLoader
             RenderTexture.ReleaseTemporary(rt);
             byte[] png = readable.EncodeToPNG();
             Object.Destroy(readable);
+            Plugin.Logger.LogDebug($"[T2D] Captured {png.Length / 1024} KB original for '{tex.name}'");
             return png;
         }
         catch (System.Exception ex)
@@ -244,5 +245,27 @@ public static partial class T2DLoader
 
         Plugin.Logger.LogWarning($"[T2D] LoadImage failed while restoring '{tex.name}'");
         return false;
+    }
+
+    /// <summary>
+    /// Removes <see cref="_originalTextureData"/> entries for textures that no longer exist in
+    /// memory (destroyed when their scene was unloaded). Call on <c>SceneManager.sceneUnloaded</c>.
+    /// </summary>
+    internal static void PruneStaleOriginals()
+    {
+        if (_originalTextureData.Count == 0) return;
+
+        var liveNames = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
+            if (tex != null) liveNames.Add(tex.name);
+
+        int before = _originalTextureData.Count;
+        foreach (var key in new List<string>(_originalTextureData.Keys))
+            if (!liveNames.Contains(key))
+                _originalTextureData.Remove(key);
+
+        int pruned = before - _originalTextureData.Count;
+        if (pruned > 0)
+            Plugin.Logger.LogInfo($"[T2D] Pruned {pruned} stale original(s) after scene unload ({_originalTextureData.Count} remaining)");
     }
 }
