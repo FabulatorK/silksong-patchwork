@@ -118,13 +118,11 @@ public static class PackManagerWindow
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
             {
-                // Enable / disable toggle
-                bool nowEnabled = GUILayout.Toggle(
-                    pack.IsEnabled, "", GUIHelper.ToggleStyle, GUIHelper.Width(20));
-                if (nowEnabled != pack.IsEnabled)
+                // Enable / disable button
+                if (GUILayout.Button(pack.IsEnabled ? "ON" : "OFF", GUIHelper.ButtonStyle, GUIHelper.Width(40)))
                 {
                     EnsureStaged();
-                    _staged[i].IsEnabled = nowEnabled;
+                    _staged[i].IsEnabled = !pack.IsEnabled;
                 }
 
                 // Name + source badge
