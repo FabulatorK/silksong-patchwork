@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using Patchwork.Handlers;
+using Patchwork.Packs;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -156,14 +158,11 @@ public static class DevProfiler
         Label($"Text sheets cached: {DialogueHandler.CachedSheetCount} ({DialogueHandler.CachedKeyCount} keys)");
         if (DialogueHandler.StaleKeyCount > 0)
             ColorLabel($"  \u26A0 {DialogueHandler.StaleKeyCount} stale text key(s)", Color.yellow);
-        Label($"Plugin packs: {Plugin.PluginPackPaths.Count}");
+        Label($"Plugin packs: {PackManager.AllPacks.Count(p => p.IsEnabled)} active / {PackManager.AllPacks.Count} total");
 
-        // List pack paths
-        foreach (var path in Plugin.PluginPackPaths)
-        {
-            var folderName = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path));
-            Label($"  \u2022 {folderName}");
-        }
+        // List active packs
+        foreach (var pack in PackManager.AllPacks.Where(p => p.IsEnabled))
+            Label($"  \u2022 {pack.Name}");
 
         // --- Utilities ---
         GUIHelper.Space(8);

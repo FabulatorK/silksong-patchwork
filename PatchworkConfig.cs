@@ -55,6 +55,9 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDialogueEditor;
     public UnityEngine.KeyCode ShowDialogueEditorKey { get { return _ShowDialogueEditor.Value; } }
 
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowPackManager;
+    public UnityEngine.KeyCode ShowPackManagerKey { get { return _ShowPackManager.Value; } }
+
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
 
@@ -87,6 +90,7 @@ public class PatchworkConfig
         _ShowSkinStatus = config.Bind("Keybinds", "ShowSkinStatus", UnityEngine.KeyCode.Alpha5, "Key to toggle the skin status overlay.");
         _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler overlay.");
         _ShowDialogueEditor = config.Bind("Keybinds", "ShowDialogueEditor", UnityEngine.KeyCode.Alpha7, "Key to toggle the in-game dialogue editor.");
+        _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha8, "Key to toggle the resource pack manager.");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");

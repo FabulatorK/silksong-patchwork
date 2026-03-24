@@ -10,6 +10,7 @@ using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Patchwork.Watchers;
+using Patchwork.Packs;
 
 namespace Patchwork;
 
@@ -25,7 +26,9 @@ public class Plugin : BaseUnityPlugin
     private static string PatchworkFolderName = "Patchwork";
     public static string BasePath { get { return Path.Combine(Paths.PluginPath, PatchworkFolderName); } }
 
-    public static HashSet<string> PluginPackPaths = new();
+    /// <summary>Paths of currently active packs in priority order.
+    /// Forwards to PackManager — all handlers iterate this.</summary>
+    public static IEnumerable<string> PluginPackPaths => PackManager.ActivePackPaths;
 
     public static bool ShowAudioLog = false;
     public static bool ShowAudioList = false;
@@ -34,6 +37,7 @@ public class Plugin : BaseUnityPlugin
     public static bool ShowSkinStatus = false;
     public static bool ShowDevProfiler = false;
     public static bool ShowDialogueEditor = false;
+    public static bool ShowPackManager = false;
 
     private void Awake()
     {
@@ -64,7 +68,7 @@ public class Plugin : BaseUnityPlugin
         }
 
         FindPatchworkFolder();
-        ScanPluginPacks();
+        PackManager.Initialize();
 
         TexUtil.Initialize();
         InitializeFolders();
@@ -128,16 +132,7 @@ public class Plugin : BaseUnityPlugin
         });
     }
 
-    private void ScanPluginPacks()
-    {
-        Directory.GetDirectories(BepInEx.Paths.PluginPath, "Patchwork", SearchOption.AllDirectories).ToList().ForEach(dir =>
-        {
-            if (BasePath.Equals(dir))
-                return;
-            Logger.LogDebug($"Found Patchwork plugin pack at {dir}");
-            PluginPackPaths.Add(dir);
-        });
-    }
+
     private static int _frameCounter = 0;
     private void Update()
     {
@@ -169,6 +164,8 @@ public class Plugin : BaseUnityPlugin
                 ShowDevProfiler = !ShowDevProfiler;
             if (Input.GetKeyDown(Config.ShowDialogueEditorKey))
                 ShowDialogueEditor = !ShowDialogueEditor;
+            if (Input.GetKeyDown(Config.ShowPackManagerKey))
+                ShowPackManager = !ShowPackManager;
         }
 
         if (SpriteFileWatcher.ReloadSprites)
@@ -237,6 +234,8 @@ public class Plugin : BaseUnityPlugin
             DevProfiler.Draw();
         if (ShowDialogueEditor)
             DialogueEditor.Draw();
+        if (ShowPackManager)
+            PackManagerWindow.Draw();
     }
     
     private void InitializeFolders()

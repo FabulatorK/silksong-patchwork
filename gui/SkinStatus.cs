@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Patchwork.Handlers;
+using Patchwork.Packs;
 using UnityEngine;
 
 namespace Patchwork.GUI;
@@ -103,23 +104,23 @@ public static class SkinStatus
         showPluginPacks = SectionToggle("Plugin Packs", showPluginPacks);
         if (showPluginPacks)
         {
-            if (Plugin.PluginPackPaths.Count == 0)
+            var activePacks = PackManager.AllPacks.Where(p => p.IsEnabled).ToList();
+            if (activePacks.Count == 0)
             {
                 DimLabel("  No plugin packs detected");
             }
             else
             {
-                foreach (var path in Plugin.PluginPackPaths)
+                foreach (var pack in activePacks)
                 {
-                    string folderName = Path.GetFileName(Path.GetDirectoryName(path));
-                    Label($"  \u2022 {folderName}");
+                    Label($"  \u2022 {pack.Name}");
 
                     // Show what asset types this pack provides
                     var types = new List<string>();
-                    if (Directory.Exists(Path.Combine(path, "Sprites"))) types.Add("sprites");
-                    if (Directory.Exists(Path.Combine(path, "Sounds"))) types.Add("sounds");
-                    if (Directory.Exists(Path.Combine(path, "Videos"))) types.Add("videos");
-                    if (Directory.Exists(Path.Combine(path, "Text"))) types.Add("text");
+                    if (Directory.Exists(Path.Combine(pack.Path, "Sprites"))) types.Add("sprites");
+                    if (Directory.Exists(Path.Combine(pack.Path, "Sounds"))) types.Add("sounds");
+                    if (Directory.Exists(Path.Combine(pack.Path, "Videos"))) types.Add("videos");
+                    if (Directory.Exists(Path.Combine(pack.Path, "Text"))) types.Add("text");
                     DimLabel($"    [{string.Join(", ", types)}]");
                 }
             }
