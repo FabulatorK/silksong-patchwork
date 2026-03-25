@@ -168,16 +168,25 @@ public static class PackManagerWindow
             if (meta.Count > 0)
                 GUILayout.Label("  " + string.Join("   ", meta), GUIHelper.LabelStyle);
 
-            // ── Asset type tags ───────────────────────────────────
-            var types = new List<string>();
-            if (Directory.Exists(Path.Combine(pack.Path, "Sprites")))     types.Add("sprites");
-            if (Directory.Exists(Path.Combine(pack.Path, "Spritesheets"))) types.Add("sheets");
-            if (Directory.Exists(Path.Combine(pack.Path, "Sounds")))      types.Add("audio");
-            if (Directory.Exists(Path.Combine(pack.Path, "Videos")))      types.Add("video");
-            if (Directory.Exists(Path.Combine(pack.Path, "Text")))        types.Add("text");
-
-            if (types.Count > 0)
-                GUILayout.Label("  [" + string.Join(", ", types) + "]", GUIHelper.LabelStyle);
+            // ── Asset footprint ───────────────────────────────────
+            string badge = pack.Stats.Badge;
+            if (badge != null)
+            {
+                // Show scanned file counts (e.g. "12 sprites  3 sheets  5 sfx")
+                GUILayout.Label("  " + badge, GUIHelper.LabelStyle);
+            }
+            else
+            {
+                // Fall back to directory-presence tags when stats haven't been scanned yet
+                var types = new List<string>();
+                if (Directory.Exists(Path.Combine(pack.Path, "Sprites")))      types.Add("sprites");
+                if (Directory.Exists(Path.Combine(pack.Path, "Spritesheets"))) types.Add("sheets");
+                if (Directory.Exists(Path.Combine(pack.Path, "Sounds")))       types.Add("audio");
+                if (Directory.Exists(Path.Combine(pack.Path, "Videos")))       types.Add("video");
+                if (Directory.Exists(Path.Combine(pack.Path, "Text")))         types.Add("text");
+                if (types.Count > 0)
+                    GUILayout.Label("  [" + string.Join(", ", types) + "]", GUIHelper.LabelStyle);
+            }
         }
         GUILayout.EndVertical();
 

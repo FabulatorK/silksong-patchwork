@@ -16,6 +16,10 @@ public class PackInfo
     /// False when discovered as a Thunderstore plugin pack.</summary>
     public bool IsLocal { get; }
 
+    /// <summary>Cached asset-file counts, populated by PackManager after each Apply()
+    /// and persisted to packs-stats.txt across sessions.</summary>
+    public PackStats Stats { get; set; }
+
     public PackInfo(string path, string name, bool isLocal,
                     string author = null, string version = null, string description = null)
     {
@@ -29,6 +33,7 @@ public class PackInfo
 
     public PackInfo Clone() => new(Path, Name, IsLocal, Author, Version, Description)
     {
-        IsEnabled = IsEnabled
+        IsEnabled = IsEnabled,
+        Stats     = Stats,
     };
 }

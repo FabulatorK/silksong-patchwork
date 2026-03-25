@@ -26,6 +26,7 @@ public static class PackManager
 
     private static string ConfigPath     => Path.Combine(Plugin.BasePath, "packs.txt");
     private static string LocalPacksPath => Path.Combine(Plugin.BasePath, "Packs");
+    private static string StatsCachePath => Path.Combine(Plugin.BasePath, "packs-stats.txt");
 
     public static IReadOnlyList<PackInfo> AllPacks => _packs;
 
@@ -43,6 +44,9 @@ public static class PackManager
         IOUtil.EnsureDirectoryExists(LocalPacksPath);
         var discovered = DiscoverAll();
         MergeWithSavedConfig(discovered);
+        LoadStatsCache();
+        // Scan any packs that have no cached stats yet (first run, or newly added packs).
+        ScanMissingStats();
     }
 
     // ================================================================
@@ -174,6 +178,8 @@ public static class PackManager
         _packs.AddRange(staged);
         SaveConfig();
         TriggerFullReload();
+        // Re-scan all packs (including any newly added) and persist stats.
+        ScanAllStats();
         Plugin.Logger.LogInfo($"[PackManager] Applied pack order: {_packs.Count} packs, " +
             $"{_packs.Count(p => p.IsEnabled)} enabled");
     }
@@ -196,6 +202,58 @@ public static class PackManager
         }
 
         Plugin.Logger.LogInfo($"[PackManager] Rescan complete: {_packs.Count} packs found");
+    }
+
+    // ================================================================
+    //  Pack stats — file-count scanning and cache persistence
+    // ================================================================
+
+    /// <summary>Reads packs-stats.txt and assigns cached stats to matching packs.</summary>
+    private static void LoadStatsCache()
+    {
+        if (!File.Exists(StatsCachePath)) return;
+        foreach (var line in File.ReadAllLines(StatsCachePath))
+        {
+            if (!PackStats.TryDeserialize(line, out string path, out var stats)) continue;
+            var pack = _packs.Find(p =>
+                string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (pack != null) pack.Stats = stats;
+        }
+    }
+
+    /// <summary>Writes current stats for all known packs to packs-stats.txt.</summary>
+    private static void SaveStatsCache()
+    {
+        var lines = new List<string>
+        {
+            "# Patchwork Pack Stats — auto-generated, do not edit manually"
+        };
+        foreach (var p in _packs)
+            if (p.Stats.IsScanned)
+                lines.Add(p.Stats.Serialize(p.Path));
+        File.WriteAllLines(StatsCachePath, lines);
+    }
+
+    /// <summary>Scans every pack directory and refreshes counts; saves the cache.</summary>
+    public static void ScanAllStats()
+    {
+        foreach (var p in _packs)
+            p.Stats = PackStats.Scan(p.Path);
+        SaveStatsCache();
+        Plugin.Logger.LogInfo($"[PackManager] Pack stats refreshed for {_packs.Count} pack(s)");
+    }
+
+    /// <summary>Scans only packs that have no cached stats yet (first run / new arrivals).</summary>
+    private static void ScanMissingStats()
+    {
+        bool any = false;
+        foreach (var p in _packs)
+        {
+            if (p.Stats.IsScanned) continue;
+            p.Stats = PackStats.Scan(p.Path);
+            any = true;
+        }
+        if (any) SaveStatsCache();
     }
 
     // ================================================================
