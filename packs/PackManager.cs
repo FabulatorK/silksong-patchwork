@@ -89,10 +89,20 @@ public static class PackManager
         string manifestPath = Path.Combine(path, "pack.json");
         if (!File.Exists(manifestPath))
         {
-            // Fall back to the parent directory name (e.g. "CoolCreator-CatKnight") rather than
-            // the fixed "Patchwork" subfolder name, which would be identical for every Thunderstore pack.
-            string parentName = Path.GetFileName(Path.GetDirectoryName(path));
-            string fallback   = string.IsNullOrEmpty(parentName) ? Path.GetFileName(path) : parentName;
+            string folderName = Path.GetFileName(path);
+            string fallback;
+            // Thunderstore packs always land in a fixed "Patchwork" subfolder, so every pack
+            // would show the same name. Use the unique parent directory name instead.
+            // Local packs (Patchwork/Packs/MyCoolPack/) already have a unique folder name.
+            if (string.Equals(folderName, "Patchwork", StringComparison.OrdinalIgnoreCase))
+            {
+                string parentName = Path.GetFileName(Path.GetDirectoryName(path));
+                fallback = string.IsNullOrEmpty(parentName) ? folderName : parentName;
+            }
+            else
+            {
+                fallback = folderName;
+            }
             return new PackInfo(path, fallback, isLocal);
         }
 
