@@ -323,9 +323,23 @@ public static class PackManagerWindow
         if (GUILayout.Button(negLabel, GUIHelper.ButtonStyle, GUIHelper.Width(30)))
         { cond.Negate = !cond.Negate; PackManager.SaveConditions(); }
 
-        string newVal = GUIHelper.TextField(
-            $"Patchwork.Cond.{pack.Path}.{ci}", cond.Value, GUIHelper.Width(146));
-        if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
+        // Value input: crest picker for CrestEquipped, free text for everything else
+        if (cond.Type == ConditionType.CrestEquipped)
+        {
+            string crestDropId = $"Patchwork.CrestVal.{pack.Path}.{ci}";
+            bool   crestOpen   = _openDropdownId == crestDropId;
+            string displayVal  = PackCondition.CrestDisplayName(cond.Value);
+            if (crestOpen) UnityEngine.GUI.contentColor = kJoinHl;
+            if (GUILayout.Button(displayVal, GUIHelper.ButtonStyle, GUIHelper.Width(146)))
+                _openDropdownId = crestOpen ? null : crestDropId;
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+        else
+        {
+            string newVal = GUIHelper.TextField(
+                $"Patchwork.Cond.{pack.Path}.{ci}", cond.Value, GUIHelper.Width(146));
+            if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
+        }
 
         UnityEngine.GUI.contentColor = new Color(1f, 0.45f, 0.45f);
         if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(22)))
@@ -350,6 +364,28 @@ public static class PackManagerWindow
             if (cond.Type == t) UnityEngine.GUI.contentColor = kJoinHl;
             if (GUILayout.Button(tLabel, GUIHelper.ButtonStyle))
             { cond.Type = t; _openDropdownId = null; PackManager.SaveConditions(); }
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+        GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
+    }
+
+    /// <summary>Renders the inline crest-value picker for condition <paramref name="ci"/> if open.</summary>
+    private static void DrawCrestValueDropdownIfOpen(PackInfo pack, int ci, float indent = 0f)
+    {
+        string dropId = $"Patchwork.CrestVal.{pack.Path}.{ci}";
+        if (_openDropdownId != dropId) return;
+        var cond = pack.Conditions[ci];
+
+        GUILayout.BeginHorizontal();
+        if (indent > 0) GUILayout.Space(indent);
+        GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
+        foreach (var (id, displayName) in PackCondition.KnownCrests)
+        {
+            bool selected = string.Equals(cond.Value, id, System.StringComparison.OrdinalIgnoreCase);
+            if (selected) UnityEngine.GUI.contentColor = kJoinHl;
+            if (GUILayout.Button(displayName, GUIHelper.ButtonStyle))
+            { cond.Value = id; _openDropdownId = null; PackManager.SaveConditions(); }
             UnityEngine.GUI.contentColor = Color.white;
         }
         GUILayout.EndVertical();
@@ -461,6 +497,7 @@ public static class PackManagerWindow
                             }
                             GUILayout.EndHorizontal();
                             DrawDropdownIfOpen(pack, ci, kAndColW);
+                            DrawCrestValueDropdownIfOpen(pack, ci, kAndColW);
                         }
                         GUILayout.EndVertical();
                     }
@@ -474,7 +511,10 @@ public static class PackManagerWindow
                 GUILayout.EndHorizontal();
 
                 if (!isGroup)
+                {
                     DrawDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
+                    DrawCrestValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
+                }
             }
 
             if (removeAt >= 0)

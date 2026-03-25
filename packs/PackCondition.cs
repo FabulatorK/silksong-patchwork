@@ -67,6 +67,32 @@ public class PackCondition
     //  GUI label helpers
     // ================================================================
 
+    /// <summary>Known crest IDs with their in-game display names.
+    /// Internal ID is what's stored in playerData; display name is shown in the Pack Manager UI.
+    /// Cursed and Cloakless are context-specific crests active in particular story segments.
+    /// </summary>
+    public static readonly (string Id, string DisplayName)[] KnownCrests =
+    {
+        ("Hunter",     "Hunter"),
+        ("Reaper",     "Reaper"),
+        ("Wanderer",   "Wanderer"),
+        ("Spell",      "Shaman"),
+        ("Toolmaster", "Architect"),
+        ("Warrior",    "Beast"),
+        ("Witch",      "Witch"),
+        ("Cursed",     "Cursed"),
+        ("Cloakless",  "Cloakless"),
+    };
+
+    /// <summary>Returns the display name for a known crest ID, or the raw ID if unknown.</summary>
+    public static string CrestDisplayName(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return "—";
+        foreach (var (crestId, name) in KnownCrests)
+            if (string.Equals(crestId, id, System.StringComparison.OrdinalIgnoreCase)) return name;
+        return id;
+    }
+
     /// <summary>Maps a <see cref="ConditionType"/> to its short display label.</summary>
     public static string LabelFor(ConditionType type) => type switch
     {
