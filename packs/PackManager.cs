@@ -27,6 +27,7 @@ public static class PackManager
     private static string ConfigPath     => Path.Combine(Plugin.BasePath, "packs.txt");
     private static string LocalPacksPath => Path.Combine(Plugin.BasePath, "Packs");
     private static string StatsCachePath => Path.Combine(Plugin.BasePath, "packs-stats.txt");
+    private static string ProfilesDir    => Path.Combine(Plugin.BasePath, "Profiles");
 
     public static IReadOnlyList<PackInfo> AllPacks => _packs;
 
@@ -177,6 +178,7 @@ public static class PackManager
         _packs.Clear();
         _packs.AddRange(staged);
         SaveConfig();
+        Util.ConflictTracker.Clear();
         TriggerFullReload();
         // Re-scan all packs (including any newly added) and persist stats.
         ScanAllStats();
@@ -188,6 +190,7 @@ public static class PackManager
     /// New packs are appended as enabled; packs no longer on disk are removed.</summary>
     public static void Rescan()
     {
+        Util.ConflictTracker.Clear();
         var discovered = DiscoverAll();
 
         // Remove packs that are no longer on disk
@@ -202,6 +205,88 @@ public static class PackManager
         }
 
         Plugin.Logger.LogInfo($"[PackManager] Rescan complete: {_packs.Count} packs found");
+    }
+
+    // ================================================================
+    //  Lookup helpers
+    // ================================================================
+
+    /// <summary>Returns the display name of the pack at <paramref name="path"/>,
+    /// falling back to the directory name if the pack is not in the current list.</summary>
+    public static string GetPackName(string path)
+    {
+        if (path == null) return "(base)";
+        var pack = _packs.Find(p =>
+            string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase));
+        return pack?.Name ?? Path.GetFileName(path);
+    }
+
+    // ================================================================
+    //  Profiles — save / load named pack configurations
+    // ================================================================
+
+    public static string[] GetProfileNames()
+    {
+        IOUtil.EnsureDirectoryExists(ProfilesDir);
+        return Directory.GetFiles(ProfilesDir, "*.txt")
+            .Select(Path.GetFileNameWithoutExtension)
+            .OrderBy(n => n)
+            .ToArray();
+    }
+
+    /// <summary>Saves the current pack order and enabled state as a named profile.</summary>
+    public static void SaveProfile(string name)
+    {
+        IOUtil.EnsureDirectoryExists(ProfilesDir);
+        var lines = new List<string>
+        {
+            $"# Patchwork Profile: {name}",
+            "# Format: +|path (enabled)   or   -|path (disabled)"
+        };
+        foreach (var p in _packs)
+            lines.Add($"{(p.IsEnabled ? '+' : '-')}|{p.Path}");
+        File.WriteAllLines(Path.Combine(ProfilesDir, $"{name}.txt"), lines);
+        Plugin.Logger.LogInfo($"[PackManager] Saved profile '{name}'");
+    }
+
+    /// <summary>Builds a staged pack list from a saved profile, ready for user review before Apply.
+    /// Returns null if the profile file does not exist.</summary>
+    public static List<PackInfo> StageProfile(string name)
+    {
+        string filePath = Path.Combine(ProfilesDir, $"{name}.txt");
+        if (!File.Exists(filePath)) return null;
+
+        var entries = new List<(string Path, bool Enabled)>();
+        foreach (var line in File.ReadAllLines(filePath))
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.Length < 3) continue;
+            entries.Add((line.Substring(2), line[0] == '+'));
+        }
+
+        var result = new List<PackInfo>();
+        foreach (var (entryPath, enabled) in entries)
+        {
+            var pack = _packs.Find(p =>
+                string.Equals(p.Path, entryPath, StringComparison.OrdinalIgnoreCase));
+            if (pack == null) continue;
+            var clone = pack.Clone();
+            clone.IsEnabled = enabled;
+            result.Add(clone);
+        }
+        // Append any currently-known packs absent from the profile (newly added since save).
+        foreach (var p in _packs)
+            if (!result.Any(r => string.Equals(r.Path, p.Path, StringComparison.OrdinalIgnoreCase)))
+                result.Add(p.Clone());
+
+        Plugin.Logger.LogInfo($"[PackManager] Staged profile '{name}'");
+        return result;
+    }
+
+    public static void DeleteProfile(string name)
+    {
+        string filePath = Path.Combine(ProfilesDir, $"{name}.txt");
+        if (File.Exists(filePath)) File.Delete(filePath);
+        Plugin.Logger.LogInfo($"[PackManager] Deleted profile '{name}'");
     }
 
     // ================================================================

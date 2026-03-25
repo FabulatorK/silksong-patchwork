@@ -136,22 +136,25 @@ public static class SpriteLoader
 
     private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)
     {
-        string suffix = Path.Combine(collectionName, materialName);
-        string match = FindFileWithSuffix(LoadPath, $"{spriteName}.png", suffix);
-        if (match != null)
-            return TexUtil.LoadFromPNG(match);
+        string suffix    = Path.Combine(collectionName, materialName);
+        string assetKey  = $"sprite:{collectionName}/{spriteName}";
+        string winnerFile = null, winnerPack = null;
+
+        string baseMatch = FindFileWithSuffix(LoadPath, $"{spriteName}.png", suffix);
+        if (baseMatch != null) { winnerFile = baseMatch; /* winnerPack stays null = base */ }
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
             string packSpritesDir = Path.Combine(packPath, "Sprites");
-            if (!Directory.Exists(packSpritesDir))
-                continue;
-            match = FindFileWithSuffix(packSpritesDir, $"{spriteName}.png", suffix);
-            if (match != null)
-                return TexUtil.LoadFromPNG(match);
+            if (!Directory.Exists(packSpritesDir)) continue;
+            string match = FindFileWithSuffix(packSpritesDir, $"{spriteName}.png", suffix);
+            if (match == null) continue;
+
+            if (winnerFile == null) { winnerFile = match; winnerPack = packPath; }
+            else ConflictTracker.Record("sprite", assetKey, winnerPack, packPath);
         }
 
-        return null;
+        return winnerFile != null ? TexUtil.LoadFromPNG(winnerFile) : null;
     }
 
     private static string FindFileWithSuffix(string searchDir, string searchPattern, string dirSuffix)
@@ -167,30 +170,31 @@ public static class SpriteLoader
 
     private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName, Texture originalTex)
     {
-        string match = FindFileWithSuffix(AtlasLoadPath, $"{materialName}.png", collection.name);
-        if (match != null)
-        {
-            var tex2d = TexUtil.LoadFromPNG(match);
-            RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-            Graphics.Blit(tex2d, rt);
-            Object.Destroy(tex2d);
-            return new SpritesheetResult { Texture = rt, FromCustom = true };
-        }
+        string assetKey   = $"sheet:{collection.name}/{materialName}";
+        string winnerFile = null, winnerPack = null;
+
+        // Collect candidate paths in priority order (file-existence checks only; load winner once).
+        string baseMatch = FindFileWithSuffix(AtlasLoadPath, $"{materialName}.png", collection.name);
+        if (baseMatch != null) { winnerFile = baseMatch; /* winnerPack stays null = base */ }
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
             string packSheetsDir = Path.Combine(packPath, "Spritesheets");
-            if (!Directory.Exists(packSheetsDir))
-                continue;
-            match = FindFileWithSuffix(packSheetsDir, $"{materialName}.png", collection.name);
-            if (match != null)
-            {
-                var tex2d = TexUtil.LoadFromPNG(match);
-                RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-                Graphics.Blit(tex2d, rt);
-                Object.Destroy(tex2d);
-                return new SpritesheetResult { Texture = rt, FromCustom = true };
-            }
+            if (!Directory.Exists(packSheetsDir)) continue;
+            string match = FindFileWithSuffix(packSheetsDir, $"{materialName}.png", collection.name);
+            if (match == null) continue;
+
+            if (winnerFile == null) { winnerFile = match; winnerPack = packPath; }
+            else ConflictTracker.Record("sheet", assetKey, winnerPack, packPath);
+        }
+
+        if (winnerFile != null)
+        {
+            var tex2d = TexUtil.LoadFromPNG(winnerFile);
+            RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            Graphics.Blit(tex2d, rt);
+            Object.Destroy(tex2d);
+            return new SpritesheetResult { Texture = rt, FromCustom = true };
         }
 
         // No custom sheet — rebuild from the original game texture so that disabling a pack

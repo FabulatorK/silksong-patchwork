@@ -26,9 +26,11 @@ public static partial class T2DLoader
     // --- Individual sprite replacement (Patchwork's value-add) ---
     // Skin authors can replace individual frames without repacking an atlas.
     // These use Sprite.Create with the replacement PNG as a standalone texture.
-    private static readonly Dictionary<string, Sprite> _loadedSprites = new();
-    private static readonly Dictionary<string, Texture2D> _preloadedTextures = new();
-    private static readonly Dictionary<string, HashSet<string>> _spriteAtlasMap = new();
+    private static readonly Dictionary<string, Sprite>           _loadedSprites      = new();
+    private static readonly Dictionary<string, Texture2D>        _preloadedTextures  = new();
+    private static readonly Dictionary<string, HashSet<string>>  _spriteAtlasMap     = new();
+    // Maps asset key → source pack path (null = base Patchwork folder). Used for conflict reporting.
+    private static readonly Dictionary<string, string>           _t2dProviders       = new();
 
     // Sprite names that are confirmed to belong to T2D atlas textures.
     // Used to scope enforcement/loading — prevents replacing UI sprites
@@ -156,7 +158,7 @@ public static partial class T2DLoader
     {
         BuildSpritesheetOverrides();
 
-        void ScanDirectory(string t2dRoot)
+        void ScanDirectory(string t2dRoot, string sourcePack)
         {
             if (!Directory.Exists(t2dRoot))
                 return;
@@ -170,11 +172,18 @@ public static partial class T2DLoader
                     string spriteName = Path.GetFileNameWithoutExtension(file);
                     string key = T2DUtil.SpriteKey(atlasName, spriteName);
                     if (_preloadedTextures.ContainsKey(key) || _loadedSprites.ContainsKey(key))
+                    {
+                        ConflictTracker.Record("t2d-sprite", key,
+                            _t2dProviders.GetValueOrDefault(key), sourcePack);
                         continue;
+                    }
 
                     Texture2D tex = TexUtil.LoadFromPNG(file);
                     if (tex != null)
+                    {
                         _preloadedTextures[key] = tex;
+                        _t2dProviders[key] = sourcePack;
+                    }
                 }
             }
 
@@ -183,17 +192,24 @@ public static partial class T2DLoader
             {
                 string spriteName = Path.GetFileNameWithoutExtension(file);
                 if (_preloadedTextures.ContainsKey(spriteName) || _loadedSprites.ContainsKey(spriteName))
+                {
+                    ConflictTracker.Record("t2d-sprite", spriteName,
+                        _t2dProviders.GetValueOrDefault(spriteName), sourcePack);
                     continue;
+                }
 
                 Texture2D tex = TexUtil.LoadFromPNG(file);
                 if (tex != null)
+                {
                     _preloadedTextures[spriteName] = tex;
+                    _t2dProviders[spriteName] = sourcePack;
+                }
             }
         }
 
-        ScanDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D"));
+        ScanDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D"), null);
         foreach (var packPath in Plugin.PluginPackPaths)
-            ScanDirectory(Path.Combine(packPath, "Sprites", "T2D"));
+            ScanDirectory(Path.Combine(packPath, "Sprites", "T2D"), packPath);
 
         // Eagerly create replacement Sprites for any originals already in memory
         foreach (var original in Resources.FindObjectsOfTypeAll<Sprite>())
@@ -515,6 +531,7 @@ public static partial class T2DLoader
         _preloadedTextures.Clear();
         _spriteAtlasMap.Clear();
         _negativeCache.Clear();
+        _t2dProviders.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
         T2DUtil.ClearCleanNameCache();

@@ -26,6 +26,10 @@ public static partial class T2DLoader
     private static readonly Dictionary<string, byte[]> _originalTextureData =
         new(System.StringComparer.OrdinalIgnoreCase);
 
+    // Maps spritesheet rawName → source pack path (null = base folder). Used for conflict reporting.
+    private static readonly Dictionary<string, string> _sheetProviders =
+        new(System.StringComparer.OrdinalIgnoreCase);
+
     internal static bool HasStoredOriginals => _originalTextureData.Count > 0;
 
     // ================================================================
@@ -97,14 +101,20 @@ public static partial class T2DLoader
     private static void BuildSpritesheetOverrides()
     {
         SpritesheetOverrides.Clear();
+        _sheetProviders.Clear();
 
-        void ScanDirectory(string dir)
+        void ScanDirectory(string dir, string sourcePack)
         {
             if (!Directory.Exists(dir)) return;
             foreach (var file in Directory.GetFiles(dir, "*.png", SearchOption.TopDirectoryOnly))
             {
                 string rawName = Path.GetFileNameWithoutExtension(file);
-                if (SpritesheetOverrides.ContainsKey(rawName)) continue;
+                if (SpritesheetOverrides.ContainsKey(rawName))
+                {
+                    ConflictTracker.Record("t2d-sheet", rawName,
+                        _sheetProviders.GetValueOrDefault(rawName), sourcePack);
+                    continue;
+                }
 
                 try
                 {
@@ -113,6 +123,7 @@ public static partial class T2DLoader
                     if (temp.LoadImage(pngData))
                     {
                         SpritesheetOverrides[rawName] = (pngData, temp.width, temp.height);
+                        _sheetProviders[rawName] = sourcePack;
                         Plugin.Logger.LogInfo($"[T2D] Loaded spritesheet override: '{rawName}' ({temp.width}x{temp.height})");
                     }
                     Object.Destroy(temp);
@@ -124,9 +135,9 @@ public static partial class T2DLoader
             }
         }
 
-        ScanDirectory(AtlasLoadPath);
+        ScanDirectory(AtlasLoadPath, null);
         foreach (var packPath in Plugin.PluginPackPaths)
-            ScanDirectory(Path.Combine(packPath, "Spritesheets", "T2D"));
+            ScanDirectory(Path.Combine(packPath, "Spritesheets", "T2D"), packPath);
     }
 
     /// <summary>

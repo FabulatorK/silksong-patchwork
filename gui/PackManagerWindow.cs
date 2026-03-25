@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Patchwork.Packs;
+using Patchwork.Util;
 
 namespace Patchwork.GUI;
 
@@ -20,6 +21,7 @@ public static class PackManagerWindow
     private static Rect    _windowRect;
     private static bool    _initialized;
     private static Vector2 _scroll;
+    private static string  _profileNameInput = "";
 
     // Staged list — null means no pending changes, non-null means user has unsaved edits.
     private static List<PackInfo> _staged;
@@ -61,6 +63,10 @@ public static class PackManagerWindow
         DrawPackList(list);
         GUIHelper.Space(4);
         DrawFooter(list);
+        GUIHelper.Space(4);
+        DrawProfilesSection();
+        GUIHelper.Space(4);
+        DrawConflictsSection();
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
@@ -132,6 +138,15 @@ public static class PackManagerWindow
                 // Name + source badge
                 string badge = pack.IsLocal ? " [local]" : " [pack]";
                 GUILayout.Label(pack.Name + badge, GUIHelper.LabelStyle);
+
+                // Conflict badge — show when this pack has shadowed assets
+                int shadowed = ConflictTracker.ShadowedCount(pack.Path);
+                if (shadowed > 0)
+                {
+                    UnityEngine.GUI.contentColor = new Color(1f, 0.75f, 0.2f);
+                    GUILayout.Label($"⚠ {shadowed}", GUIHelper.LabelStyle);
+                    UnityEngine.GUI.contentColor = Color.white;
+                }
                 GUILayout.FlexibleSpace();
 
                 // Priority arrows
@@ -210,5 +225,76 @@ public static class PackManagerWindow
     private static void EnsureStaged()
     {
         _staged ??= PackManager.AllPacks.Select(p => p.Clone()).ToList();
+    }
+
+    // ================================================================
+    //  Profiles section
+    // ================================================================
+
+    private static void DrawProfilesSection()
+    {
+        GUILayout.Label("── Profiles ──────────────────────────────", GUIHelper.LabelStyle);
+
+        // Existing profiles
+        var names = PackManager.GetProfileNames();
+        if (names.Length > 0)
+        {
+            GUILayout.BeginHorizontal();
+            foreach (var name in names)
+            {
+                if (GUILayout.Button(name, GUIHelper.ButtonStyle))
+                {
+                    var staged = PackManager.StageProfile(name);
+                    if (staged != null) _staged = staged;
+                }
+                if (GUILayout.Button("✕", GUIHelper.ButtonStyle, GUIHelper.Width(24)))
+                    PackManager.DeleteProfile(name);
+            }
+            GUILayout.EndHorizontal();
+        }
+        else
+        {
+            GUILayout.Label("  No saved profiles.", GUIHelper.LabelStyle);
+        }
+
+        // Save current as new profile
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Save as:", GUIHelper.LabelStyle, GUIHelper.Width(58));
+        _profileNameInput = GUIHelper.TextField("PackManagerProfileName", _profileNameInput, GUIHelper.Width(140));
+        UnityEngine.GUI.enabled = !string.IsNullOrWhiteSpace(_profileNameInput);
+        if (GUILayout.Button("Save", GUIHelper.ButtonStyle, GUIHelper.Width(50)))
+        {
+            PackManager.SaveProfile(_profileNameInput.Trim());
+            _profileNameInput = "";
+        }
+        UnityEngine.GUI.enabled = true;
+        GUILayout.EndHorizontal();
+    }
+
+    // ================================================================
+    //  Conflicts section
+    // ================================================================
+
+    private static bool _conflictsFoldout;
+
+    private static void DrawConflictsSection()
+    {
+        int total = ConflictTracker.Total;
+        string header = total == 0
+            ? "── Conflicts: none ───────────────────────"
+            : $"── Conflicts: {total} ──────────────────────────";
+
+        if (GUILayout.Button(header, GUIHelper.LabelStyle))
+            _conflictsFoldout = !_conflictsFoldout;
+
+        if (!_conflictsFoldout || total == 0) return;
+
+        foreach (var e in ConflictTracker.All)
+        {
+            string winner = PackManager.GetPackName(e.WinnerPack);
+            string loser  = PackManager.GetPackName(e.LoserPack);
+            GUILayout.Label($"  [{e.Type}] {e.Key}\n    {winner}  >  {loser}",
+                GUIHelper.LabelStyle);
+        }
     }
 }
