@@ -5,9 +5,10 @@ namespace Patchwork.Packs;
 
 public enum ConditionType
 {
-    Scene,         // active scene name exactly matches value
-    SceneContains, // active scene name contains value
-    PackActive,    // another pack (by display name) is enabled
+    Scene,          // active scene name exactly matches value
+    SceneContains,  // active scene name contains value
+    PackActive,     // another pack (by display name) is enabled
+    CrestEquipped,  // player currently has a specific crest equipped
 }
 
 /// <summary>How a condition joins with the next one in the list (per-pair, not global).</summary>
@@ -37,6 +38,11 @@ public class PackCondition
             ConditionType.PackActive =>
                 allPacks.Any(p => p.IsEnabled &&
                     string.Equals(p.Name, Value, System.StringComparison.OrdinalIgnoreCase)),
+            ConditionType.CrestEquipped =>
+                string.Equals(
+                    HeroController.instance?.playerData?.CurrentCrestID,
+                    Value,
+                    System.StringComparison.OrdinalIgnoreCase),
             _ => true
         };
         return Negate ? !result : result;
@@ -45,16 +51,20 @@ public class PackCondition
     public PackCondition Clone() => new() { Type = Type, Value = Value, Negate = Negate, JoinNext = JoinNext };
 
     // ================================================================
-    //  GUI label helper
+    //  GUI label helpers
     // ================================================================
 
-    public string TypeLabel => Type switch
+    /// <summary>Maps a <see cref="ConditionType"/> to its short display label.</summary>
+    public static string LabelFor(ConditionType type) => type switch
     {
         ConditionType.Scene         => "scene",
         ConditionType.SceneContains => "scene~",
         ConditionType.PackActive    => "pack",
-        _                           => "?"
+        ConditionType.CrestEquipped => "crest",
+        _                           => type.ToString()
     };
+
+    public string TypeLabel => LabelFor(Type);
 
     // ================================================================
     //  Serialization  (pipe-separated within a tab-delimited line)
@@ -77,6 +87,7 @@ public class PackCondition
         {
             "scene~" => ConditionType.SceneContains,
             "pack"   => ConditionType.PackActive,
+            "crest"  => ConditionType.CrestEquipped,
             _        => ConditionType.Scene,
         };
         bool negate = parts[1] == "1";

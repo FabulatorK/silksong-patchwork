@@ -346,13 +346,7 @@ public static class PackManagerWindow
         GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
         foreach (ConditionType t in System.Enum.GetValues(typeof(ConditionType)))
         {
-            string tLabel = t switch
-            {
-                ConditionType.Scene         => "scene",
-                ConditionType.SceneContains => "scene~",
-                ConditionType.PackActive    => "pack",
-                _                           => t.ToString()
-            };
+            string tLabel = PackCondition.LabelFor(t);
             if (cond.Type == t) UnityEngine.GUI.contentColor = kJoinHl;
             if (GUILayout.Button(tLabel, GUIHelper.ButtonStyle))
             { cond.Type = t; _openDropdownId = null; PackManager.SaveConditions(); }
