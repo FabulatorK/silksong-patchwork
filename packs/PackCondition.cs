@@ -10,7 +10,8 @@ public enum ConditionType
     PackActive,    // another pack (by display name) is enabled
 }
 
-public enum LogicMode    { Or, And }
+/// <summary>How a condition joins with the next one in the list (per-pair, not global).</summary>
+public enum LogicJoin     { Or, And }
 public enum ReloadTrigger { OnSceneTransition, HotReload }
 
 /// <summary>
@@ -19,9 +20,11 @@ public enum ReloadTrigger { OnSceneTransition, HotReload }
 /// </summary>
 public class PackCondition
 {
-    public ConditionType Type   { get; set; } = ConditionType.Scene;
-    public string        Value  { get; set; } = "";
-    public bool          Negate { get; set; } = false;
+    public ConditionType Type      { get; set; } = ConditionType.Scene;
+    public string        Value     { get; set; } = "";
+    public bool          Negate    { get; set; } = false;
+    /// <summary>How this condition joins with the next one (OR = new clause, AND = same clause).</summary>
+    public LogicJoin     JoinNext  { get; set; } = LogicJoin.Or;
 
     public bool Evaluate(string sceneName, IReadOnlyList<PackInfo> allPacks)
     {
@@ -39,46 +42,58 @@ public class PackCondition
         return Negate ? !result : result;
     }
 
-    public PackCondition Clone() => new() { Type = Type, Value = Value, Negate = Negate };
+    public PackCondition Clone() => new() { Type = Type, Value = Value, Negate = Negate, JoinNext = JoinNext };
 
     // ================================================================
-    //  GUI helpers — cycle through enum values on button click
+    //  GUI label helper
     // ================================================================
 
     public string TypeLabel => Type switch
     {
-        ConditionType.Scene        => "scene",
+        ConditionType.Scene         => "scene",
         ConditionType.SceneContains => "scene~",
-        ConditionType.PackActive   => "pack",
-        _                          => "?"
+        ConditionType.PackActive    => "pack",
+        _                           => "?"
     };
-
-    public void CycleType() =>
-        Type = Type switch
-        {
-            ConditionType.Scene        => ConditionType.SceneContains,
-            ConditionType.SceneContains => ConditionType.PackActive,
-            _                          => ConditionType.Scene,
-        };
 
     // ================================================================
     //  Serialization  (pipe-separated within a tab-delimited line)
-    //  format: type|negate|value
+    //  format: type|negate|join|value
+    //  (old format: type|negate|value — parsed with backward compat)
     // ================================================================
 
-    public string Serialize() => $"{TypeLabel}|{(Negate ? 1 : 0)}|{Value}";
+    public string Serialize()
+    {
+        string join = JoinNext == LogicJoin.And ? "and" : "or";
+        return $"{TypeLabel}|{(Negate ? 1 : 0)}|{join}|{Value}";
+    }
 
     public static PackCondition TryDeserialize(string token)
     {
         var parts = token.Split('|');
         if (parts.Length < 3) return null;
+
         ConditionType type = parts[0] switch
         {
             "scene~" => ConditionType.SceneContains,
             "pack"   => ConditionType.PackActive,
             _        => ConditionType.Scene,
         };
-        string value = string.Join("|", parts, 2, parts.Length - 2); // value may contain |
-        return new PackCondition { Type = type, Negate = parts[1] == "1", Value = value };
+        bool negate = parts[1] == "1";
+
+        // Detect format: new = type|negate|join|value, old = type|negate|value
+        LogicJoin join = LogicJoin.Or;
+        string value;
+        if (parts.Length >= 4 && (parts[2] == "or" || parts[2] == "and"))
+        {
+            join  = parts[2] == "and" ? LogicJoin.And : LogicJoin.Or;
+            value = string.Join("|", parts, 3, parts.Length - 3);
+        }
+        else
+        {
+            value = string.Join("|", parts, 2, parts.Length - 2); // value may contain |
+        }
+
+        return new PackCondition { Type = type, Negate = negate, JoinNext = join, Value = value };
     }
 }

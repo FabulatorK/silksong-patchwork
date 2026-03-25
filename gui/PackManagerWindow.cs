@@ -30,6 +30,9 @@ public static class PackManagerWindow
     // Set of pack paths whose condition editor is currently expanded.
     private static readonly HashSet<string> _conditionsOpen = new();
 
+    // ID of the currently open inline type-dropdown (null = none open).
+    private static string _openDropdownId = null;
+
     // ================================================================
     //  Public entry point
     // ================================================================
@@ -264,24 +267,9 @@ public static class PackManagerWindow
     {
         GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
         {
-            // ── Logic mode + reload trigger ───────────────────────
+            // ── Reload trigger ─────────────────────────────────────
             GUILayout.BeginHorizontal();
             {
-                GUILayout.Label("Logic:", GUIHelper.LabelStyle, GUIHelper.Width(42));
-
-                bool orActive  = pack.ConditionLogic == LogicMode.Or;
-                if (orActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
-                if (GUILayout.Button("OR",  GUIHelper.ButtonStyle, GUIHelper.Width(34)))
-                { pack.ConditionLogic = LogicMode.Or;  PackManager.SaveConditions(); }
-                UnityEngine.GUI.contentColor = Color.white;
-
-                bool andActive = pack.ConditionLogic == LogicMode.And;
-                if (andActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
-                if (GUILayout.Button("AND", GUIHelper.ButtonStyle, GUIHelper.Width(38)))
-                { pack.ConditionLogic = LogicMode.And; PackManager.SaveConditions(); }
-                UnityEngine.GUI.contentColor = Color.white;
-
-                GUILayout.Space(16);
                 GUILayout.Label("Reload:", GUIHelper.LabelStyle, GUIHelper.Width(50));
 
                 bool sceneActive = pack.ReloadTrigger == ReloadTrigger.OnSceneTransition;
@@ -302,16 +290,22 @@ public static class PackManagerWindow
 
             GUIHelper.Space(2);
 
-            // ── Condition rows ────────────────────────────────────
+            // ── Condition rows (Factorio-style DNF) ───────────────
             int removeAt = -1;
             for (int ci = 0; ci < pack.Conditions.Count; ci++)
             {
-                var cond = pack.Conditions[ci];
+                var cond   = pack.Conditions[ci];
+                string dropId = $"Patchwork.CondType.{pack.Path}.{ci}";
+                bool dropOpen = _openDropdownId == dropId;
+
+                // Condition row
                 GUILayout.BeginHorizontal();
                 {
-                    // Type cycle button
+                    // Type dropdown button
+                    if (dropOpen) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
                     if (GUILayout.Button(cond.TypeLabel, GUIHelper.ButtonStyle, GUIHelper.Width(62)))
-                    { cond.CycleType(); PackManager.SaveConditions(); }
+                        _openDropdownId = dropOpen ? null : dropId;
+                    UnityEngine.GUI.contentColor = Color.white;
 
                     // Negate toggle  (== / !=)
                     string negLabel = cond.Negate ? "!=" : "==";
@@ -332,14 +326,75 @@ public static class PackManagerWindow
                     UnityEngine.GUI.contentColor = Color.white;
                 }
                 GUILayout.EndHorizontal();
+
+                // Inline type dropdown — expands below the row when open
+                if (dropOpen)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(4);
+                    GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
+                    foreach (ConditionType t in System.Enum.GetValues(typeof(ConditionType)))
+                    {
+                        string tLabel = t switch
+                        {
+                            ConditionType.Scene         => "scene",
+                            ConditionType.SceneContains => "scene~",
+                            ConditionType.PackActive    => "pack",
+                            _                           => t.ToString()
+                        };
+                        if (cond.Type == t) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                        if (GUILayout.Button(tLabel, GUIHelper.ButtonStyle))
+                        {
+                            cond.Type      = t;
+                            _openDropdownId = null;
+                            PackManager.SaveConditions();
+                        }
+                        UnityEngine.GUI.contentColor = Color.white;
+                    }
+                    GUILayout.EndVertical();
+                    GUILayout.EndHorizontal();
+                }
+
+                // AND / OR join toggle between consecutive condition rows
+                if (ci < pack.Conditions.Count - 1)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(20);
+
+                    bool joinIsOr = cond.JoinNext == LogicJoin.Or;
+                    if (joinIsOr) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                    if (GUILayout.Button("OR", GUIHelper.ButtonStyle, GUIHelper.Width(34)))
+                    { cond.JoinNext = LogicJoin.Or; PackManager.SaveConditions(); }
+                    UnityEngine.GUI.contentColor = Color.white;
+
+                    bool joinIsAnd = cond.JoinNext == LogicJoin.And;
+                    if (joinIsAnd) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                    if (GUILayout.Button("AND", GUIHelper.ButtonStyle, GUIHelper.Width(38)))
+                    { cond.JoinNext = LogicJoin.And; PackManager.SaveConditions(); }
+                    UnityEngine.GUI.contentColor = Color.white;
+
+                    GUILayout.EndHorizontal();
+                }
             }
 
             if (removeAt >= 0)
             { pack.Conditions.RemoveAt(removeAt); PackManager.SaveConditions(); }
 
-            // ── Add condition button ──────────────────────────────
+            GUIHelper.Space(2);
+
+            // ── Bottom bar: Add condition + Done ──────────────────
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button("+ Add condition", GUIHelper.ButtonStyle))
             { pack.Conditions.Add(new PackCondition()); PackManager.SaveConditions(); }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Done", GUIHelper.ButtonStyle, GUIHelper.Width(50)))
+            {
+                _conditionsOpen.Remove(pack.Path);
+                _openDropdownId = null;
+            }
+            GUILayout.EndHorizontal();
         }
         GUILayout.EndVertical();
     }

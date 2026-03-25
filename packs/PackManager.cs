@@ -407,7 +407,8 @@ public static class PackManager
 
     /// <summary>
     /// Reads packs-conditions.txt and restores conditions onto matching packs.
-    /// Format per line: packPath \t trigger \t logic \t cond1_serialized [\t cond2 ...]
+    /// Format per line: packPath \t trigger \t cond1_serialized [\t cond2 ...]
+    /// (Old format had a logic field at column 2; detected and skipped for backward compat.)
     /// </summary>
     public static void LoadConditions()
     {
@@ -422,10 +423,13 @@ public static class PackManager
                 string.Equals(p.Path, parts[0], StringComparison.OrdinalIgnoreCase));
             if (pack == null) continue;
 
-            pack.ReloadTrigger  = parts[1] == "hot" ? ReloadTrigger.HotReload : ReloadTrigger.OnSceneTransition;
-            pack.ConditionLogic = parts[2] == "and" ? LogicMode.And : LogicMode.Or;
+            pack.ReloadTrigger = parts[1] == "hot" ? ReloadTrigger.HotReload : ReloadTrigger.OnSceneTransition;
+
+            // Backward compat: old format had a global logic field ("and"/"or") at parts[2]
+            int condStart = (parts[2] == "and" || parts[2] == "or") ? 3 : 2;
+
             pack.Conditions.Clear();
-            for (int i = 3; i < parts.Length; i++)
+            for (int i = condStart; i < parts.Length; i++)
             {
                 var cond = PackCondition.TryDeserialize(parts[i]);
                 if (cond != null) pack.Conditions.Add(cond);
@@ -441,14 +445,13 @@ public static class PackManager
         var lines = new List<string>
         {
             "# Patchwork Pack Conditions — auto-generated, do not edit manually",
-            "# Format: packPath \\t trigger \\t logic \\t cond1 [\\t cond2 ...]"
+            "# Format: packPath \\t trigger \\t cond1 [\\t cond2 ...]"
         };
         foreach (var p in _packs.Where(q => q.HasConditions))
         {
             string trigger = p.ReloadTrigger == ReloadTrigger.HotReload ? "hot" : "scene";
-            string logic   = p.ConditionLogic == LogicMode.And ? "and" : "or";
             string condStr = string.Join("\t", p.Conditions.Select(c => c.Serialize()));
-            lines.Add($"{p.Path}\t{trigger}\t{logic}\t{condStr}");
+            lines.Add($"{p.Path}\t{trigger}\t{condStr}");
         }
         File.WriteAllLines(ConditionsPath, lines);
     }
