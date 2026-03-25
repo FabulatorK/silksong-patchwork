@@ -207,11 +207,11 @@ public static class PackManagerWindow
                 GUILayout.Label("  " + string.Join("   ", meta), GUIHelper.LabelStyle);
 
             // ── Asset footprint ───────────────────────────────────
-            string badge = pack.Stats.Badge;
-            if (badge != null)
+            string footprint = pack.Stats.Badge;
+            if (footprint != null)
             {
                 // Show scanned file counts (e.g. "12 sprites  3 sheets  5 sfx")
-                GUILayout.Label("  " + badge, GUIHelper.LabelStyle);
+                GUILayout.Label("  " + footprint, GUIHelper.LabelStyle);
             }
             else
             {

@@ -10,11 +10,18 @@ namespace Patchwork.Util;
 /// </summary>
 public static class ConflictTracker
 {
-    public readonly record struct Entry(
-        string Type,       // "sprite" | "sheet" | "t2d-sprite" | "t2d-sheet"
-        string Key,        // asset identifier (e.g. "sprite:Hornet/ground/Slash")
-        string WinnerPack, // null = base Patchwork folder
-        string LoserPack); // null = base Patchwork folder
+    public struct Entry
+    {
+        public string Type;       // "sprite" | "sheet" | "t2d-sprite" | "t2d-sheet"
+        public string Key;        // asset identifier (e.g. "sprite:Hornet/ground/Slash")
+        public string WinnerPack; // null = base Patchwork folder
+        public string LoserPack;  // null = base Patchwork folder
+
+        public Entry(string type, string key, string winnerPack, string loserPack)
+        {
+            Type = type; Key = key; WinnerPack = winnerPack; LoserPack = loserPack;
+        }
+    }
 
     private static readonly List<Entry> _entries = new();
 
