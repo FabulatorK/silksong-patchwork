@@ -39,13 +39,26 @@ public class PackCondition
                 allPacks.Any(p => p.IsEnabled &&
                     string.Equals(p.Name, Value, System.StringComparison.OrdinalIgnoreCase)),
             ConditionType.CrestEquipped =>
-                string.Equals(
-                    HeroController.instance?.playerData?.CurrentCrestID,
-                    Value,
-                    System.StringComparison.OrdinalIgnoreCase),
+                CrestMatches(HeroController.instance?.playerData?.CurrentCrestID, Value),
             _ => true
         };
         return Negate ? !result : result;
+    }
+
+    /// <summary>
+    /// Returns true if <paramref name="currentID"/> matches <paramref name="value"/>.
+    /// An exact case-insensitive match always passes.
+    /// A base name without a variant suffix also matches all variants of that crest:
+    /// e.g. "Hunter" matches "Hunter", "Hunter_v2", "Hunter_v3".
+    /// Specifying the full variant (e.g. "Hunter_v2") still works as a precise filter.
+    /// </summary>
+    private static bool CrestMatches(string currentID, string value)
+    {
+        if (currentID == null || string.IsNullOrEmpty(value)) return false;
+        if (string.Equals(currentID, value, System.StringComparison.OrdinalIgnoreCase))
+            return true;
+        // "Hunter" should match "Hunter_v2", "Hunter_v3", etc.
+        return currentID.StartsWith(value + "_", System.StringComparison.OrdinalIgnoreCase);
     }
 
     public PackCondition Clone() => new() { Type = Type, Value = Value, Negate = Negate, JoinNext = JoinNext };
