@@ -291,35 +291,48 @@ public static class PackManagerWindow
             GUIHelper.Space(2);
 
             // ── Condition rows (Factorio-style DNF) ───────────────
+            // Conditions that continue an AND-chain are indented to show they belong to
+            // the same clause. OR joins appear at the outer level; AND joins at the inner level.
+            //
+            //   [condition A]          ← base
+            //   or | AND               ← base  (A's JoinNext = Or)
+            //   [condition B]          ← base  (starts new clause)
+            //   OR | and               ← inner (B's JoinNext = And)
+            //       [condition C]      ← inner (continues B's clause)
+            //
+            const float kBaseIndent = 6f;
+            const float kAndIndent  = 28f;
+
             int removeAt = -1;
             for (int ci = 0; ci < pack.Conditions.Count; ci++)
             {
-                var cond   = pack.Conditions[ci];
-                string dropId = $"Patchwork.CondType.{pack.Path}.{ci}";
-                bool dropOpen = _openDropdownId == dropId;
+                var cond = pack.Conditions[ci];
+                bool prevWasAnd = ci > 0 && pack.Conditions[ci - 1].JoinNext == LogicJoin.And;
+                float rowIndent = prevWasAnd ? kAndIndent : kBaseIndent;
+
+                string dropId  = $"Patchwork.CondType.{pack.Path}.{ci}";
+                bool   dropOpen = _openDropdownId == dropId;
 
                 // Condition row
                 GUILayout.BeginHorizontal();
                 {
-                    // Type dropdown button
+                    GUILayout.Space(rowIndent);
+
                     if (dropOpen) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
                     if (GUILayout.Button(cond.TypeLabel, GUIHelper.ButtonStyle, GUIHelper.Width(62)))
                         _openDropdownId = dropOpen ? null : dropId;
                     UnityEngine.GUI.contentColor = Color.white;
 
-                    // Negate toggle  (== / !=)
                     string negLabel = cond.Negate ? "!=" : "==";
                     if (GUILayout.Button(negLabel, GUIHelper.ButtonStyle, GUIHelper.Width(30)))
                     { cond.Negate = !cond.Negate; PackManager.SaveConditions(); }
 
-                    // Value text field
                     string newVal = GUIHelper.TextField(
                         $"Patchwork.Cond.{pack.Path}.{ci}",
                         cond.Value,
-                        GUIHelper.Width(160));
+                        GUIHelper.Width(150));
                     if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
 
-                    // Remove button
                     UnityEngine.GUI.contentColor = new Color(1f, 0.45f, 0.45f);
                     if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(22)))
                         removeAt = ci;
@@ -327,11 +340,11 @@ public static class PackManagerWindow
                 }
                 GUILayout.EndHorizontal();
 
-                // Inline type dropdown — expands below the row when open
+                // Inline type dropdown — expands at the same indent as the row
                 if (dropOpen)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Space(4);
+                    GUILayout.Space(rowIndent + 2f);
                     GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
                     foreach (ConditionType t in System.Enum.GetValues(typeof(ConditionType)))
                     {
@@ -345,7 +358,7 @@ public static class PackManagerWindow
                         if (cond.Type == t) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
                         if (GUILayout.Button(tLabel, GUIHelper.ButtonStyle))
                         {
-                            cond.Type      = t;
+                            cond.Type       = t;
                             _openDropdownId = null;
                             PackManager.SaveConditions();
                         }
@@ -355,21 +368,23 @@ public static class PackManagerWindow
                     GUILayout.EndHorizontal();
                 }
 
-                // AND / OR join toggle between consecutive condition rows
+                // AND / OR join toggle — OR at base indent, AND at clause indent
                 if (ci < pack.Conditions.Count - 1)
                 {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Space(20);
+                    bool joinIsAnd = cond.JoinNext == LogicJoin.And;
+                    float joinIndent = joinIsAnd ? kAndIndent : kBaseIndent;
 
-                    bool joinIsOr = cond.JoinNext == LogicJoin.Or;
-                    if (joinIsOr) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
-                    if (GUILayout.Button("OR", GUIHelper.ButtonStyle, GUIHelper.Width(34)))
-                    { cond.JoinNext = LogicJoin.Or; PackManager.SaveConditions(); }
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(joinIndent);
+
+                    bool joinIsOr = !joinIsAnd;
+                    if (joinIsOr)  UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                    if (GUILayout.Button("or",  GUIHelper.ButtonStyle, GUIHelper.Width(30)))
+                    { cond.JoinNext = LogicJoin.Or;  PackManager.SaveConditions(); }
                     UnityEngine.GUI.contentColor = Color.white;
 
-                    bool joinIsAnd = cond.JoinNext == LogicJoin.And;
                     if (joinIsAnd) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
-                    if (GUILayout.Button("AND", GUIHelper.ButtonStyle, GUIHelper.Width(38)))
+                    if (GUILayout.Button("and", GUIHelper.ButtonStyle, GUIHelper.Width(34)))
                     { cond.JoinNext = LogicJoin.And; PackManager.SaveConditions(); }
                     UnityEngine.GUI.contentColor = Color.white;
 
