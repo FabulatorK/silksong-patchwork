@@ -101,6 +101,8 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => DialogueHandler.CheckForStaleKeys();
 
+        SceneManager.sceneLoaded += (scene, mode) => PackManager.OnSceneLoaded(scene.name);
+
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
@@ -136,10 +138,20 @@ public class Plugin : BaseUnityPlugin
 
 
     private static int _frameCounter = 0;
+    private static int _conditionPollFrames = 0;
+    private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
+
     private void Update()
     {
         DevProfiler.RecordFrame();
         DevProfiler.BeginUpdateTiming();
+
+        // Poll hot-reload conditions periodically (for future non-scene condition types).
+        if (++_conditionPollFrames >= ConditionPollInterval)
+        {
+            _conditionPollFrames = 0;
+            PackManager.PollHotReloadConditions();
+        }
 
         // Disable/re-enable the keyboard device in Unity's new Input System based
         // on whether a Patchwork text field is focused. This blocks the game from

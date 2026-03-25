@@ -27,6 +27,9 @@ public static class PackManagerWindow
     private static List<PackInfo> _staged;
     private static bool HasChanges => _staged != null;
 
+    // Set of pack paths whose condition editor is currently expanded.
+    private static readonly HashSet<string> _conditionsOpen = new();
+
     // ================================================================
     //  Public entry point
     // ================================================================
@@ -147,6 +150,26 @@ public static class PackManagerWindow
                     GUILayout.Label($"⚠ {shadowed}", GUIHelper.LabelStyle);
                     UnityEngine.GUI.contentColor = Color.white;
                 }
+
+                // Conditions toggle button (works on live list, not staged)
+                var livePack = PackManager.AllPacks.FirstOrDefault(p =>
+                    string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
+                if (livePack != null)
+                {
+                    bool condOpen = _conditionsOpen.Contains(pack.Path);
+                    if (condOpen || livePack.HasConditions)
+                        UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                    string condLabel = livePack.HasConditions
+                        ? $"[{livePack.Conditions.Count} cond]"
+                        : "[+ cond]";
+                    if (GUILayout.Button(condLabel, GUIHelper.ButtonStyle, GUIHelper.Width(74)))
+                    {
+                        if (condOpen) _conditionsOpen.Remove(pack.Path);
+                        else          _conditionsOpen.Add(pack.Path);
+                    }
+                    UnityEngine.GUI.contentColor = Color.white;
+                }
+
                 GUILayout.FlexibleSpace();
 
                 // Priority arrows
@@ -202,6 +225,12 @@ public static class PackManagerWindow
                 if (types.Count > 0)
                     GUILayout.Label("  [" + string.Join(", ", types) + "]", GUIHelper.LabelStyle);
             }
+
+            // ── Inline condition editor ───────────────────────────
+            var livePackForEditor = PackManager.AllPacks.FirstOrDefault(p =>
+                string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
+            if (livePackForEditor != null && _conditionsOpen.Contains(pack.Path))
+                DrawConditionEditor(livePackForEditor);
         }
         GUILayout.EndVertical();
 
@@ -225,6 +254,94 @@ public static class PackManagerWindow
     private static void EnsureStaged()
     {
         _staged ??= PackManager.AllPacks.Select(p => p.Clone()).ToList();
+    }
+
+    // ================================================================
+    //  Per-pack condition editor  (works on live list, saves immediately)
+    // ================================================================
+
+    private static void DrawConditionEditor(PackInfo pack)
+    {
+        GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
+        {
+            // ── Logic mode + reload trigger ───────────────────────
+            GUILayout.BeginHorizontal();
+            {
+                GUILayout.Label("Logic:", GUIHelper.LabelStyle, GUIHelper.Width(42));
+
+                bool orActive  = pack.ConditionLogic == LogicMode.Or;
+                if (orActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (GUILayout.Button("OR",  GUIHelper.ButtonStyle, GUIHelper.Width(34)))
+                { pack.ConditionLogic = LogicMode.Or;  PackManager.SaveConditions(); }
+                UnityEngine.GUI.contentColor = Color.white;
+
+                bool andActive = pack.ConditionLogic == LogicMode.And;
+                if (andActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (GUILayout.Button("AND", GUIHelper.ButtonStyle, GUIHelper.Width(38)))
+                { pack.ConditionLogic = LogicMode.And; PackManager.SaveConditions(); }
+                UnityEngine.GUI.contentColor = Color.white;
+
+                GUILayout.Space(16);
+                GUILayout.Label("Reload:", GUIHelper.LabelStyle, GUIHelper.Width(50));
+
+                bool sceneActive = pack.ReloadTrigger == ReloadTrigger.OnSceneTransition;
+                if (sceneActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (GUILayout.Button("on scene", GUIHelper.ButtonStyle, GUIHelper.Width(72)))
+                { pack.ReloadTrigger = ReloadTrigger.OnSceneTransition; PackManager.SaveConditions(); }
+                UnityEngine.GUI.contentColor = Color.white;
+
+                bool hotActive = pack.ReloadTrigger == ReloadTrigger.HotReload;
+                if (hotActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (GUILayout.Button("hot reload", GUIHelper.ButtonStyle, GUIHelper.Width(80)))
+                { pack.ReloadTrigger = ReloadTrigger.HotReload; PackManager.SaveConditions(); }
+                UnityEngine.GUI.contentColor = Color.white;
+
+                GUILayout.FlexibleSpace();
+            }
+            GUILayout.EndHorizontal();
+
+            GUIHelper.Space(2);
+
+            // ── Condition rows ────────────────────────────────────
+            int removeAt = -1;
+            for (int ci = 0; ci < pack.Conditions.Count; ci++)
+            {
+                var cond = pack.Conditions[ci];
+                GUILayout.BeginHorizontal();
+                {
+                    // Type cycle button
+                    if (GUILayout.Button(cond.TypeLabel, GUIHelper.ButtonStyle, GUIHelper.Width(62)))
+                    { cond.CycleType(); PackManager.SaveConditions(); }
+
+                    // Negate toggle  (== / !=)
+                    string negLabel = cond.Negate ? "!=" : "==";
+                    if (GUILayout.Button(negLabel, GUIHelper.ButtonStyle, GUIHelper.Width(30)))
+                    { cond.Negate = !cond.Negate; PackManager.SaveConditions(); }
+
+                    // Value text field
+                    string newVal = GUIHelper.TextField(
+                        $"Patchwork.Cond.{pack.Path}.{ci}",
+                        cond.Value,
+                        GUIHelper.Width(160));
+                    if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
+
+                    // Remove button
+                    UnityEngine.GUI.contentColor = new Color(1f, 0.45f, 0.45f);
+                    if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(22)))
+                        removeAt = ci;
+                    UnityEngine.GUI.contentColor = Color.white;
+                }
+                GUILayout.EndHorizontal();
+            }
+
+            if (removeAt >= 0)
+            { pack.Conditions.RemoveAt(removeAt); PackManager.SaveConditions(); }
+
+            // ── Add condition button ──────────────────────────────
+            if (GUILayout.Button("+ Add condition", GUIHelper.ButtonStyle))
+            { pack.Conditions.Add(new PackCondition()); PackManager.SaveConditions(); }
+        }
+        GUILayout.EndVertical();
     }
 
     // ================================================================

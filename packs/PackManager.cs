@@ -24,17 +24,24 @@ public static class PackManager
 {
     private static readonly List<PackInfo> _packs = new();
 
-    private static string ConfigPath     => Path.Combine(Plugin.BasePath, "packs.txt");
-    private static string LocalPacksPath => Path.Combine(Plugin.BasePath, "Packs");
-    private static string StatsCachePath => Path.Combine(Plugin.BasePath, "packs-stats.txt");
-    private static string ProfilesDir    => Path.Combine(Plugin.BasePath, "Profiles");
+    private static string ConfigPath      => Path.Combine(Plugin.BasePath, "packs.txt");
+    private static string LocalPacksPath  => Path.Combine(Plugin.BasePath, "Packs");
+    private static string StatsCachePath  => Path.Combine(Plugin.BasePath, "packs-stats.txt");
+    private static string ProfilesDir     => Path.Combine(Plugin.BasePath, "Profiles");
+    private static string ConditionsPath  => Path.Combine(Plugin.BasePath, "packs-conditions.txt");
+
+    // Current scene name, updated by OnSceneLoaded; used for condition evaluation.
+    private static string _currentScene = "";
+    // Previous conditional-active state per pack path, for change detection.
+    private static readonly Dictionary<string, bool> _prevConditionalStates = new();
 
     public static IReadOnlyList<PackInfo> AllPacks => _packs;
 
-    /// <summary>Paths of enabled packs in priority order (index 0 = highest priority).
-    /// Replaces Plugin.PluginPackPaths everywhere.</summary>
+    /// <summary>Paths of enabled packs whose conditions are satisfied, in priority order.</summary>
     public static IEnumerable<string> ActivePackPaths =>
-        _packs.Where(p => p.IsEnabled).Select(p => p.Path);
+        _packs.Where(p => p.IsEnabled &&
+                          (!p.HasConditions || p.EvaluateConditions(_currentScene, _packs)))
+              .Select(p => p.Path);
 
     // ================================================================
     //  Initialization
@@ -46,8 +53,8 @@ public static class PackManager
         var discovered = DiscoverAll();
         MergeWithSavedConfig(discovered);
         LoadStatsCache();
-        // Scan any packs that have no cached stats yet (first run, or newly added packs).
         ScanMissingStats();
+        LoadConditions();
     }
 
     // ================================================================
@@ -178,6 +185,7 @@ public static class PackManager
         _packs.Clear();
         _packs.AddRange(staged);
         SaveConfig();
+        SaveConditions();
         Util.ConflictTracker.Clear();
         TriggerFullReload();
         // Re-scan all packs (including any newly added) and persist stats.
@@ -339,6 +347,110 @@ public static class PackManager
             any = true;
         }
         if (any) SaveStatsCache();
+    }
+
+    // ================================================================
+    //  Conditional pack evaluation
+    // ================================================================
+
+    /// <summary>
+    /// Called by Plugin on <c>SceneManager.sceneLoaded</c>.
+    /// Updates the current scene name and evaluates all conditional packs.
+    /// </summary>
+    public static void OnSceneLoaded(string sceneName)
+    {
+        _currentScene = sceneName;
+        EvaluateConditionalPacks(onlyHotReload: false);
+    }
+
+    /// <summary>
+    /// Called periodically from Plugin.Update for packs with <see cref="ReloadTrigger.HotReload"/>
+    /// so that non-scene conditions (future condition types) are re-checked mid-scene.
+    /// </summary>
+    public static void PollHotReloadConditions()
+    {
+        EvaluateConditionalPacks(onlyHotReload: true);
+    }
+
+    private static void EvaluateConditionalPacks(bool onlyHotReload)
+    {
+        var conditional = _packs.Where(p =>
+            p.HasConditions &&
+            (!onlyHotReload || p.ReloadTrigger == ReloadTrigger.HotReload)).ToList();
+
+        if (conditional.Count == 0) return;
+
+        bool anyChanged = false;
+        foreach (var pack in conditional)
+        {
+            bool newActive = pack.IsEnabled && pack.EvaluateConditions(_currentScene, _packs);
+            _prevConditionalStates.TryGetValue(pack.Path, out bool prevActive);
+            if (newActive == prevActive) continue;
+
+            _prevConditionalStates[pack.Path] = newActive;
+            anyChanged = true;
+            Plugin.Logger.LogInfo(
+                $"[PackManager] '{pack.Name}' condition → {(newActive ? "active" : "inactive")} " +
+                $"(scene='{_currentScene}')");
+        }
+
+        if (anyChanged)
+        {
+            Util.ConflictTracker.Clear();
+            TriggerFullReload();
+        }
+    }
+
+    // ================================================================
+    //  Condition persistence
+    // ================================================================
+
+    /// <summary>
+    /// Reads packs-conditions.txt and restores conditions onto matching packs.
+    /// Format per line: packPath \t trigger \t logic \t cond1_serialized [\t cond2 ...]
+    /// </summary>
+    public static void LoadConditions()
+    {
+        if (!File.Exists(ConditionsPath)) return;
+        foreach (var line in File.ReadAllLines(ConditionsPath))
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+            var parts = line.Split('\t');
+            if (parts.Length < 3) continue;
+
+            var pack = _packs.Find(p =>
+                string.Equals(p.Path, parts[0], StringComparison.OrdinalIgnoreCase));
+            if (pack == null) continue;
+
+            pack.ReloadTrigger  = parts[1] == "hot" ? ReloadTrigger.HotReload : ReloadTrigger.OnSceneTransition;
+            pack.ConditionLogic = parts[2] == "and" ? LogicMode.And : LogicMode.Or;
+            pack.Conditions.Clear();
+            for (int i = 3; i < parts.Length; i++)
+            {
+                var cond = PackCondition.TryDeserialize(parts[i]);
+                if (cond != null) pack.Conditions.Add(cond);
+            }
+        }
+        Plugin.Logger.LogInfo($"[PackManager] Loaded conditions for " +
+            $"{_packs.Count(p => p.HasConditions)} pack(s)");
+    }
+
+    /// <summary>Writes current conditions for all packs that have any to packs-conditions.txt.</summary>
+    public static void SaveConditions()
+    {
+        var lines = new List<string>
+        {
+            "# Patchwork Pack Conditions — auto-generated, do not edit manually",
+            "# Format: packPath \\t trigger \\t logic \\t cond1 [\\t cond2 ...]"
+        };
+        foreach (var p in _packs.Where(q => q.HasConditions))
+        {
+            string trigger = p.ReloadTrigger == ReloadTrigger.HotReload ? "hot" : "scene";
+            string logic   = p.ConditionLogic == LogicMode.And ? "and" : "or";
+            string condStr = string.Join("\t", p.Conditions.Select(c => c.Serialize()));
+            lines.Add($"{p.Path}\t{trigger}\t{logic}\t{condStr}");
+        }
+        File.WriteAllLines(ConditionsPath, lines);
     }
 
     // ================================================================
