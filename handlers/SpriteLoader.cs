@@ -213,7 +213,7 @@ public static class SpriteLoader
                 tex2d.width, tex2d.height, 0,
                 RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             Graphics.Blit(tex2d, rt);
-            Object.Destroy(tex2d);
+            UnityEngine.Object.Destroy(tex2d);
             return new SpritesheetResult { Texture = rt, FromCustom = true };
         }
 
