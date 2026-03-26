@@ -503,6 +503,14 @@ public static partial class T2DLoader
         SkippedTextureIds.Clear();
         T2DUtil.ClearCleanNameCache();
 
+        // Clear tracking state so stale renderer/sprite associations from the old pack
+        // cannot interfere with the new one.  Renderers will be re-tracked as HandleLoad
+        // processes them in the sweep below.
+        _knownRenderers.Clear();
+        _knownImages.Clear();
+        _confirmedSpriteNames.Clear();
+        _trackedSpriteNames.Clear();
+
         // Rebuild everything from disk
         PreloadAllTextures();
         Plugin.Logger.LogInfo($"[T2D-Reload] After PreloadAllTextures: " +
