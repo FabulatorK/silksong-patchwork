@@ -407,7 +407,7 @@ public static class PackManagerWindow
 
         GUILayout.BeginHorizontal();
         if (indent > 0) GUILayout.Space(indent);
-        GUILayout.BeginVertical(GUIHelper.BoxStyle);
+        GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
         foreach (var (value, displayName) in PackCondition.KnownNailLevels)
         {
             bool selected = string.Equals(cond.Value, value, System.StringComparison.OrdinalIgnoreCase);
@@ -455,7 +455,7 @@ public static class PackManagerWindow
 
         GUILayout.BeginHorizontal();
         if (indent > 0) GUILayout.Space(indent);
-        GUILayout.BeginVertical(GUIHelper.BoxStyle, GUIHelper.Width(280));
+        GUILayout.BeginVertical(UnityEngine.GUI.skin.box, GUIHelper.Width(280));
         {
             // Search box
             GUILayout.BeginHorizontal();
