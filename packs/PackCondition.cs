@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Patchwork.Util;
 
 namespace Patchwork.Packs;
 
@@ -10,6 +11,7 @@ public enum ConditionType
     PackActive,     // another pack (by display name) is enabled
     CrestEquipped,  // player currently has a specific crest equipped
     NailUpgrade,    // player's nail upgrade level (0–4); value supports >=/<=/>/< prefix
+    PlayerData,     // generic PlayerData field check; value: "fieldName" (bool) or "fieldName >= target"
 }
 
 /// <summary>How a condition joins with the next one in the list (per-pair, not global).</summary>
@@ -43,6 +45,8 @@ public class PackCondition
                 CrestMatches(HeroController.instance?.playerData?.CurrentCrestID, Value),
             ConditionType.NailUpgrade =>
                 NailUpgradeMatches(HeroController.instance?.playerData?.nailUpgrades ?? 0, Value),
+            ConditionType.PlayerData =>
+                EvaluatePlayerData(HeroController.instance?.playerData, Value),
             _ => true
         };
         return Negate ? !result : result;
@@ -75,6 +79,97 @@ public class PackCondition
             "<"  => actual <  target,
             _    => actual == target,
         };
+    }
+
+    // ================================================================
+    //  PlayerData generic condition
+    // ================================================================
+
+    /// <summary>
+    /// Evaluates a generic PlayerData expression.
+    /// Format: "fieldName" (bool — true if field is true/non-zero/non-empty)
+    ///      or "fieldName [op] target" where op ∈ == != >= <= > &lt;
+    /// </summary>
+    private static bool EvaluatePlayerData(PlayerData pd, string expr)
+    {
+        if (pd == null || string.IsNullOrEmpty(expr)) return false;
+
+        if (!TryParseFieldExpr(expr, out string fieldName, out string op, out string target))
+            return false;
+
+        object val = PlayerDataCatalog.GetValue(pd, fieldName);
+        if (val == null) return false;
+
+        // bool shorthand: no operator → true if truthy
+        if (op == null)
+        {
+            if (val is bool b)  return b;
+            if (val is int  i)  return i != 0;
+            if (val is float f) return f != 0f;
+            if (val is string s) return !string.IsNullOrEmpty(s);
+            return false;
+        }
+
+        return CompareValue(val, op, target);
+    }
+
+    /// <summary>Splits "fieldName op target" into its parts. Returns false if expr is just a field name (bool shorthand).</summary>
+    private static bool TryParseFieldExpr(string expr, out string fieldName, out string op, out string target)
+    {
+        fieldName = expr.Trim();
+        op        = null;
+        target    = null;
+
+        // Try operators longest-first to avoid prefix collisions (>= before >)
+        string[] ops = { ">=", "<=", "!=", ">", "<", "==" };
+        foreach (var o in ops)
+        {
+            int idx = expr.IndexOf(o, StringComparison.Ordinal);
+            if (idx < 0) continue;
+            fieldName = expr.Substring(0, idx).Trim();
+            op        = o;
+            target    = expr.Substring(idx + o.Length).Trim();
+            return true;
+        }
+        return false; // bool shorthand
+    }
+
+    private static bool CompareValue(object val, string op, string target)
+    {
+        if (val is bool b)
+        {
+            bool t = target.Equals("true", System.StringComparison.OrdinalIgnoreCase) || target == "1";
+            return op switch { "==" => b == t, "!=" => b != t, _ => b == t };
+        }
+        if (val is int i)
+        {
+            if (!int.TryParse(target, out int t)) return false;
+            return op switch
+            {
+                ">=" => i >= t, "<=" => i <= t, "!=" => i != t,
+                ">"  => i >  t, "<"  => i <  t, _    => i == t,
+            };
+        }
+        if (val is float f)
+        {
+            if (!float.TryParse(target, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float t)) return false;
+            return op switch
+            {
+                ">=" => f >= t, "<=" => f <= t, "!=" => f != t,
+                ">"  => f >  t, "<"  => f <  t, _    => f == t,
+            };
+        }
+        if (val is string s)
+        {
+            int cmp = string.Compare(s, target, System.StringComparison.OrdinalIgnoreCase);
+            return op switch
+            {
+                ">=" => cmp >= 0, "<=" => cmp <= 0, "!=" => cmp != 0,
+                ">"  => cmp >  0, "<"  => cmp <  0, _    => cmp == 0,
+            };
+        }
+        return false;
     }
 
     private static int ParseNailLevel(string s) => s.ToLowerInvariant() switch
@@ -169,6 +264,7 @@ public class PackCondition
         ConditionType.PackActive    => "pack",
         ConditionType.CrestEquipped => "crest",
         ConditionType.NailUpgrade   => "nail",
+        ConditionType.PlayerData    => "pd",
         _                           => type.ToString()
     };
 
@@ -197,6 +293,7 @@ public class PackCondition
             "pack"   => ConditionType.PackActive,
             "crest"  => ConditionType.CrestEquipped,
             "nail"   => ConditionType.NailUpgrade,
+            "pd"     => ConditionType.PlayerData,
             _        => ConditionType.Scene,
         };
         bool negate = parts[1] == "1";

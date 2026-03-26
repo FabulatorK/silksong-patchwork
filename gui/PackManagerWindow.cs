@@ -33,6 +33,10 @@ public static class PackManagerWindow
     // ID of the currently open inline type-dropdown (null = none open).
     private static string _openDropdownId = null;
 
+    // PlayerData condition search state
+    private static string  _pdSearch    = "";
+    private static Vector2 _pdScrollPos = Vector2.zero;
+
     // ── Condition-editor layout constants ─────────────────────────────
     // Conditions sit 2 indent columns to the right.
     // OR buttons live in column 1 (outer), AND buttons in column 2 (inner).
@@ -344,6 +348,20 @@ public static class PackManagerWindow
                 _openDropdownId = nailOpen ? null : nailDropId;
             UnityEngine.GUI.contentColor = Color.white;
         }
+        else if (cond.Type == ConditionType.PlayerData)
+        {
+            string pdDropId = $"Patchwork.PdVal.{pack.Path}.{ci}";
+            bool   pdOpen   = _openDropdownId == pdDropId;
+            // Show short label: just the field name (before any operator)
+            string displayVal = string.IsNullOrEmpty(cond.Value) ? "—" : cond.Value.Split(' ')[0];
+            if (pdOpen) UnityEngine.GUI.contentColor = kJoinHl;
+            if (GUILayout.Button("…", GUIHelper.ButtonStyle, GUIHelper.Width(28)))
+                _openDropdownId = pdOpen ? null : pdDropId;
+            UnityEngine.GUI.contentColor = Color.white;
+            string newVal = GUIHelper.TextField(
+                $"Patchwork.PdExpr.{pack.Path}.{ci}", cond.Value, GUIHelper.Width(114));
+            if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
+        }
         else
         {
             string newVal = GUIHelper.TextField(
@@ -419,6 +437,56 @@ public static class PackManagerWindow
             if (GUILayout.Button(displayName, GUIHelper.ButtonStyle))
             { cond.Value = id; _openDropdownId = null; PackManager.SaveConditions(); }
             UnityEngine.GUI.contentColor = Color.white;
+        }
+        GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
+    }
+
+    /// <summary>
+    /// Renders the PlayerData field-search dropdown for condition <paramref name="ci"/> if open.
+    /// Shows a search text box and a scrollable filtered list of PlayerData fields.
+    /// Clicking a field sets cond.Value to "fieldName" (bool) or "fieldName >= " (numeric/string).
+    /// </summary>
+    private static void DrawPdDropdownIfOpen(PackInfo pack, int ci, float indent = 0f)
+    {
+        string dropId = $"Patchwork.PdVal.{pack.Path}.{ci}";
+        if (_openDropdownId != dropId) return;
+        var cond = pack.Conditions[ci];
+
+        GUILayout.BeginHorizontal();
+        if (indent > 0) GUILayout.Space(indent);
+        GUILayout.BeginVertical(GUIHelper.BoxStyle, GUIHelper.Width(280));
+        {
+            // Search box
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Search:", GUIHelper.LabelStyle, GUIHelper.Width(52));
+            string newSearch = GUIHelper.TextField("Patchwork.PdSearch", _pdSearch, GUIHelper.Width(200));
+            if (newSearch != _pdSearch) { _pdSearch = newSearch; _pdScrollPos = Vector2.zero; }
+            GUILayout.EndHorizontal();
+
+            // Scrollable field list — cap at 60 results, list height 200px
+            var results = PlayerDataCatalog.Search(_pdSearch);
+            int count = 0;
+            _pdScrollPos = GUILayout.BeginScrollView(_pdScrollPos, GUIHelper.Width(272), GUILayout.Height(200));
+            foreach (var entry in results)
+            {
+                if (count++ >= 60) break;
+                GUILayout.BeginHorizontal();
+                UnityEngine.GUI.contentColor = new Color(0.65f, 0.85f, 1f);
+                GUILayout.Label($"[{entry.TypeLabel}]", GUIHelper.LabelStyle, GUIHelper.Width(44));
+                UnityEngine.GUI.contentColor = Color.white;
+                if (GUILayout.Button(entry.Name, GUIHelper.ButtonStyle))
+                {
+                    // For bool: set value to just the field name; for others: field >=
+                    cond.Value = entry.FieldType == typeof(bool)
+                        ? entry.Name
+                        : $"{entry.Name} >= ";
+                    _openDropdownId = null;
+                    PackManager.SaveConditions();
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndScrollView();
         }
         GUILayout.EndVertical();
         GUILayout.EndHorizontal();
@@ -531,6 +599,7 @@ public static class PackManagerWindow
                             DrawDropdownIfOpen(pack, ci, kAndColW);
                             DrawCrestValueDropdownIfOpen(pack, ci, kAndColW);
                             DrawNailValueDropdownIfOpen(pack, ci, kAndColW);
+                            DrawPdDropdownIfOpen(pack, ci, kAndColW);
                         }
                         GUILayout.EndVertical();
                     }
@@ -548,6 +617,7 @@ public static class PackManagerWindow
                     DrawDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
                     DrawCrestValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
                     DrawNailValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
+                    DrawPdDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
                 }
             }
 
