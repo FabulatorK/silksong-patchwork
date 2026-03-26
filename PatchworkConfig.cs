@@ -70,6 +70,14 @@ public class PatchworkConfig
     // GC every N scenes during full dump
     private readonly ConfigEntry<int> _GCEveryNScenes;
     public int GCEveryNScenes { get { return _GCEveryNScenes.Value; } }
+
+    private readonly ConfigEntry<int> _HeapReserveMB;
+    /// <summary>
+    /// MB to pre-allocate at startup to raise the Mono GC's high-water mark.
+    /// -1 = auto (25% of system RAM, capped at 512 MB). 0 = disabled.
+    /// </summary>
+    public int HeapReserveMB => _HeapReserveMB.Value;
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -98,5 +106,10 @@ public class PatchworkConfig
         _AnimationControllerFreezeKey = config.Bind("Keybinds", "AnimationControllerFreezeKey", UnityEngine.KeyCode.End, "Key to freeze/unfreeze the object of the selected animator in the animation controller.");
 
         _GCEveryNScenes = config.Bind("Dumping", "GCEveryNScenes", 10, "Run garbage collection every N scenes during full dump. Lower = more stable but slower.");
+
+        _HeapReserveMB = config.Bind("Performance", "HeapReserveMB", -1,
+            "Mono heap reserve in MB. Pre-allocates this much memory at startup to raise the GC's " +
+            "high-water mark, reducing mid-gameplay stutter from heap-growth collections when custom " +
+            "asset packs are loaded. -1 = auto (25% of system RAM, capped at 512 MB). 0 = disabled.");
     }
 }

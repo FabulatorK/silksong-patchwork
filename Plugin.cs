@@ -46,6 +46,13 @@ public class Plugin : BaseUnityPlugin
         Config = new PatchworkConfig(base.Config);
         Logger.LogInfo($"Patchwork is loaded! Version: {MyPluginInfo.PLUGIN_VERSION}");
 
+        int reserveMb = Config.HeapReserveMB < 0 ? GcUtil.SuggestReserveMB() : Config.HeapReserveMB;
+        if (reserveMb > 0)
+        {
+            Logger.LogInfo($"[GC] Pre-warming Mono heap: {reserveMb} MB (system RAM: {UnityEngine.SystemInfo.systemMemorySize} MB)");
+            GcUtil.PrewarmHeap((long)reserveMb * 1024 * 1024);
+        }
+
         // Detect conflicting plugins that patch the same sprite hooks.
         foreach (var pluginInfo in BepInEx.Bootstrap.Chainloader.PluginInfos)
         {
@@ -106,6 +113,7 @@ public class Plugin : BaseUnityPlugin
         SceneManager.sceneLoaded += (scene, mode) => StartCoroutine(T2DLoader.WarmSprites());
 
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
+        SceneManager.sceneUnloaded += _ => GcUtil.CollectAtTransition();
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);
         harmony.PatchAll();
