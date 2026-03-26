@@ -39,9 +39,9 @@ public static class PackManagerWindow
 
     // ── Condition-editor layout constants ─────────────────────────────
     // Conditions sit 2 indent columns to the right.
-    // OR buttons live in column 1 (outer), AND buttons in column 2 (inner).
-    private const  float kOrColW         = 38f;
+    // AND buttons live in column 1 (outer), OR buttons in column 2 (inner).
     private const  float kAndColW        = 38f;
+    private const  float kOrColW         = 38f;
     private static readonly Color kJoinHl = new Color(0.45f, 0.85f, 1f); // highlighted join button
 
     // 1×1 texture used to draw the AND-group bracket line.
@@ -525,17 +525,17 @@ public static class PackManagerWindow
 
             // ── Condition rows ─────────────────────────────────────
             // Two-column indent before each condition:
-            //   Column 1 (kOrColW)  — "or"  button when the preceding join is OR
-            //   Column 2 (kAndColW) — "and" button when the preceding join is AND
+            //   Column 1 (kAndColW) — "and" button when the preceding join is AND
+            //   Column 2 (kOrColW)  — "or"  button when the preceding join is OR
             // An AND-group (two or more consecutive AND-joined conditions) is wrapped
-            // in a horizontal that prefixes a thin bracket bar and shifts the AND
-            // buttons into column 2.  Clicking a join button toggles it (and/or),
-            // which moves it between columns on the next frame.
+            // in a bracket bar that runs down the far-left of the whole group, with
+            // the AND buttons in column 1 and OR button in column 2 of the first row.
+            // Clicking a join button toggles it (and/or) on the next frame.
             //
-            //   [space ][space ][condition A]         ← first, no join button
-            //   [  or  ][space ][condition B]         ← B's entry join is OR
-            //   [  or  ][bracket][space ][condition C] ─┐ C & D share an AND-clause
-            //            [      ][  and ][condition D] ─┘ (bracket spans both rows)
+            //   [space ][space ][condition A]                  ← first, no join button
+            //   [space ][  or  ][condition B]                  ← B's entry join is OR
+            //   [bracket][space ][  or  ][condition C] ─┐      ← C & D share an AND-clause
+            //   [bracket][  and ][space ][condition D] ─┘      (bracket spans both rows)
 
             var clauses  = BuildClauses(pack.Conditions);
             int removeAt = -1;
@@ -547,29 +547,16 @@ public static class PackManagerWindow
                 bool isGroup      = clause.Count > 1;
                 int  entryJoinIdx = isFirst ? -1 : clause[0] - 1;
 
-                GUILayout.BeginHorizontal();
+                if (isGroup)
                 {
-                    // ── Column 1: OR button (inter-clause join) ───
-                    if (!isFirst)
+                    // AND group: bracket on far left spanning the full group height,
+                    // then a vertical block of rows — each row has [AND col][OR col][content].
+                    GUILayout.BeginHorizontal();
                     {
-                        UnityEngine.GUI.contentColor = kJoinHl; // the inter-clause join is always Or
-                        if (GUILayout.Button("or", GUIHelper.ButtonStyle, GUIHelper.Width(kOrColW)))
-                        { pack.Conditions[entryJoinIdx].JoinNext = LogicJoin.And; PackManager.SaveConditions(); }
-                        UnityEngine.GUI.contentColor = Color.white;
-                    }
-                    else
-                    {
-                        GUILayout.Space(kOrColW);
-                    }
-
-                    // ── Column 2 + conditions ─────────────────────
-                    if (isGroup)
-                    {
-                        // Bracket: thin coloured bar spanning the full AND-group height
                         var prevBg = UnityEngine.GUI.backgroundColor;
                         UnityEngine.GUI.backgroundColor = new Color(0.45f, 0.7f, 0.9f, 0.85f);
                         GUILayout.Box("", BracketStyle,
-                            GUILayout.Width(3), GUILayout.ExpandHeight(true));
+                            GUILayout.Width(4), GUILayout.ExpandHeight(true));
                         UnityEngine.GUI.backgroundColor = prevBg;
                         GUILayout.Space(2);
 
@@ -582,9 +569,10 @@ public static class PackManagerWindow
 
                             GUILayout.BeginHorizontal();
                             {
+                                // Column 1: AND button (intra-group) or space
                                 if (!firstInGroup)
                                 {
-                                    UnityEngine.GUI.contentColor = kJoinHl; // always And within the group
+                                    UnityEngine.GUI.contentColor = kJoinHl;
                                     if (GUILayout.Button("and", GUIHelper.ButtonStyle, GUIHelper.Width(kAndColW)))
                                     { pack.Conditions[intraJoin].JoinNext = LogicJoin.Or; PackManager.SaveConditions(); }
                                     UnityEngine.GUI.contentColor = Color.white;
@@ -593,31 +581,60 @@ public static class PackManagerWindow
                                 {
                                     GUILayout.Space(kAndColW);
                                 }
+
+                                // Column 2: OR button (inter-clause) on first row only
+                                if (firstInGroup && !isFirst)
+                                {
+                                    UnityEngine.GUI.contentColor = kJoinHl;
+                                    if (GUILayout.Button("or", GUIHelper.ButtonStyle, GUIHelper.Width(kOrColW)))
+                                    { pack.Conditions[entryJoinIdx].JoinNext = LogicJoin.And; PackManager.SaveConditions(); }
+                                    UnityEngine.GUI.contentColor = Color.white;
+                                }
+                                else
+                                {
+                                    GUILayout.Space(kOrColW);
+                                }
+
                                 DrawConditionContent(pack, ci, ref removeAt);
                             }
                             GUILayout.EndHorizontal();
-                            DrawDropdownIfOpen(pack, ci, kAndColW);
-                            DrawCrestValueDropdownIfOpen(pack, ci, kAndColW);
-                            DrawNailValueDropdownIfOpen(pack, ci, kAndColW);
-                            DrawPdDropdownIfOpen(pack, ci, kAndColW);
+                            DrawDropdownIfOpen(pack, ci, kAndColW + kOrColW);
+                            DrawCrestValueDropdownIfOpen(pack, ci, kAndColW + kOrColW);
+                            DrawNailValueDropdownIfOpen(pack, ci, kAndColW + kOrColW);
+                            DrawPdDropdownIfOpen(pack, ci, kAndColW + kOrColW);
                         }
                         GUILayout.EndVertical();
                     }
-                    else
+                    GUILayout.EndHorizontal();
+                }
+                else
+                {
+                    // Single-condition clause
+                    GUILayout.BeginHorizontal();
                     {
-                        // Single-condition clause — just indent column 2 and show content
+                        // Column 1: space (no AND for single conditions)
                         GUILayout.Space(kAndColW);
+
+                        // Column 2: OR button (inter-clause) or space
+                        if (!isFirst)
+                        {
+                            UnityEngine.GUI.contentColor = kJoinHl;
+                            if (GUILayout.Button("or", GUIHelper.ButtonStyle, GUIHelper.Width(kOrColW)))
+                            { pack.Conditions[entryJoinIdx].JoinNext = LogicJoin.And; PackManager.SaveConditions(); }
+                            UnityEngine.GUI.contentColor = Color.white;
+                        }
+                        else
+                        {
+                            GUILayout.Space(kOrColW);
+                        }
+
                         DrawConditionContent(pack, clause[0], ref removeAt);
                     }
-                }
-                GUILayout.EndHorizontal();
-
-                if (!isGroup)
-                {
-                    DrawDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
-                    DrawCrestValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
-                    DrawNailValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
-                    DrawPdDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
+                    GUILayout.EndHorizontal();
+                    DrawDropdownIfOpen(pack, clause[0], kAndColW + kOrColW);
+                    DrawCrestValueDropdownIfOpen(pack, clause[0], kAndColW + kOrColW);
+                    DrawNailValueDropdownIfOpen(pack, clause[0], kAndColW + kOrColW);
+                    DrawPdDropdownIfOpen(pack, clause[0], kAndColW + kOrColW);
                 }
             }
 
@@ -626,13 +643,31 @@ public static class PackManagerWindow
 
             GUIHelper.Space(2);
 
-            // ── Bottom bar: Add condition + Done ──────────────────
+            // ── Ghost "add condition" row ──────────────────────────
+            // Looks like an empty condition with muted colours; clicking the type
+            // chip (the only interactive element) appends a new default condition.
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("+ Add condition", GUIHelper.ButtonStyle))
-            { pack.Conditions.Add(new PackCondition()); PackManager.SaveConditions(); }
+            {
+                GUILayout.Space(kAndColW + kOrColW);
+                UnityEngine.GUI.contentColor = new Color(0.45f, 1f, 0.55f, 0.7f);
+                if (GUILayout.Button("+ scene", GUIHelper.ButtonStyle, GUIHelper.Width(62)))
+                { pack.Conditions.Add(new PackCondition()); PackManager.SaveConditions(); }
+                UnityEngine.GUI.contentColor = Color.white;
+                UnityEngine.GUI.enabled = false;
+                UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, 0.2f);
+                GUILayout.Button("==", GUIHelper.ButtonStyle, GUIHelper.Width(30));
+                GUILayout.Button("———", GUIHelper.ButtonStyle, GUIHelper.Width(146));
+                GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(22));
+                UnityEngine.GUI.enabled = true;
+                UnityEngine.GUI.contentColor = Color.white;
+            }
+            GUILayout.EndHorizontal();
 
+            GUIHelper.Space(2);
+
+            // ── Done button ───────────────────────────────────────
+            GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-
             if (GUILayout.Button("Done", GUIHelper.ButtonStyle, GUIHelper.Width(50)))
             {
                 _conditionsOpen.Remove(pack.Path);
