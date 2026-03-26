@@ -9,6 +9,7 @@ public enum ConditionType
     SceneContains,  // active scene name contains value
     PackActive,     // another pack (by display name) is enabled
     CrestEquipped,  // player currently has a specific crest equipped
+    NailUpgrade,    // player's nail upgrade level (0–4); value supports >=/<=/>/< prefix
 }
 
 /// <summary>How a condition joins with the next one in the list (per-pair, not global).</summary>
@@ -40,10 +41,51 @@ public class PackCondition
                     string.Equals(p.Name, Value, System.StringComparison.OrdinalIgnoreCase)),
             ConditionType.CrestEquipped =>
                 CrestMatches(HeroController.instance?.playerData?.CurrentCrestID, Value),
+            ConditionType.NailUpgrade =>
+                NailUpgradeMatches(HeroController.instance?.playerData?.nailUpgrades ?? 0, Value),
             _ => true
         };
         return Negate ? !result : result;
     }
+
+    /// <summary>
+    /// Returns true if the player's nail upgrade level satisfies the value expression.
+    /// Value format: [operator]level, where operator is optional (default ==).
+    /// Supported operators: == >= <= > &lt;
+    /// Level can be numeric (0–4) or named: old sharpened channelled coiled pure
+    /// Examples: "pure", ">=channelled", ">1", "<=coiled"
+    /// </summary>
+    private static bool NailUpgradeMatches(int actual, string value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        string rest = value.Trim();
+        string op   = "==";
+        if      (rest.StartsWith(">=")) { op = ">="; rest = rest.Substring(2); }
+        else if (rest.StartsWith("<=")) { op = "<="; rest = rest.Substring(2); }
+        else if (rest.StartsWith(">"))  { op = ">";  rest = rest.Substring(1); }
+        else if (rest.StartsWith("<"))  { op = "<";  rest = rest.Substring(1); }
+        else if (rest.StartsWith("==")) { op = "=="; rest = rest.Substring(2); }
+        int target = ParseNailLevel(rest.Trim());
+        if (target < 0) return false;
+        return op switch
+        {
+            ">=" => actual >= target,
+            "<=" => actual <= target,
+            ">"  => actual >  target,
+            "<"  => actual <  target,
+            _    => actual == target,
+        };
+    }
+
+    private static int ParseNailLevel(string s) => s.ToLowerInvariant() switch
+    {
+        "0" or "old"         => 0,
+        "1" or "sharpened"   => 1,
+        "2" or "channelled"  => 2,
+        "3" or "coiled"      => 3,
+        "4" or "pure"        => 4,
+        _ => int.TryParse(s, out int n) && n >= 0 ? n : -1,
+    };
 
     /// <summary>
     /// Returns true if <paramref name="currentID"/> matches <paramref name="value"/>.
@@ -93,6 +135,32 @@ public class PackCondition
         return id;
     }
 
+    /// <summary>
+    /// Preset nail upgrade picker entries. Value is stored as-is in the condition;
+    /// DisplayName is shown in the Pack Manager picker dropdown.
+    /// </summary>
+    public static readonly (string Value, string DisplayName)[] KnownNailLevels =
+    {
+        ("pure",         "Pure Nail"),
+        ("coiled",       "Coiled Nail"),
+        ("channelled",   "Channelled Nail"),
+        ("sharpened",    "Sharpened Nail"),
+        ("old",          "Old Nail"),
+        (">=pure",       "≥ Pure Nail"),
+        (">=coiled",     "≥ Coiled Nail"),
+        (">=channelled", "≥ Channelled Nail"),
+        (">=sharpened",  "≥ Sharpened Nail"),
+    };
+
+    /// <summary>Returns the display name for a known nail value, or the raw value if custom.</summary>
+    public static string NailDisplayValue(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "—";
+        foreach (var (val, name) in KnownNailLevels)
+            if (string.Equals(val, value, System.StringComparison.OrdinalIgnoreCase)) return name;
+        return value;
+    }
+
     /// <summary>Maps a <see cref="ConditionType"/> to its short display label.</summary>
     public static string LabelFor(ConditionType type) => type switch
     {
@@ -100,6 +168,7 @@ public class PackCondition
         ConditionType.SceneContains => "scene~",
         ConditionType.PackActive    => "pack",
         ConditionType.CrestEquipped => "crest",
+        ConditionType.NailUpgrade   => "nail",
         _                           => type.ToString()
     };
 
@@ -127,6 +196,7 @@ public class PackCondition
             "scene~" => ConditionType.SceneContains,
             "pack"   => ConditionType.PackActive,
             "crest"  => ConditionType.CrestEquipped,
+            "nail"   => ConditionType.NailUpgrade,
             _        => ConditionType.Scene,
         };
         bool negate = parts[1] == "1";

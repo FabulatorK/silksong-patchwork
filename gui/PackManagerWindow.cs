@@ -323,7 +323,7 @@ public static class PackManagerWindow
         if (GUILayout.Button(negLabel, GUIHelper.ButtonStyle, GUIHelper.Width(30)))
         { cond.Negate = !cond.Negate; PackManager.SaveConditions(); }
 
-        // Value input: crest picker for CrestEquipped, free text for everything else
+        // Value input: picker for CrestEquipped/NailUpgrade, free text for everything else
         if (cond.Type == ConditionType.CrestEquipped)
         {
             string crestDropId = $"Patchwork.CrestVal.{pack.Path}.{ci}";
@@ -332,6 +332,16 @@ public static class PackManagerWindow
             if (crestOpen) UnityEngine.GUI.contentColor = kJoinHl;
             if (GUILayout.Button(displayVal, GUIHelper.ButtonStyle, GUIHelper.Width(146)))
                 _openDropdownId = crestOpen ? null : crestDropId;
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+        else if (cond.Type == ConditionType.NailUpgrade)
+        {
+            string nailDropId = $"Patchwork.NailVal.{pack.Path}.{ci}";
+            bool   nailOpen   = _openDropdownId == nailDropId;
+            string displayVal = PackCondition.NailDisplayValue(cond.Value);
+            if (nailOpen) UnityEngine.GUI.contentColor = kJoinHl;
+            if (GUILayout.Button(displayVal, GUIHelper.ButtonStyle, GUIHelper.Width(146)))
+                _openDropdownId = nailOpen ? null : nailDropId;
             UnityEngine.GUI.contentColor = Color.white;
         }
         else
@@ -364,6 +374,28 @@ public static class PackManagerWindow
             if (cond.Type == t) UnityEngine.GUI.contentColor = kJoinHl;
             if (GUILayout.Button(tLabel, GUIHelper.ButtonStyle))
             { cond.Type = t; _openDropdownId = null; PackManager.SaveConditions(); }
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+        GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
+    }
+
+    /// <summary>Renders the inline nail-level picker for condition <paramref name="ci"/> if open.</summary>
+    private static void DrawNailValueDropdownIfOpen(PackInfo pack, int ci, float indent = 0f)
+    {
+        string dropId = $"Patchwork.NailVal.{pack.Path}.{ci}";
+        if (_openDropdownId != dropId) return;
+        var cond = pack.Conditions[ci];
+
+        GUILayout.BeginHorizontal();
+        if (indent > 0) GUILayout.Space(indent);
+        GUILayout.BeginVertical(GUIHelper.BoxStyle);
+        foreach (var (value, displayName) in PackCondition.KnownNailLevels)
+        {
+            bool selected = string.Equals(cond.Value, value, System.StringComparison.OrdinalIgnoreCase);
+            if (selected) UnityEngine.GUI.contentColor = kJoinHl;
+            if (GUILayout.Button(displayName, GUIHelper.ButtonStyle))
+            { cond.Value = value; _openDropdownId = null; PackManager.SaveConditions(); }
             UnityEngine.GUI.contentColor = Color.white;
         }
         GUILayout.EndVertical();
@@ -498,6 +530,7 @@ public static class PackManagerWindow
                             GUILayout.EndHorizontal();
                             DrawDropdownIfOpen(pack, ci, kAndColW);
                             DrawCrestValueDropdownIfOpen(pack, ci, kAndColW);
+                            DrawNailValueDropdownIfOpen(pack, ci, kAndColW);
                         }
                         GUILayout.EndVertical();
                     }
@@ -514,6 +547,7 @@ public static class PackManagerWindow
                 {
                     DrawDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
                     DrawCrestValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
+                    DrawNailValueDropdownIfOpen(pack, clause[0], kOrColW + kAndColW);
                 }
             }
 
