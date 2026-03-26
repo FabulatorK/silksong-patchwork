@@ -119,14 +119,14 @@ public static partial class T2DLoader
                 try
                 {
                     byte[] pngData = File.ReadAllBytes(file);
-                    Texture2D temp = new(2, 2);
-                    if (temp.LoadImage(pngData))
+                    if (!TryReadPngDimensions(pngData, out int w, out int h))
                     {
-                        SpritesheetOverrides[rawName] = (pngData, temp.width, temp.height);
-                        _sheetProviders[rawName] = sourcePack;
-                        Plugin.Logger.LogInfo($"[T2D] Loaded spritesheet override: '{rawName}' ({temp.width}x{temp.height})");
+                        Plugin.Logger.LogWarning($"[T2D] Could not read PNG dimensions for spritesheet '{rawName}', skipping.");
+                        continue;
                     }
-                    Object.Destroy(temp);
+                    SpritesheetOverrides[rawName] = (pngData, w, h);
+                    _sheetProviders[rawName] = sourcePack;
+                    Plugin.Logger.LogInfo($"[T2D] Loaded spritesheet override: '{rawName}' ({w}x{h})");
                 }
                 catch (System.Exception ex)
                 {
@@ -138,6 +138,25 @@ public static partial class T2DLoader
         ScanDirectory(AtlasLoadPath, null);
         foreach (var packPath in Plugin.PluginPackPaths)
             ScanDirectory(Path.Combine(packPath, "Spritesheets", "T2D"), packPath);
+    }
+
+    /// <summary>
+    /// Reads PNG image dimensions from the IHDR chunk without decoding the image or touching the GPU.
+    /// PNG spec: 8-byte signature, then IHDR chunk (4-byte length, 4-byte type tag,
+    /// 4-byte width, 4-byte height — all big-endian uint32).
+    /// </summary>
+    private static bool TryReadPngDimensions(byte[] data, out int width, out int height)
+    {
+        width = height = 0;
+        // Minimum valid size: 8 (sig) + 4 (len) + 4 (IHDR) + 4 (w) + 4 (h) = 24 bytes
+        if (data == null || data.Length < 24) return false;
+        // Verify PNG signature: \x89 P N G \r \n \x1a \n
+        if (data[0] != 0x89 || data[1] != 0x50 || data[2] != 0x4E || data[3] != 0x47 ||
+            data[4] != 0x0D || data[5] != 0x0A || data[6] != 0x1A || data[7] != 0x0A)
+            return false;
+        width  = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
+        height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
+        return width > 0 && height > 0;
     }
 
     /// <summary>

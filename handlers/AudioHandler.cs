@@ -19,6 +19,16 @@ public static class AudioHandler
     // Never cleared — lets Reload() restore the vanilla clip when a pack is disabled.
     private static readonly Dictionary<int, AudioClip> _originalClips = new();
 
+    // Reverse index: sound name (no extension, case-insensitive) → full file path.
+    // Built lazily on first use and rebuilt at the start of every Reload().
+    // Turns per-clip Directory.GetFiles scans into O(1) lookups.
+    private static readonly Dictionary<string, string> _soundIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static bool _indexBuilt;
+
+    /// <summary>True when at least one audio replacement file exists across all active packs.</summary>
+    public static bool HasAudioReplacements => _indexBuilt && _soundIndex.Count > 0;
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -67,6 +77,13 @@ public static class AudioHandler
 
     public static void Reload()
     {
+        RebuildSoundIndex();
+
+        // If there are no replacement files and no previously-loaded clips to restore,
+        // skip the expensive FindObjectsOfTypeAll pass entirely.
+        if (!HasAudioReplacements && LoadedClips.Count == 0)
+            return;
+
         // Clear cache so clips are re-read from disk on this reload pass.
         LoadedClips.Clear();
 
@@ -93,6 +110,31 @@ public static class AudioHandler
 
             AudioList.LogAudio(source);
         }
+    }
+
+    private static void RebuildSoundIndex()
+    {
+        _soundIndex.Clear();
+        _indexBuilt = true;
+
+        void ScanDir(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (var file in Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories))
+            {
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                if (ext != ".ogg" && ext != ".wav" && ext != ".mp3" &&
+                    ext != ".aiff" && ext != ".aif")
+                    continue;
+                string name = Path.GetFileNameWithoutExtension(file);
+                if (!_soundIndex.ContainsKey(name))
+                    _soundIndex[name] = file;
+            }
+        }
+
+        ScanDir(SoundFolder);
+        foreach (var packPath in Plugin.PluginPackPaths)
+            ScanDir(Path.Combine(packPath, "Sounds"));
     }
 
     public static void LoadAudio(AudioSource source)
@@ -174,19 +216,7 @@ public static class AudioHandler
 
     static string GetSoundPath(string soundName)
     {
-        var files = Directory.GetFiles(SoundFolder, $"{soundName}.*", SearchOption.AllDirectories);
-        if (files.Length > 0)
-            return files[0];
-
-        foreach (var packPath in Plugin.PluginPackPaths)
-        {
-            string packSoundsDir = Path.Combine(packPath, "Sounds");
-            if (!Directory.Exists(packSoundsDir))
-                continue;
-            var packFiles = Directory.GetFiles(packSoundsDir, $"{soundName}.*", SearchOption.AllDirectories);
-            if (packFiles.Length > 0)
-                return packFiles[0];
-        }
-        return null;
+        if (!_indexBuilt) RebuildSoundIndex();
+        return _soundIndex.TryGetValue(soundName, out var path) ? path : null;
     }
 }
