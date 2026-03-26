@@ -20,6 +20,7 @@ public static class T2DHandler
 
     private static void PerfTickFrame()
     {
+        if (!Plugin.ShowDevProfiler) return;
         int frame = Time.frameCount;
         if (frame != _perfLastFrame)
         {
