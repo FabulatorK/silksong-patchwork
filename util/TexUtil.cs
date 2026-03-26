@@ -40,4 +40,27 @@ public static class TexUtil
         }
         return tex;
     }
+
+    /// <summary>Reads raw PNG bytes from disk without uploading to the GPU.</summary>
+    public static byte[] ReadBytesFromPNG(string path)
+    {
+        if (!File.Exists(path))
+        {
+            Plugin.Logger.LogWarning($"ReadBytesFromPNG: File {path} does not exist");
+            return null;
+        }
+        return File.ReadAllBytes(path);
+    }
+
+    /// <summary>Creates a Texture2D from raw PNG bytes (GPU upload). Returns null on failure.</summary>
+    public static Texture2D CreateTextureFromBytes(byte[] pngData)
+    {
+        Texture2D tex = new(2, 2);
+        if (!tex.LoadImage(pngData))
+        {
+            Plugin.Logger.LogWarning("CreateTextureFromBytes: Failed to load image data");
+            return null;
+        }
+        return tex;
+    }
 }

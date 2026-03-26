@@ -103,6 +103,8 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => PackManager.OnSceneLoaded(scene.name);
 
+        SceneManager.sceneLoaded += (scene, mode) => StartCoroutine(T2DLoader.WarmSprites());
+
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
 
         Harmony harmony = new(MyPluginInfo.PLUGIN_GUID);

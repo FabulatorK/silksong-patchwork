@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,7 +28,7 @@ public static partial class T2DLoader
     // Skin authors can replace individual frames without repacking an atlas.
     // These use Sprite.Create with the replacement PNG as a standalone texture.
     private static readonly Dictionary<string, Sprite>           _loadedSprites      = new();
-    private static readonly Dictionary<string, Texture2D>        _preloadedTextures  = new();
+    private static readonly Dictionary<string, byte[]>           _preloadedBytes     = new();
     private static readonly Dictionary<string, HashSet<string>>  _spriteAtlasMap     = new();
     // Maps asset key → source pack path (null = base Patchwork folder). Used for conflict reporting.
     private static readonly Dictionary<string, string>           _t2dProviders       = new();
@@ -54,7 +55,7 @@ public static partial class T2DLoader
 
     /// <summary>True when any T2D replacement data exists. Gates all expensive per-frame sweeps.</summary>
     public static bool HasT2DReplacements =>
-        SpritesheetOverrides.Count > 0 || _preloadedTextures.Count > 0 || _loadedSprites.Count > 0;
+        SpritesheetOverrides.Count > 0 || _preloadedBytes.Count > 0 || _loadedSprites.Count > 0;
 
     /// <summary>True while a harmony setter or enforcement sweep is in progress.</summary>
     public static bool IsHandlingOrEnforcing => _handling || _enforcing;
@@ -62,11 +63,11 @@ public static partial class T2DLoader
     // Read-only stats for GUI
     public static int SpritesheetOverrideCount => SpritesheetOverrides.Count;
     public static int LoadedT2DSpriteCount => _loadedSprites.Count;
-    public static int PreloadedT2DTextureCount => _preloadedTextures.Count;
+    public static int PreloadedT2DTextureCount => _preloadedBytes.Count;
     public static int TrackedRendererCount => _knownRenderers.Count + _knownImages.Count;
     public static IEnumerable<string> LoadedT2DSpriteNames => _loadedSprites.Keys;
     public static IEnumerable<string> SpritesheetOverrideNames => SpritesheetOverrides.Keys;
-    public static IEnumerable<string> PreloadedT2DTextureNames => _preloadedTextures.Keys;
+    public static IEnumerable<string> PreloadedT2DTextureNames => _preloadedBytes.Keys;
 
     // ================================================================
     //  Entry points called from T2DHandler harmony patches
@@ -104,8 +105,9 @@ public static partial class T2DLoader
             }
         }
 
-        // Pass 2: Convert remaining preloaded individual textures into Sprites.
-        if (_preloadedTextures.Count > 0)
+        // Pass 2: Promote preloaded byte arrays into Sprites for originals already in memory.
+        // GPU upload happens here (scene transition) rather than at Plugin.Awake().
+        if (_preloadedBytes.Count > 0)
         {
             foreach (var original in Resources.FindObjectsOfTypeAll<Sprite>())
             {
@@ -118,9 +120,11 @@ public static partial class T2DLoader
 
                 string cleanTexName = T2DUtil.CleanTextureName(original.texture.name);
                 string key = T2DUtil.SpriteKey(cleanTexName, original.name);
-                if (!_preloadedTextures.TryGetValue(key, out var tex))
+                if (!_preloadedBytes.TryGetValue(key, out var bytes))
                     continue;
 
+                Texture2D tex = TexUtil.CreateTextureFromBytes(bytes);
+                if (tex == null) continue;
                 tex.name = original.texture.name;
 
                 Sprite newSprite = Sprite.Create(tex,
@@ -129,7 +133,7 @@ public static partial class T2DLoader
                 newSprite.name = original.name;
 
                 _loadedSprites[key] = newSprite;
-                _preloadedTextures.Remove(key);
+                _preloadedBytes.Remove(key);
 
                 string texName = original.texture.name;
                 if (!_spriteAtlasMap.ContainsKey(texName))
@@ -171,17 +175,17 @@ public static partial class T2DLoader
                 {
                     string spriteName = Path.GetFileNameWithoutExtension(file);
                     string key = T2DUtil.SpriteKey(atlasName, spriteName);
-                    if (_preloadedTextures.ContainsKey(key) || _loadedSprites.ContainsKey(key))
+                    if (_preloadedBytes.ContainsKey(key) || _loadedSprites.ContainsKey(key))
                     {
                         ConflictTracker.Record("t2d-sprite", key,
                             _t2dProviders.GetValueOrDefault(key), sourcePack);
                         continue;
                     }
 
-                    Texture2D tex = TexUtil.LoadFromPNG(file);
-                    if (tex != null)
+                    byte[] bytes = TexUtil.ReadBytesFromPNG(file);
+                    if (bytes != null)
                     {
-                        _preloadedTextures[key] = tex;
+                        _preloadedBytes[key] = bytes;
                         _t2dProviders[key] = sourcePack;
                     }
                 }
@@ -191,17 +195,17 @@ public static partial class T2DLoader
             foreach (var file in Directory.GetFiles(t2dRoot, "*.png"))
             {
                 string spriteName = Path.GetFileNameWithoutExtension(file);
-                if (_preloadedTextures.ContainsKey(spriteName) || _loadedSprites.ContainsKey(spriteName))
+                if (_preloadedBytes.ContainsKey(spriteName) || _loadedSprites.ContainsKey(spriteName))
                 {
                     ConflictTracker.Record("t2d-sprite", spriteName,
                         _t2dProviders.GetValueOrDefault(spriteName), sourcePack);
                     continue;
                 }
 
-                Texture2D tex = TexUtil.LoadFromPNG(file);
-                if (tex != null)
+                byte[] bytes = TexUtil.ReadBytesFromPNG(file);
+                if (bytes != null)
                 {
-                    _preloadedTextures[spriteName] = tex;
+                    _preloadedBytes[spriteName] = bytes;
                     _t2dProviders[spriteName] = sourcePack;
                 }
             }
@@ -210,45 +214,6 @@ public static partial class T2DLoader
         ScanDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D"), null);
         foreach (var packPath in Plugin.PluginPackPaths)
             ScanDirectory(Path.Combine(packPath, "Sprites", "T2D"), packPath);
-
-        // Eagerly create replacement Sprites for any originals already in memory
-        foreach (var original in Resources.FindObjectsOfTypeAll<Sprite>())
-        {
-            if (original == null || original.texture == null)
-                continue;
-            if (!T2DUtil.IsT2DTexture(original.texture.name))
-                continue;
-
-            _confirmedSpriteNames.Add(original.name);
-
-            string cleanTexName = T2DUtil.CleanTextureName(original.texture.name);
-            string key = T2DUtil.SpriteKey(cleanTexName, original.name);
-
-            string matchedKey = null;
-            Texture2D tex = null;
-            if (_preloadedTextures.TryGetValue(key, out tex))
-                matchedKey = key;
-            else if (_preloadedTextures.TryGetValue(original.name, out tex))
-                matchedKey = original.name;
-
-            if (matchedKey != null)
-            {
-                tex.name = original.texture.name;
-
-                Sprite newSprite = Sprite.Create(tex,
-                    new Rect(0, 0, tex.width, tex.height),
-                    new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
-                newSprite.name = original.name;
-
-                _loadedSprites[key] = newSprite;
-                _preloadedTextures.Remove(matchedKey);
-
-                string texName = original.texture.name;
-                if (!_spriteAtlasMap.ContainsKey(texName))
-                    _spriteAtlasMap[texName] = new HashSet<string>();
-                _spriteAtlasMap[texName].Add(original.name);
-            }
-        }
     }
 
     // ================================================================
@@ -268,14 +233,13 @@ public static partial class T2DLoader
                 _spriteAtlasMap[textureName].Add(spriteName);
 
                 string key = T2DUtil.SpriteKey(cleanTexName, spriteName);
-                if (_preloadedTextures.ContainsKey(key) || _loadedSprites.ContainsKey(key))
+                if (_preloadedBytes.ContainsKey(key) || _loadedSprites.ContainsKey(key))
                     continue;
 
-                Texture2D spriteTex = TexUtil.LoadFromPNG(file);
-                if (spriteTex == null) continue;
-                spriteTex.name = textureName;
+                byte[] bytes = TexUtil.ReadBytesFromPNG(file);
+                if (bytes == null) continue;
 
-                _preloadedTextures[key] = spriteTex;
+                _preloadedBytes[key] = bytes;
             }
         }
 
@@ -321,27 +285,31 @@ public static partial class T2DLoader
                 if (!_spriteAtlasMap.ContainsKey(sprite.texture.name))
                     PreloadAtlasTextures(sprite.texture.name, cleanTexName);
 
-                Texture2D spriteTex = null;
+                byte[] spriteBytes = null;
                 string matchedKey = null;
-                if (_preloadedTextures.TryGetValue(key, out spriteTex))
+                if (_preloadedBytes.TryGetValue(key, out spriteBytes))
                     matchedKey = key;
-                else if (_preloadedTextures.TryGetValue(sprite.name, out spriteTex))
+                else if (_preloadedBytes.TryGetValue(sprite.name, out spriteBytes))
                     matchedKey = sprite.name;
 
-                if (spriteTex != null)
+                if (spriteBytes != null)
                 {
-                    spriteTex.name = sprite.texture.name;
+                    Texture2D spriteTex = TexUtil.CreateTextureFromBytes(spriteBytes);
+                    if (spriteTex != null)
+                    {
+                        spriteTex.name = sprite.texture.name;
 
-                    Sprite newSprite = Sprite.Create(spriteTex,
-                        new Rect(0, 0, spriteTex.width, spriteTex.height),
-                        new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
-                    newSprite.name = sprite.name;
+                        Sprite newSprite = Sprite.Create(spriteTex,
+                            new Rect(0, 0, spriteTex.width, spriteTex.height),
+                            new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+                        newSprite.name = sprite.name;
 
-                    _loadedSprites[key] = newSprite;
-                    _preloadedTextures.Remove(matchedKey);
+                        _loadedSprites[key] = newSprite;
+                        _preloadedBytes.Remove(matchedKey);
 
-                    SetSprite(spriteContainer, newSprite);
-                    TrackContainer(spriteContainer);
+                        SetSprite(spriteContainer, newSprite);
+                        TrackContainer(spriteContainer);
+                    }
                 }
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
@@ -516,19 +484,18 @@ public static partial class T2DLoader
     {
         Plugin.Logger.LogInfo($"[T2D-Reload] Starting hot reload. " +
             $"Pre-reload state: {_loadedSprites.Count} loaded sprites, " +
-            $"{_preloadedTextures.Count} preloaded textures, " +
+            $"{_preloadedBytes.Count} preloaded byte arrays, " +
             $"{SpritesheetOverrides.Count} spritesheet overrides, " +
             $"{_spriteAtlasMap.Count} atlas map entries");
 
-        // Save old objects for deferred cleanup — do NOT destroy yet,
+        // Save old sprites for deferred cleanup — do NOT destroy yet,
         // because renderers still reference these sprites. Destroying now would leave
         // renderers with null sprites, causing them to be skipped during re-apply.
         var oldSprites = new List<Sprite>(_loadedSprites.Values);
-        var oldTextures = new List<Texture2D>(_preloadedTextures.Values);
 
         // Clear all caches
         _loadedSprites.Clear();
-        _preloadedTextures.Clear();
+        _preloadedBytes.Clear();
         _spriteAtlasMap.Clear();
         _negativeCache.Clear();
         _t2dProviders.Clear();
@@ -540,8 +507,8 @@ public static partial class T2DLoader
         PreloadAllTextures();
         Plugin.Logger.LogInfo($"[T2D-Reload] After PreloadAllTextures: " +
             $"{SpritesheetOverrides.Count} spritesheet overrides, " +
-            $"{_preloadedTextures.Count} preloaded textures, " +
-            $"{_loadedSprites.Count} eagerly loaded sprites");
+            $"{_preloadedBytes.Count} preloaded byte arrays, " +
+            $"{_loadedSprites.Count} loaded sprites");
 
         // Re-apply in-place texture swaps; also restore vanilla pixels for any texture whose
         // pack was just disabled (HasStoredOriginals is true while any originals are pending).
@@ -582,7 +549,7 @@ public static partial class T2DLoader
             $"{srCount} SpriteRenderers ({srLoaded} new loads), " +
             $"{imgCount} Images ({imgLoaded} new loads)");
 
-        // NOW destroy old objects — renderers have been updated with new replacements
+        // NOW destroy old sprites — renderers have been updated with new replacements
         foreach (var sprite in oldSprites)
         {
             if (sprite != null && sprite.texture != null)
@@ -590,16 +557,61 @@ public static partial class T2DLoader
             if (sprite != null)
                 Object.Destroy(sprite);
         }
-        foreach (var tex in oldTextures)
-        {
-            if (tex != null) Object.Destroy(tex);
-        }
 
         Plugin.Logger.LogInfo($"[T2D-Reload] Reload complete. " +
             $"Post-reload state: {_loadedSprites.Count} loaded sprites, " +
-            $"{_preloadedTextures.Count} preloaded textures, " +
+            $"{_preloadedBytes.Count} preloaded byte arrays, " +
             $"{_spriteAtlasMap.Count} atlas map entries. " +
-            $"Destroyed {oldSprites.Count} old sprites, {oldTextures.Count} old textures");
+            $"Destroyed {oldSprites.Count} old sprites");
+    }
+
+    /// <summary>
+    /// Coroutine: promotes remaining preloaded byte arrays into Sprites one per frame.
+    /// Run this after each scene load to spread GPU upload cost over the loading window
+    /// rather than stalling during Plugin.Awake().
+    /// </summary>
+    public static IEnumerator WarmSprites()
+    {
+        if (_preloadedBytes.Count == 0)
+            yield break;
+
+        // Build a name→PPU lookup from sprites currently in memory for correct scaling.
+        var ppuLookup = new Dictionary<string, float>();
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (sprite != null && !ppuLookup.ContainsKey(sprite.name))
+                ppuLookup[sprite.name] = sprite.pixelsPerUnit;
+        }
+
+        int warmed = 0;
+        foreach (var kvp in _preloadedBytes.ToList())
+        {
+            if (_loadedSprites.ContainsKey(kvp.Key))
+                continue; // already promoted by ApplyReplacementsInScene
+
+            Texture2D tex = TexUtil.CreateTextureFromBytes(kvp.Value);
+            if (tex == null)
+                continue;
+
+            string spriteName = kvp.Key.Contains('/')
+                ? kvp.Key.Substring(kvp.Key.LastIndexOf('/') + 1)
+                : kvp.Key;
+            float ppu = ppuLookup.TryGetValue(spriteName, out float p) ? p : 100f;
+
+            Sprite newSprite = Sprite.Create(tex,
+                new Rect(0, 0, tex.width, tex.height),
+                new Vector2(0.5f, 0.5f), ppu);
+            newSprite.name = spriteName;
+
+            _loadedSprites[kvp.Key] = newSprite;
+            _preloadedBytes.Remove(kvp.Key);
+            warmed++;
+
+            yield return null;
+        }
+
+        if (warmed > 0)
+            Plugin.Logger.LogInfo($"[T2D-Warm] WarmSprites complete: promoted {warmed} sprites from byte cache");
     }
 
     public static void InvalidateSpritesheet(string texName)
@@ -640,15 +652,15 @@ public static partial class T2DLoader
         {
             string key = T2DUtil.SpriteKey(atlasName, spriteName);
             _loadedSprites.Remove(key);
-            _preloadedTextures.Remove(key);
+            _preloadedBytes.Remove(key);
             _negativeCache.Remove(key);
         }
         else
         {
             foreach (var key in _loadedSprites.Keys.Where(k => k == spriteName || k.EndsWith($"/{spriteName}")).ToList())
                 _loadedSprites.Remove(key);
-            foreach (var key in _preloadedTextures.Keys.Where(k => k == spriteName || k.EndsWith($"/{spriteName}")).ToList())
-                _preloadedTextures.Remove(key);
+            foreach (var key in _preloadedBytes.Keys.Where(k => k == spriteName || k.EndsWith($"/{spriteName}")).ToList())
+                _preloadedBytes.Remove(key);
             _negativeCache.Remove(spriteName);
         }
 
@@ -659,7 +671,7 @@ public static partial class T2DLoader
             {
                 string key = T2DUtil.SpriteKey(cleanName, sprName);
                 _loadedSprites.Remove(key);
-                _preloadedTextures.Remove(key);
+                _preloadedBytes.Remove(key);
                 _negativeCache.Remove(key);
             }
             _spriteAtlasMap.Remove(spriteName);
