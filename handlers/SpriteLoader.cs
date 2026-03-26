@@ -22,6 +22,16 @@ public static class SpriteLoader
     // Keyed by collection name → material name.  Never cleared across reloads.
     private static readonly Dictionary<string, Dictionary<string, Texture>> _originalTextures = new();
 
+    // Pre-built file indices: relative key (normalized, case-insensitive) → (absolute path, source pack).
+    // Sprites:     key = "CollectionName/MaterialName/SpriteName.png"
+    // Spritesheets: key = "CollectionName/MaterialName.png"
+    // Built once per Reload() and lazily on first lookup before any Reload() fires.
+    private static readonly Dictionary<string, (string FullPath, string Pack)> _spriteFileIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, (string FullPath, string Pack)> _sheetFileIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static bool _fileIndexBuilt;
+
     // Read-only stats for GUI
     public static int LoadedCollectionCount => LoadedAtlases.Count;
     public static int LoadedSpriteCount
@@ -134,73 +144,80 @@ public static class SpriteLoader
             SpriteDumper.DumpCollection(collection, true);
     }
 
+    private static void RebuildFileIndex()
+    {
+        _spriteFileIndex.Clear();
+        _sheetFileIndex.Clear();
+        _fileIndexBuilt = true;
+
+        void IndexDir(string root, string sourcePack,
+            Dictionary<string, (string, string)> index, string conflictType)
+        {
+            if (!Directory.Exists(root)) return;
+            foreach (var file in Directory.GetFiles(root, "*.png", SearchOption.AllDirectories))
+            {
+                // Compute path relative to the search root, normalised to forward slashes.
+                string rel = file.Substring(root.Length)
+                                 .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                                 .Replace('\\', '/');
+
+                if (index.TryGetValue(rel, out var existing))
+                    ConflictTracker.Record(conflictType, ConflictKey(conflictType, rel),
+                        existing.Item2, sourcePack);
+                else
+                    index[rel] = (file, sourcePack);
+            }
+        }
+
+        IndexDir(LoadPath,     null, _spriteFileIndex, "sprite");
+        foreach (var p in Plugin.PluginPackPaths)
+            IndexDir(Path.Combine(p, "Sprites"), p, _spriteFileIndex, "sprite");
+
+        IndexDir(AtlasLoadPath, null, _sheetFileIndex, "sheet");
+        foreach (var p in Plugin.PluginPackPaths)
+            IndexDir(Path.Combine(p, "Spritesheets"), p, _sheetFileIndex, "sheet");
+    }
+
+    // Produces a conflict-tracker key matching the format used by the old per-sprite code.
+    // Sprite rel:  "CollectionName/MaterialName/SpriteName.png" → "sprite:CollectionName/SpriteName"
+    // Sheet  rel:  "CollectionName/MaterialName.png"            → "sheet:CollectionName/MaterialName"
+    private static string ConflictKey(string type, string rel)
+    {
+        string noExt = rel.EndsWith(".png") ? rel.Substring(0, rel.Length - 4) : rel;
+        var parts = noExt.Split('/');
+        return type == "sprite" && parts.Length >= 3
+            ? $"sprite:{parts[0]}/{parts[2]}"
+            : $"{type}:{noExt}";
+    }
+
     private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)
     {
-        string suffix    = Path.Combine(collectionName, materialName);
-        string assetKey  = $"sprite:{collectionName}/{spriteName}";
-        string winnerFile = null, winnerPack = null;
-
-        string baseMatch = FindFileWithSuffix(LoadPath, $"{spriteName}.png", suffix);
-        if (baseMatch != null) { winnerFile = baseMatch; /* winnerPack stays null = base */ }
-
-        foreach (var packPath in Plugin.PluginPackPaths)
-        {
-            string packSpritesDir = Path.Combine(packPath, "Sprites");
-            if (!Directory.Exists(packSpritesDir)) continue;
-            string match = FindFileWithSuffix(packSpritesDir, $"{spriteName}.png", suffix);
-            if (match == null) continue;
-
-            if (winnerFile == null) { winnerFile = match; winnerPack = packPath; }
-            else ConflictTracker.Record("sprite", assetKey, winnerPack, packPath);
-        }
-
-        return winnerFile != null ? TexUtil.LoadFromPNG(winnerFile) : null;
+        if (!_fileIndexBuilt) RebuildFileIndex();
+        string key = $"{collectionName}/{materialName}/{spriteName}.png";
+        return _spriteFileIndex.TryGetValue(key, out var entry)
+            ? TexUtil.LoadFromPNG(entry.FullPath)
+            : null;
     }
 
-    private static string FindFileWithSuffix(string searchDir, string searchPattern, string dirSuffix)
+    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection,
+        string materialName, Texture originalTex)
     {
-        var files = Directory.GetFiles(searchDir, searchPattern, SearchOption.AllDirectories);
-        foreach (var f in files)
+        if (!_fileIndexBuilt) RebuildFileIndex();
+        string key = $"{collection.name}/{materialName}.png";
+
+        if (_sheetFileIndex.TryGetValue(key, out var entry))
         {
-            if (Path.GetDirectoryName(f).EndsWith(dirSuffix))
-                return f;
-        }
-        return null;
-    }
-
-    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection, string materialName, Texture originalTex)
-    {
-        string assetKey   = $"sheet:{collection.name}/{materialName}";
-        string winnerFile = null, winnerPack = null;
-
-        // Collect candidate paths in priority order (file-existence checks only; load winner once).
-        string baseMatch = FindFileWithSuffix(AtlasLoadPath, $"{materialName}.png", collection.name);
-        if (baseMatch != null) { winnerFile = baseMatch; /* winnerPack stays null = base */ }
-
-        foreach (var packPath in Plugin.PluginPackPaths)
-        {
-            string packSheetsDir = Path.Combine(packPath, "Spritesheets");
-            if (!Directory.Exists(packSheetsDir)) continue;
-            string match = FindFileWithSuffix(packSheetsDir, $"{materialName}.png", collection.name);
-            if (match == null) continue;
-
-            if (winnerFile == null) { winnerFile = match; winnerPack = packPath; }
-            else ConflictTracker.Record("sheet", assetKey, winnerPack, packPath);
-        }
-
-        if (winnerFile != null)
-        {
-            var tex2d = TexUtil.LoadFromPNG(winnerFile);
-            RenderTexture rt = RenderTexture.GetTemporary(tex2d.width, tex2d.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            var tex2d = TexUtil.LoadFromPNG(entry.FullPath);
+            RenderTexture rt = RenderTexture.GetTemporary(
+                tex2d.width, tex2d.height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             Graphics.Blit(tex2d, rt);
             Object.Destroy(tex2d);
             return new SpritesheetResult { Texture = rt, FromCustom = true };
         }
 
-        // No custom sheet — rebuild from the original game texture so that disabling a pack
-        // actually restores the vanilla sprites rather than perpetuating a stale RenderTexture.
-        var tex = TexUtil.GetReadable(originalTex);
-        return new SpritesheetResult { Texture = tex, FromCustom = false };
+        // No custom sheet — restore from the original game texture.
+        return new SpritesheetResult { Texture = TexUtil.GetReadable(originalTex), FromCustom = false };
     }
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
@@ -237,6 +254,7 @@ public static class SpriteLoader
     
     public static void Reload()
     {
+        RebuildFileIndex();
         Plugin.Logger.LogInfo($"[tk2d-Reload] Starting sprite reload for scene {SceneManager.GetActiveScene().name}. " +
             $"Pre-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
             $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
