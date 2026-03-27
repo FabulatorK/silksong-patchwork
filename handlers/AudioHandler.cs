@@ -97,6 +97,13 @@ public static class AudioHandler
                 AudioClip replacement = LoadAudioClip(clipName);
                 if (replacement != null)
                 {
+                    // Save the original clip before we overwrite source.clip. Adding to LoadedClips
+                    // first would cause the ClipSetterPatch guard (LoadedClips.ContainsKey) to block
+                    // the Harmony postfix, so _originalClips would never receive this entry and the
+                    // clip could not be restored when the pack is disabled.
+                    int id = source.GetInstanceID();
+                    if (source.clip != null && !source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
+                        _originalClips[id] = source.clip;
                     LoadedClips[clipName] = replacement;
                     source.clip = replacement;
                 }

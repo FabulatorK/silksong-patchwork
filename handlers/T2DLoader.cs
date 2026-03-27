@@ -604,9 +604,14 @@ public static partial class T2DLoader
             foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
             {
                 if (tex == null) continue;
+                // Sprite-sized textures (from oldSprites) share their atlas name as the key in
+                // _originalTextureData. If we let TryRestoreTexture run on them it will consume
+                // the full-atlas PNG entry, leaving the real atlas un-restorable. Guard with the
+                // preSkipped flag: anything we intentionally skipped is not a candidate for restore.
+                bool preSkipped = SkippedTextureIds.Contains(tex.GetInstanceID());
                 if (TrySwapTexture(tex))
                     swapCount++;
-                else if (TryRestoreTexture(tex))
+                else if (!preSkipped && TryRestoreTexture(tex))
                     restoreCount++;
             }
             Plugin.Logger.LogInfo($"[T2D-Reload] Swapped {swapCount} textures via spritesheets, restored {restoreCount} to vanilla");
