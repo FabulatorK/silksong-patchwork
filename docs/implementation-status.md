@@ -117,7 +117,33 @@ finished packs.
 
 ---
 
-## Architecture Principles
+## Technical Debt
+
+### Legacy GUI shim cleanup  *(one release after GUI/UX redesign)*
+
+The GUI/UX redesign kept two standalone windows as shims for one release cycle to
+avoid hard breakage for users with custom keybinds.  Remove these after the next
+release:
+
+| Item | File(s) | What to remove |
+|------|---------|----------------|
+| DevProfiler standalone window | `gui/DevProfiler.cs`, `Plugin.cs`, `PatchworkConfig.cs` | `DevProfiler.Draw()`, `Plugin.ShowDevProfiler`, `ShowDevProfilerKey` config entry |
+| AnimationController standalone window | `gui/AnimationController.cs`, `Plugin.cs`, `PatchworkConfig.cs` | `DrawAnimationController()`, `Plugin.ShowAnimationController`, `ShowAnimationControllerKey` config entry |
+| Old Alpha1–7 keybind config entries | `PatchworkConfig.cs` | `ShowAudioLog`, `ShowAudioList`, `ShowAnimationController`, `ShowTextLog`, `ShowSkinStatus`, `ShowDialogueEditor` keys (all point to removed/merged windows) |
+
+### Data layer independence violation
+
+`AudioHandler` calls `AudioLog.LogAudio()` and `AudioList.LogAudio()`.
+`DialogueHandler` calls `TextLog.LogText()` and `DialogueEditor.TrackText()`.
+
+This violates Architecture Principle 4 (handlers must not reference GUI).  The pragmatic
+fix during the GUI redesign was to keep the data-holding files as handler targets and
+only extract their rendering.  Proper fix: replace direct calls with events/delegates
+so handlers have zero GUI imports.
+
+---
+
+
 
 These apply to all future work and should be respected when implementing any planned
 item above:
