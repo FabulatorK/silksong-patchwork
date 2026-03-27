@@ -113,11 +113,27 @@ public static class DevProfiler
         );
     }
 
+    /// <summary>
+    /// Renders the profiler content without a window chrome.
+    /// Called by PerformancePillar inside the Dev Hub window.
+    /// The caller is responsible for wrapping this in a scroll view if desired.
+    /// </summary>
+    public static void DrawPillarContent()
+    {
+        DrawContent();
+    }
+
     private static void DrawWindow(int windowID)
     {
         GUIHelper.Space(16);
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
+        DrawContent();
+        GUILayout.EndScrollView();
+        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
+    }
 
+    private static void DrawContent()
+    {
         // --- FPS & Frame Time ---
         SectionHeader("Performance");
 
@@ -160,7 +176,6 @@ public static class DevProfiler
             ColorLabel($"  \u26A0 {DialogueHandler.StaleKeyCount} stale text key(s)", Color.yellow);
         Label($"Plugin packs: {PackManager.AllPacks.Count(p => p.IsEnabled)} active / {PackManager.AllPacks.Count} total");
 
-        // List active packs
         foreach (var pack in PackManager.AllPacks.Where(p => p.IsEnabled))
             Label($"  \u2022 {pack.Name}");
 
@@ -186,9 +201,6 @@ public static class DevProfiler
 
         if (GUILayout.Button("Log Scene Hierarchy", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             LogSceneHierarchy();
-
-        GUILayout.EndScrollView();
-        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
     private static void DrawFrameGraph()

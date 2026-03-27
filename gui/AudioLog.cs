@@ -94,6 +94,55 @@ public static class AudioLog
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
+    /// <summary>
+    /// Renders log entries into the current GUILayout context (no window chrome).
+    /// Called by AudioPillar inside the Dev Hub window.
+    /// </summary>
+    public static void DrawEntries(int maxVisible, double fadeDuration, bool hideModded)
+    {
+        // Remove fully faded overflow entries
+        for (int i = AudioPlayEntries.Count - 1; i >= maxVisible; i--)
+        {
+            if (AudioPlayEntries[i].IsFadedOut(fadeDuration))
+                AudioPlayEntries.RemoveAt(i);
+        }
+
+        // Mark overflow entries that just got bumped
+        for (int i = maxVisible; i < AudioPlayEntries.Count; i++)
+        {
+            if (AudioPlayEntries[i].BumpedTime == null)
+                AudioPlayEntries[i].BumpedTime = DateTime.Now;
+        }
+
+        // Clear bumped time for entries that scrolled back into visible range
+        for (int i = 0; i < Math.Min(maxVisible, AudioPlayEntries.Count); i++)
+            AudioPlayEntries[i].BumpedTime = null;
+
+        int shown = 0;
+        GUILayout.BeginVertical();
+        for (int i = 0; i < AudioPlayEntries.Count; i++)
+        {
+            var entry = AudioPlayEntries[i];
+
+            if (hideModded && File.Exists(Path.Combine(AudioHandler.SoundFolder, entry.ClipName + ".wav")))
+                continue;
+
+            bool isVisible = i < maxVisible;
+            float opacity  = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
+
+            UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
+            GUILayout.Label(entry.ClipName, GUIHelper.LabelStyle);
+            shown++;
+        }
+        if (shown == 0)
+        {
+            UnityEngine.GUI.contentColor = Color.yellow;
+            GUILayout.Label("No audio played recently.", GUIHelper.LabelStyle);
+        }
+        UnityEngine.GUI.contentColor = Color.white;
+        GUILayout.EndVertical();
+    }
+
     public static void LogAudio(AudioClip clip)
     {
         string cleanName = clip.name.Replace("PATCHWORK_", "");

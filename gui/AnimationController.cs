@@ -256,12 +256,27 @@ public static class AnimationController
             GUILayout.MaxWidth(GUIHelper.Scaled(MaxWindowWidth))
         );
     }
-    private static void AnimationControllerWindow(int windowID)
+
+    /// <summary>
+    /// Renders the animator list content without window chrome or scroll view.
+    /// Called by GraphicsPillar — the caller (GraphicsPillar) wraps this in a scroll view.
+    /// </summary>
+    public static void DrawPillarContent()
     {
-        GUIHelper.Space(16); 
-        
+        DrawAnimatorEntries();
+    }
+
+    private static void DrawAnimatorList()
+    {
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
         GUILayout.BeginVertical();
+        DrawAnimatorEntries();
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+    }
+
+    private static void DrawAnimatorEntries()
+    {
         foreach (var kvp in Animators.OrderByDescending(k => k.Key == "Hero_Hornet(Clone)"))
         {
             string name = kvp.Key;
@@ -285,27 +300,26 @@ public static class AnimationController
 
             if (GUILayout.Button(name, GUIHelper.ButtonStyle))
                 SelectAnimator(animator);
-            
+
             string fullPath = $"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}";
-            string displayPath = fullPath.Length > MaxPathLength 
-                ? "..." + fullPath.Substring(fullPath.Length - MaxPathLength + 3) 
+            string displayPath = fullPath.Length > MaxPathLength
+                ? "..." + fullPath.Substring(fullPath.Length - MaxPathLength + 3)
                 : fullPath;
 
             GUILayout.Label(displayPath, GUIHelper.LabelStyle);
 
             GUILayout.BeginHorizontal();
-
             GUIHelper.Space(48);
 
             if (SelectedAnimator == name)
             {
                 GUILayout.BeginVertical();
-                if (GUILayout.Button(animator.CurrentClip.name + (ShowAnimationDropdown.GetValueOrDefault(name, false) ? " ▲" : " ▼"), GUIHelper.ButtonStyle))
+                if (GUILayout.Button(animator.CurrentClip.name + (ShowAnimationDropdown.GetValueOrDefault(name, false) ? " \u25B2" : " \u25BC"), GUIHelper.ButtonStyle))
                 {
                     ShowAnimationDropdown[name] = !ShowAnimationDropdown.GetValueOrDefault(name, false);
                     if (ShowAnimationDropdown[name])
                     {
-                        _animationSearchText = "";  // Reset search when opening
+                        _animationSearchText = "";
                         _animationDropdownScroll = Vector2.zero;
                     }
                 }
@@ -313,32 +327,23 @@ public static class AnimationController
                 if (ShowAnimationDropdown.GetValueOrDefault(name, false))
                 {
                     GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
-                    
-                    // Search field
                     GUILayout.BeginHorizontal();
                     GUILayout.Label("Search:", GUIHelper.LabelStyle, GUIHelper.Width(60));
-                    _animationSearchText = GUIHelper.TextField(
-                        _animationSearchText,
-                        GUIHelper.Width(280),
-                        GUIHelper.Height(32)
-                    );
+                    _animationSearchText = GUIHelper.TextField(_animationSearchText, GUIHelper.Width(280), GUIHelper.Height(32));
                     GUILayout.EndHorizontal();
-                    
-                    // Filter clips
+
                     var filteredClips = animator.Library.clips
-                        .Where(c => !string.IsNullOrEmpty(c.name) && 
-                                    (string.IsNullOrEmpty(_animationSearchText) || 
-                                    c.name.ToLower().Contains(_animationSearchText.ToLower())))
+                        .Where(c => !string.IsNullOrEmpty(c.name) &&
+                                    (string.IsNullOrEmpty(_animationSearchText) ||
+                                     c.name.ToLower().Contains(_animationSearchText.ToLower())))
                         .ToList();
-                    
-                    // Show count
+
                     GUILayout.Label($"{filteredClips.Count} of {animator.Library.clips.Length}", GUIHelper.LabelStyle);
-                    
-                    // Scrollable list
+
                     _animationDropdownScroll = GUILayout.BeginScrollView(
                         _animationDropdownScroll,
                         GUIHelper.Height(MaxVisibleAnimations * 22));
-                    
+
                     foreach (var clip in filteredClips)
                     {
                         if (GUILayout.Button(clip.name, GUIHelper.ButtonStyle))
@@ -352,7 +357,6 @@ public static class AnimationController
                             FrameChangeRequested = false;
                         }
                     }
-                    
                     GUILayout.EndScrollView();
                     GUILayout.EndVertical();
                 }
@@ -390,16 +394,13 @@ public static class AnimationController
                     else
                     {
                         SpriteDumper.DumpSingleSprite(currentFrameDef, spriteCollection);
-                        if (!File.Exists(Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png")))
+                        string dumpedPath = Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
+                        if (!File.Exists(dumpedPath))
                             Plugin.Logger.LogError($"Failed to dump sprite for editing: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
                         else
                         {
                             IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0]));
-                            File.Copy(
-                                Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png"),
-                                openPath,
-                                true
-                            );
+                            File.Copy(dumpedPath, openPath, true);
                             Process.Start(openPath);
                         }
                     }
@@ -420,25 +421,16 @@ public static class AnimationController
                             continue;
                         string matname = frameDef.material.name.Split(' ')[0];
                         string loadPath = Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname, frameDef.name + ".png");
-                        if (File.Exists(loadPath))
-                        {
-                            dumped++;
-                            continue;
-                        }
+                        if (File.Exists(loadPath)) { dumped++; continue; }
                         SpriteDumper.DumpSingleSprite(frameDef, frameCollection);
-                        string dumpPath = Path.Combine(SpriteDumper.DumpPath, frameCollection.name, matname, frameDef.name + ".png");
-                        if (!File.Exists(dumpPath))
-                        {
-                            Plugin.Logger.LogError($"Failed to dump sprite: {frameCollection.name}/{matname}/{frameDef.name}");
-                            continue;
-                        }
+                        string dumpPath2 = Path.Combine(SpriteDumper.DumpPath, frameCollection.name, matname, frameDef.name + ".png");
+                        if (!File.Exists(dumpPath2)) { Plugin.Logger.LogError($"Failed to dump sprite: {frameCollection.name}/{matname}/{frameDef.name}"); continue; }
                         IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname));
-                        File.Copy(dumpPath, loadPath, true);
+                        File.Copy(dumpPath2, loadPath, true);
                         dumped++;
                     }
                     Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
 
-                    // Open all sprites in the default image editor
                     for (int f2 = 0; f2 < clip.frames.Length; f2++)
                     {
                         var openFrame = clip.frames[f2];
@@ -446,19 +438,29 @@ public static class AnimationController
                         if (openCollection == null || openFrame.spriteId < 0 || openFrame.spriteId >= openCollection.spriteDefinitions.Length)
                             continue;
                         var openDef = openCollection.spriteDefinitions[openFrame.spriteId];
-                        if (string.IsNullOrEmpty(openDef.name))
-                            continue;
+                        if (string.IsNullOrEmpty(openDef.name)) continue;
                         string openMatname = openDef.material.name.Split(' ')[0];
-                        string openPath = Path.Combine(SpriteLoader.LoadPath, openCollection.name, openMatname, openDef.name + ".png");
-                        if (File.Exists(openPath))
-                            Process.Start(openPath);
+                        string openPath2 = Path.Combine(SpriteLoader.LoadPath, openCollection.name, openMatname, openDef.name + ".png");
+                        if (File.Exists(openPath2))
+                            Process.Start(openPath2);
                     }
                 }
                 GUILayout.EndHorizontal();
             }
         }
-        GUILayout.EndVertical();
-        GUILayout.EndScrollView();
+
+        if (Animators.Count == 0)
+        {
+            GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
+            GUILayout.Label("No animators registered.", GUIHelper.LabelStyle);
+            GUI.contentColor = Color.white;
+        }
+    }
+
+    private static void AnimationControllerWindow(int windowID)
+    {
+        GUIHelper.Space(16);
+        DrawAnimatorList();
         GUI.DragWindow(GUIHelper.DragRect);
     }
     #endregion

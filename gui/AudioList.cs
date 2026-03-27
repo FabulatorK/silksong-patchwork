@@ -58,6 +58,14 @@ public static class AudioList
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
+    /// <summary>Returns a sorted copy of the loaded clip name set.</summary>
+    public static List<string> GetClipNames()
+    {
+        var list = new List<string>(LoadedAudioClips);
+        list.Sort();
+        return list;
+    }
+
     public static void LogAudio(AudioSource source)
     {
         if (source == null || string.IsNullOrEmpty(source.clip?.name))

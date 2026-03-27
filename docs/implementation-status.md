@@ -52,6 +52,20 @@ item is implemented or a new plan is recorded.
 | Far-left AND-group bracket | `gui/PackManagerWindow.cs` | Bracket moved from between the two join columns to the outermost left of the group, wrapping both columns and content |
 | Ghost "add condition" row | `gui/PackManagerWindow.cs` | Replaces the `+ Add condition` button with a faded condition-shaped row; green-tinted `+ scene` chip is the only interactive element |
 
+### GUI — Dev Hub unified window
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| StatusOverlay corner badge | `gui/StatusOverlay.cs`, `Plugin.cs` | Always-on HUD; shows active packs, conflicts, sprite/clip counts; clicking opens Pack Manager |
+| DevHub tabbed shell | `gui/DevHub.cs`, `Plugin.cs`, `PatchworkConfig.cs` | Single tabbed window; Alpha2-5 open at Graphics/Audio/Text/Performance tabs; `ShowDevHub` / `DevHubTab` in Plugin |
+| PerformancePillar | `gui/pillars/PerformancePillar.cs`, `gui/DevProfiler.cs` | Absorbs DevProfiler content; `DevProfiler.DrawPillarContent()` exposed; DevProfiler.Draw() kept as transition shim |
+| AudioPillar | `gui/pillars/AudioPillar.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs` | Two-pane: loaded clips (left) + live log (right); `AudioLog.DrawEntries()` + `AudioList.GetClipNames()` exposed |
+| TextPillar | `gui/pillars/TextPillar.cs`, `gui/TextLog.cs`, `gui/DialogueEditor.cs` | Two-pane: accessed keys (left, clickable) + editor surface (right); click bridges to editor in-pillar |
+| GraphicsPillar | `gui/pillars/GraphicsPillar.cs`, `gui/AnimationController.cs` | Sub-tabs: Overview (file scan, counts) + Animated (AnimationController content); `SkinStatus.cs` deleted |
+| VideoPillar stub | `gui/pillars/VideoPillar.cs` | Placeholder until VideoHandler has content; reads `VideoHandler.VideoFileMap` |
+| Pack Manager "Dev Tools →" footer | `gui/PackManagerWindow.cs` | Blue button in footer opens Dev Hub at Graphics tab |
+| Keybind consolidation | `PatchworkConfig.cs`, `Plugin.cs` | Alpha1=PackManager; Alpha2–5 open DevHub at Graphics/Audio/Text/Performance; legacy shims kept one release |
+
 ### Documentation
 
 | Document | File | Status |
@@ -59,7 +73,7 @@ item is implemented or a new plan is recorded.
 | Conflict handling (EN) | `docs/conflict-handling.md` | Complete |
 | Conflict handling (ZH) | `docs/conflict-handling-zh.md` | Complete |
 | Packed bundle format | `docs/packed-bundle-format.md` | **Plan only — not implemented** |
-| GUI/UX redesign | `docs/gui-ux-redesign.md` | **Plan only — not implemented** |
+| GUI/UX redesign | `docs/gui-ux-redesign.md` | **Implemented** — all 8 steps shipped |
 | This file | `docs/implementation-status.md` | Living document |
 
 ---
@@ -114,14 +128,14 @@ Pack Manager (end users) and Dev Hub (creators).
 
 | Step | Deliverable | Status |
 |------|-------------|--------|
-| 1 | `gui/StatusOverlay.cs` — corner badge for end users | Not started |
-| 2 | `gui/DevHub.cs` — tabbed shell, empty pillar stubs | Not started |
-| 3 | `gui/pillars/PerformancePillar.cs` — absorbs DevProfiler | Not started |
-| 4 | `gui/pillars/AudioPillar.cs` — absorbs AudioLog + AudioList | Not started |
-| 5 | `gui/pillars/TextPillar.cs` — absorbs TextLog + DialogueEditor | Not started |
-| 6 | `gui/pillars/GraphicsPillar.cs` — absorbs SkinStatus + AnimationController UI | Not started |
-| 7 | `gui/pillars/VideoPillar.cs` — stub, reads VideoHandler | Not started |
-| 8 | Pack Manager footer button + keybind cleanup | Not started |
+| 1 | `gui/StatusOverlay.cs` — corner badge for end users | **Shipped** |
+| 2 | `gui/DevHub.cs` — tabbed shell, empty pillar stubs | **Shipped** |
+| 3 | `gui/pillars/PerformancePillar.cs` — absorbs DevProfiler | **Shipped** |
+| 4 | `gui/pillars/AudioPillar.cs` — absorbs AudioLog + AudioList | **Shipped** |
+| 5 | `gui/pillars/TextPillar.cs` — absorbs TextLog + DialogueEditor | **Shipped** |
+| 6 | `gui/pillars/GraphicsPillar.cs` — absorbs SkinStatus + AnimationController UI | **Shipped** |
+| 7 | `gui/pillars/VideoPillar.cs` — stub, reads VideoHandler | **Shipped** |
+| 8 | Pack Manager footer button + keybind cleanup | **Shipped** |
 
 **Prerequisite check before Step 6:** Confirm that `AnimationController.cs` can be
 cleanly split into a data/patch layer and a view layer (its Harmony patches on

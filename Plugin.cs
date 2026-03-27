@@ -30,6 +30,7 @@ public class Plugin : BaseUnityPlugin
     /// Forwards to PackManager — all handlers iterate this.</summary>
     public static IEnumerable<string> PluginPackPaths => PackManager.ActivePackPaths;
 
+    // ── Legacy per-window toggles (kept for DevProfiler standalone shim) ──────
     public static bool ShowAudioLog = false;
     public static bool ShowAudioList = false;
     public static bool ShowAnimationController = false;
@@ -38,6 +39,14 @@ public class Plugin : BaseUnityPlugin
     public static bool ShowDevProfiler = false;
     public static bool ShowDialogueEditor = false;
     public static bool ShowPackManager = false;
+
+    // ── New unified UI ────────────────────────────────────────────────────────
+    /// <summary>Corner badge always-on overlay for end users.</summary>
+    public static bool ShowStatusOverlay = true;
+    /// <summary>Tabbed Dev Hub window for creators.</summary>
+    public static bool ShowDevHub = false;
+    /// <summary>Currently active Dev Hub tab (0=Graphics … 4=Video).</summary>
+    public static int  DevHubTab = 0;
 
     private void Awake()
     {
@@ -174,22 +183,36 @@ public class Plugin : BaseUnityPlugin
             if (Input.GetKeyDown(Config.FullDumpKey) && Config.DumpSprites)
                 SceneTraverser.TraverseAllScenes();
 
-            if (Input.GetKeyDown(Config.ShowAudioLogKey))
-                ShowAudioLog = !ShowAudioLog;
-            if (Input.GetKeyDown(Config.ShowAudioListKey))
-                ShowAudioList = !ShowAudioList;
-            if (Input.GetKeyDown(Config.ShowAnimationControllerKey))
-                ShowAnimationController = !ShowAnimationController;
-            if (Input.GetKeyDown(Config.ShowTextLogKey))
-                ShowTextLog = !ShowTextLog;
-            if (Input.GetKeyDown(Config.ShowSkinStatusKey))
-                ShowSkinStatus = !ShowSkinStatus;
-            if (Input.GetKeyDown(Config.ShowDevProfilerKey))
-                ShowDevProfiler = !ShowDevProfiler;
-            if (Input.GetKeyDown(Config.ShowDialogueEditorKey))
-                ShowDialogueEditor = !ShowDialogueEditor;
+            // New keybind layout (Step 8 / gui-ux-redesign):
+            //   Alpha1 → Pack Manager
+            //   Alpha2 → Dev Hub (Graphics tab)
+            //   Alpha3 → Dev Hub (Audio tab)
+            //   Alpha4 → Dev Hub (Text tab)
+            //   Alpha5 → Dev Hub (Performance tab)
             if (Input.GetKeyDown(Config.ShowPackManagerKey))
                 ShowPackManager = !ShowPackManager;
+
+            if (Input.GetKeyDown(Config.ShowDevHubKey))
+                ShowDevHub = !ShowDevHub;
+
+            // Tab shortcuts: press while Dev Hub is open to switch tabs,
+            // or open directly at the selected tab.
+            if (Input.GetKeyDown(Config.DevHubGraphicsKey))
+                DevHub.OpenAt(DevHub.TabGraphics);
+            if (Input.GetKeyDown(Config.DevHubAudioKey))
+                DevHub.OpenAt(DevHub.TabAudio);
+            if (Input.GetKeyDown(Config.DevHubTextKey))
+                DevHub.OpenAt(DevHub.TabText);
+            if (Input.GetKeyDown(Config.DevHubPerformanceKey))
+                DevHub.OpenAt(DevHub.TabPerformance);
+
+            // Legacy: DevProfiler standalone shim (kept for one release)
+            if (Input.GetKeyDown(Config.ShowDevProfilerKey))
+                ShowDevProfiler = !ShowDevProfiler;
+
+            // Legacy: AnimationController standalone (kept for one release)
+            if (Input.GetKeyDown(Config.ShowAnimationControllerKey))
+                ShowAnimationController = !ShowAnimationController;
         }
 
         if (SpriteFileWatcher.ReloadSprites)
@@ -244,22 +267,21 @@ public class Plugin : BaseUnityPlugin
     {
         GUIHelper.BeginOnGUI();
 
-        if (ShowAudioLog)
-            AudioLog.DrawAudioLog();
-        if (ShowAudioList)
-            AudioList.DrawAudioList();
-        if (ShowAnimationController)
-            AnimationController.DrawAnimationController();
-        if (ShowTextLog)
-            TextLog.DrawTextLog();
-        if (ShowSkinStatus)
-            SkinStatus.Draw();
-        if (ShowDevProfiler)
-            DevProfiler.Draw();
-        if (ShowDialogueEditor)
-            DialogueEditor.Draw();
+        // ── New unified UI ────────────────────────────────────────────────────
+        if (ShowStatusOverlay)
+            StatusOverlay.Draw();
+        if (ShowDevHub)
+            DevHub.Draw();
+
+        // ── Core end-user window ──────────────────────────────────────────────
         if (ShowPackManager)
             PackManagerWindow.Draw();
+
+        // ── Legacy standalone shims (kept for one release, then removed) ──────
+        if (ShowDevProfiler)
+            DevProfiler.Draw();
+        if (ShowAnimationController)
+            AnimationController.DrawAnimationController();
     }
     
     private void InitializeFolders()

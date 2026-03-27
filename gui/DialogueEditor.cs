@@ -85,6 +85,15 @@ public static class DialogueEditor
     }
 
     /// <summary>
+    /// Renders the edit surface (selected entry header + text area + tag buttons + action buttons)
+    /// without a window chrome. Called by TextPillar inside the Dev Hub window.
+    /// </summary>
+    public static void DrawEditorSurface()
+    {
+        DrawEditPane();
+    }
+
+    /// <summary>
     /// Called by DialogueHandler.GetTextPostfix to feed text entries into the editor.
     /// </summary>
     public static void TrackText(string sheet, string key, string text)
@@ -321,6 +330,90 @@ public static class DialogueEditor
         }
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
+    }
+
+    /// <summary>
+    /// Renders the edit pane (header, text area, tag buttons, save/revert/delete).
+    /// Called by TextPillar — no window chrome, no scroll view wrapper.
+    /// </summary>
+    private static void DrawEditPane()
+    {
+        if (selectedEntry != null)
+        {
+            UnityEngine.GUI.contentColor = new Color(0.6f, 0.85f, 1f);
+            GUILayout.Label($"Sheet: {selectedEntry.Sheet}  |  Key: {selectedEntry.Key}", GUIHelper.LabelStyle);
+            UnityEngine.GUI.contentColor = Color.white;
+
+            GUIHelper.Space(2);
+
+            editAreaScroll = GUILayout.BeginScrollView(editAreaScroll, GUILayout.Height(GUIHelper.Scaled(140)));
+            string newText = GUIHelper.TextArea(
+                EditAreaControlName,
+                editText,
+                GUILayout.ExpandWidth(true),
+                GUILayout.ExpandHeight(true)
+            );
+            if (newText != editText)
+            {
+                editText = newText;
+                hasUnsavedChanges = true;
+            }
+
+            if (UnityEngine.GUI.GetNameOfFocusedControl() == EditAreaControlName)
+            {
+                var editor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
+                if (editor != null)
+                    lastCursorIndex = editor.cursorIndex;
+            }
+            GUILayout.EndScrollView();
+
+            GUIHelper.Space(4);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Tags:", GUIHelper.LabelStyle, GUIHelper.Width(38));
+            foreach (var tag in TextTags)
+            {
+                if (GUILayout.Button(tag, TagButtonStyle, GUIHelper.Height(20)))
+                {
+                    int insertPos = Mathf.Clamp(lastCursorIndex, 0, editText.Length);
+                    editText = editText.Insert(insertPos, tag);
+                    lastCursorIndex = insertPos + tag.Length;
+                    hasUnsavedChanges = true;
+                }
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUIHelper.Space(4);
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(hasUnsavedChanges ? "Save *" : "Save", GUIHelper.ButtonStyle, GUIHelper.Height(26), GUIHelper.Width(80)))
+                SaveEntry(selectedEntry, editText);
+            if (GUILayout.Button("Revert", GUIHelper.ButtonStyle, GUIHelper.Height(26), GUIHelper.Width(80)))
+            {
+                editText = selectedEntry.CurrentText;
+                hasUnsavedChanges = false;
+            }
+            if (GUILayout.Button("Delete Override", GUIHelper.ButtonStyle, GUIHelper.Height(26)))
+                DeleteOverride(selectedEntry);
+            GUILayout.EndHorizontal();
+
+            if (!string.IsNullOrEmpty(statusMessage) && Time.realtimeSinceStartup - statusTime < 4f)
+            {
+                GUIHelper.Space(2);
+                bool isError = statusMessage.StartsWith("Error");
+                UnityEngine.GUI.contentColor = isError ? new Color(1f, 0.4f, 0.4f) : new Color(0.4f, 1f, 0.4f);
+                GUILayout.Label(statusMessage, GUIHelper.LabelStyle);
+                UnityEngine.GUI.contentColor = Color.white;
+            }
+        }
+        else
+        {
+            GUIHelper.Space(8);
+            UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
+            GUILayout.Label("Click a text entry on the left to edit it.", GUIHelper.LabelStyle);
+            UnityEngine.GUI.contentColor = Color.white;
+        }
     }
 
     private static void SaveEntry(DialogueEntry entry, string text)

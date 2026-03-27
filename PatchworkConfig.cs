@@ -58,6 +58,22 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowPackManager;
     public UnityEngine.KeyCode ShowPackManagerKey { get { return _ShowPackManager.Value; } }
 
+    // ── Dev Hub keybinds (new unified UI) ────────────────────────────────────
+    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDevHub;
+    public UnityEngine.KeyCode ShowDevHubKey { get { return _ShowDevHub.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubGraphicsKey;
+    public UnityEngine.KeyCode DevHubGraphicsKey { get { return _DevHubGraphicsKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubAudioKey;
+    public UnityEngine.KeyCode DevHubAudioKey { get { return _DevHubAudioKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubTextKey;
+    public UnityEngine.KeyCode DevHubTextKey { get { return _DevHubTextKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubPerformanceKey;
+    public UnityEngine.KeyCode DevHubPerformanceKey { get { return _DevHubPerformanceKey.Value; } }
+
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
 
@@ -98,7 +114,14 @@ public class PatchworkConfig
         _ShowSkinStatus = config.Bind("Keybinds", "ShowSkinStatus", UnityEngine.KeyCode.Alpha5, "Key to toggle the skin status overlay.");
         _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler overlay.");
         _ShowDialogueEditor = config.Bind("Keybinds", "ShowDialogueEditor", UnityEngine.KeyCode.Alpha7, "Key to toggle the in-game dialogue editor.");
-        _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha8, "Key to toggle the resource pack manager.");
+        _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha1, "Key to toggle the Pack Manager (end-user window).");
+
+        // New Dev Hub keybinds
+        _ShowDevHub         = config.Bind("Keybinds", "ShowDevHub",         UnityEngine.KeyCode.Alpha2, "Key to toggle the Dev Hub (creator tools window).");
+        _DevHubGraphicsKey  = config.Bind("Keybinds", "DevHubGraphics",     UnityEngine.KeyCode.Alpha2, "Open Dev Hub directly on the Graphics tab.");
+        _DevHubAudioKey     = config.Bind("Keybinds", "DevHubAudio",        UnityEngine.KeyCode.Alpha3, "Open Dev Hub directly on the Audio tab.");
+        _DevHubTextKey      = config.Bind("Keybinds", "DevHubText",         UnityEngine.KeyCode.Alpha4, "Open Dev Hub directly on the Text tab.");
+        _DevHubPerformanceKey = config.Bind("Keybinds", "DevHubPerformance", UnityEngine.KeyCode.Alpha5, "Open Dev Hub directly on the Performance tab.");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");

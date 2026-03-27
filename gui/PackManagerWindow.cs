@@ -273,7 +273,19 @@ public static class PackManagerWindow
         string status = HasChanges
             ? $"{active}/{list.Count} active  •  unsaved changes"
             : $"{active}/{list.Count} active";
+
+        GUILayout.BeginHorizontal();
         GUILayout.Label(status, GUIHelper.LabelStyle);
+        GUILayout.FlexibleSpace();
+
+        // Dev Tools button — opens the Dev Hub for creators
+        Color prev = UnityEngine.GUI.backgroundColor;
+        UnityEngine.GUI.backgroundColor = new Color(0.25f, 0.45f, 0.8f);
+        if (GUILayout.Button("Dev Tools \u2192", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
+            DevHub.OpenAt(DevHub.TabGraphics);
+        UnityEngine.GUI.backgroundColor = prev;
+
+        GUILayout.EndHorizontal();
     }
 
     // ================================================================

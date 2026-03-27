@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 namespace Patchwork.GUI;
 
@@ -88,6 +89,60 @@ public static class TextLog
         GUILayout.EndScrollView();
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
+    }
+
+    /// <summary>Total number of tracked text entries.</summary>
+    public static int EntryCount => TextLogEntries.Count;
+
+    /// <summary>
+    /// Renders log entries into the current GUILayout context (no window chrome).
+    /// Calls <paramref name="onEntryClick"/> when an entry is clicked.
+    /// Called by TextPillar inside the Dev Hub window.
+    /// </summary>
+    public static void DrawEntries(int maxVisible, double fadeDuration, Action<string, string, string> onEntryClick)
+    {
+        // Remove fully faded overflow entries
+        for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)
+        {
+            if (TextLogEntries[i].IsFadedOut(fadeDuration))
+                TextLogEntries.RemoveAt(i);
+        }
+
+        // Mark overflow entries that just got bumped
+        for (int i = maxVisible; i < TextLogEntries.Count; i++)
+        {
+            if (TextLogEntries[i].BumpedTime == null)
+                TextLogEntries[i].BumpedTime = DateTime.Now;
+        }
+
+        // Clear bumped time for entries that scrolled back into visible range
+        for (int i = 0; i < Math.Min(maxVisible, TextLogEntries.Count); i++)
+            TextLogEntries[i].BumpedTime = null;
+
+        GUILayout.BeginVertical();
+        for (int i = 0; i < TextLogEntries.Count; i++)
+        {
+            var entry    = TextLogEntries[i];
+            bool visible = i < maxVisible;
+            float opacity = visible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
+
+            UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
+
+            string preview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
+            if (preview.Length > MaxPreviewLength)
+                preview = preview.Substring(0, MaxPreviewLength - 3) + "...";
+
+            if (GUILayout.Button($"{entry.SheetName}.{entry.KeyName}: {preview}", GUIHelper.LabelStyle))
+                onEntryClick?.Invoke(entry.SheetName, entry.KeyName, entry.Text);
+        }
+
+        if (TextLogEntries.Count == 0)
+        {
+            UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
+            GUILayout.Label("No entries yet.", GUIHelper.LabelStyle);
+        }
+        UnityEngine.GUI.contentColor = Color.white;
+        GUILayout.EndVertical();
     }
 
     public static void LogText(string sheet, string key, string text)
