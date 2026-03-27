@@ -63,6 +63,7 @@ public static class AudioPillar
         _rightScroll = GUILayout.BeginScrollView(_rightScroll, GUILayout.ExpandHeight(true));
         AudioLog.DrawEntries(maxVisible, fadeDuration, Plugin.Config.HideModdedAudioInLog);
         GUILayout.EndScrollView();
+        GUILayout.EndVertical();
 
         GUILayout.EndHorizontal();
 
