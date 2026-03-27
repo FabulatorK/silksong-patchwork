@@ -76,7 +76,7 @@ public static partial class T2DLoader
     public static void OnSpriteSet(SpriteRenderer sr, Sprite value)
     {
         _trackedSpriteNames[sr.GetInstanceID()] = value.name;
-        if (value.texture != null)
+        if (value.texture != null && !HasIndividualReplacement(value))
             TrySwapTexture(value.texture);
         HandleLoad(sr, value);
     }
@@ -84,9 +84,24 @@ public static partial class T2DLoader
     public static void OnSpriteSet(Image img, Sprite value)
     {
         _trackedSpriteNames[img.GetInstanceID()] = value.name;
-        if (value.texture != null)
+        if (value.texture != null && !HasIndividualReplacement(value))
             TrySwapTexture(value.texture);
         HandleLoad(img, value);
+    }
+
+    /// <summary>
+    /// Returns true when an individual sprite replacement exists for this sprite,
+    /// either already promoted to _loadedSprites or still pending in _preloadedBytes.
+    /// Used to skip the in-place atlas swap for sprites that have their own PNG.
+    /// </summary>
+    private static bool HasIndividualReplacement(Sprite sprite)
+    {
+        if (sprite.texture == null || !T2DUtil.IsT2DTexture(sprite.texture.name))
+            return false;
+        string key = T2DUtil.SpriteKey(T2DUtil.CleanTextureName(sprite.texture.name), sprite.name);
+        return _loadedSprites.ContainsKey(key)
+            || _preloadedBytes.ContainsKey(key)
+            || _preloadedBytes.ContainsKey(sprite.name);
     }
 
     // ================================================================
