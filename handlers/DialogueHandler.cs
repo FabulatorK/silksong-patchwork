@@ -21,6 +21,7 @@ public class DialogueHandler
     // All user-override keys loaded from disk, for stale-key detection.
     private static readonly HashSet<string> AllOverrideKeys = new();
     public static int StaleKeyCount { get; private set; }
+    private static bool _staleKeysReported;
 
     // Read-only stats for GUI
     public static int CachedSheetCount
@@ -96,6 +97,7 @@ public class DialogueHandler
         RequestedOverrideKeys.Clear();
         AllOverrideKeys.Clear();
         StaleKeyCount = 0;
+        _staleKeysReported = false;
 
         // Re-switch to the current language to trigger the game's text refresh
         string currentLang = Language.CurrentLanguage().ToString();
@@ -157,6 +159,8 @@ public class DialogueHandler
     /// </summary>
     public static void CheckForStaleKeys()
     {
+        if (_staleKeysReported) return;
+
         int staleCount = 0;
         foreach (var compositeKey in AllOverrideKeys)
         {
@@ -174,19 +178,15 @@ public class DialogueHandler
                 continue;
 
             staleCount++;
-
-            // Per-key warnings are verbose and fire on every scene load before the game
-            // has had a chance to request keys from menus/rooms not yet visited.
-            // Only log them when DumpText is enabled (developer workflow).
-            if (Plugin.Config.DumpText)
-                Plugin.Logger.LogWarning(
-                    $"[Patchwork] Text override key \"{key}\" in sheet \"{sheet}\" ({lang}) " +
-                    $"was never requested by the game — key may have been renamed by a game update. " +
-                    $"Consider re-dumping text with DumpText enabled.");
+            Plugin.Logger.LogWarning(
+                $"[Patchwork] Text override key \"{key}\" in sheet \"{sheet}\" ({lang}) " +
+                $"was never requested by the game — key may have been renamed by a game update. " +
+                $"Consider re-dumping text with DumpText enabled.");
         }
         StaleKeyCount = staleCount;
+        _staleKeysReported = true;
         if (staleCount > 0)
-            Plugin.Logger.LogInfo($"[Patchwork] {staleCount} text override key(s) not yet seen this session (enable DumpText for details).");
+            Plugin.Logger.LogWarning($"[Patchwork] {staleCount} stale text override key(s) detected. These overrides are not being applied.");
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang, string basePath)
