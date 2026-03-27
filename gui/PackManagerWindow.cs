@@ -91,6 +91,7 @@ public static class PackManagerWindow
         // The list we're rendering — staged changes if pending, live list otherwise.
         var list = _staged ?? PackManager.AllPacks.ToList();
 
+        GUIHelper.Space(16);
         DrawToolbar(list);
         GUIHelper.Space(4);
         DrawPackList(list);
