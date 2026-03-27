@@ -33,59 +33,15 @@ public static class TextLog
     private static void TextLogWindow(int windowID)
     {
         GUIHelper.Space(16);
-
-        int maxVisible = Mathf.Clamp(Plugin.Config.TextLogMaxVisible, 5, 50);
+        int maxVisible    = Mathf.Clamp(Plugin.Config.TextLogMaxVisible, 5, 50);
         double fadeDuration = Plugin.Config.TextLogDuration;
 
-        // Remove fully faded overflow entries
-        for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)
-        {
-            if (TextLogEntries[i].IsFadedOut(fadeDuration))
-                TextLogEntries.RemoveAt(i);
-        }
-
-        // Mark overflow entries that just got bumped
-        for (int i = maxVisible; i < TextLogEntries.Count; i++)
-        {
-            if (TextLogEntries[i].BumpedTime == null)
-                TextLogEntries[i].BumpedTime = DateTime.Now;
-        }
-
-        // Clear bumped time for entries that scrolled back into visible range
-        for (int i = 0; i < Math.Min(maxVisible, TextLogEntries.Count); i++)
-        {
-            TextLogEntries[i].BumpedTime = null;
-        }
-
         scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-        GUILayout.BeginVertical();
-        for (int i = 0; i < TextLogEntries.Count; i++)
+        DrawEntries(maxVisible, fadeDuration, (sheet, key, text) =>
         {
-            var entry = TextLogEntries[i];
-            bool isVisible = i < maxVisible;
-            float opacity = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
-
-            var color = new Color(1.0f, 1.0f, 1.0f, opacity);
-            UnityEngine.GUI.contentColor = color;
-
-            string textPreview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
-            if (textPreview.Length > MaxPreviewLength)
-                textPreview = textPreview.Substring(0, MaxPreviewLength - 3) + "...";
-
-            string label = $"{entry.SheetName}.{entry.KeyName}: {textPreview}";
-
-            // Clickable entry — opens in Dialogue Editor
-            if (GUILayout.Button(label, GUIHelper.LabelStyle))
-            {
-                DialogueEditor.SelectEntry(entry.SheetName, entry.KeyName, entry.Text);
-                Plugin.ShowDialogueEditor = true;
-            }
-        }
-
-        if (TextLogEntries.Count == 0)
-            GUILayout.Label("No log entries.", GUIHelper.LabelStyle);
-
-        GUILayout.EndVertical();
+            DialogueEditor.SelectEntry(sheet, key, text);
+            Plugin.ShowDialogueEditor = true;
+        });
         GUILayout.EndScrollView();
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
@@ -101,31 +57,13 @@ public static class TextLog
     /// </summary>
     public static void DrawEntries(int maxVisible, double fadeDuration, Action<string, string, string> onEntryClick)
     {
-        // Remove fully faded overflow entries
-        for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)
-        {
-            if (TextLogEntries[i].IsFadedOut(fadeDuration))
-                TextLogEntries.RemoveAt(i);
-        }
-
-        // Mark overflow entries that just got bumped
-        for (int i = maxVisible; i < TextLogEntries.Count; i++)
-        {
-            if (TextLogEntries[i].BumpedTime == null)
-                TextLogEntries[i].BumpedTime = DateTime.Now;
-        }
-
-        // Clear bumped time for entries that scrolled back into visible range
-        for (int i = 0; i < Math.Min(maxVisible, TextLogEntries.Count); i++)
-            TextLogEntries[i].BumpedTime = null;
+        UpdateEntryLifecycle(maxVisible, fadeDuration);
 
         GUILayout.BeginVertical();
         for (int i = 0; i < TextLogEntries.Count; i++)
         {
-            var entry    = TextLogEntries[i];
-            bool visible = i < maxVisible;
-            float opacity = visible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
-
+            var entry = TextLogEntries[i];
+            float opacity = i < maxVisible ? 1f : entry.GetFadeOpacity(fadeDuration);
             UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
 
             string preview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
@@ -143,6 +81,18 @@ public static class TextLog
         }
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
+    }
+
+    private static void UpdateEntryLifecycle(int maxVisible, double fadeDuration)
+    {
+        for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)
+            if (TextLogEntries[i].IsFadedOut(fadeDuration))
+                TextLogEntries.RemoveAt(i);
+        for (int i = maxVisible; i < TextLogEntries.Count; i++)
+            if (TextLogEntries[i].BumpedTime == null)
+                TextLogEntries[i].BumpedTime = DateTime.Now;
+        for (int i = 0; i < Math.Min(maxVisible, TextLogEntries.Count); i++)
+            TextLogEntries[i].BumpedTime = null;
     }
 
     public static void LogText(string sheet, string key, string text)

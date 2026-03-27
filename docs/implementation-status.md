@@ -117,32 +117,6 @@ finished packs.
 
 ---
 
-## Planned — GUI / UX Redesign
-
-> Design document: `docs/gui-ux-redesign.md`
-
-Collapse 8 independent windows into two audience-appropriate entry points:
-Pack Manager (end users) and Dev Hub (creators).
-
-### Build sequence
-
-| Step | Deliverable | Status |
-|------|-------------|--------|
-| 1 | `gui/StatusOverlay.cs` — corner badge for end users | **Shipped** |
-| 2 | `gui/DevHub.cs` — tabbed shell, empty pillar stubs | **Shipped** |
-| 3 | `gui/pillars/PerformancePillar.cs` — absorbs DevProfiler | **Shipped** |
-| 4 | `gui/pillars/AudioPillar.cs` — absorbs AudioLog + AudioList | **Shipped** |
-| 5 | `gui/pillars/TextPillar.cs` — absorbs TextLog + DialogueEditor | **Shipped** |
-| 6 | `gui/pillars/GraphicsPillar.cs` — absorbs SkinStatus + AnimationController UI | **Shipped** |
-| 7 | `gui/pillars/VideoPillar.cs` — stub, reads VideoHandler | **Shipped** |
-| 8 | Pack Manager footer button + keybind cleanup | **Shipped** |
-
-**Prerequisite check before Step 6:** Confirm that `AnimationController.cs` can be
-cleanly split into a data/patch layer and a view layer (its Harmony patches on
-`tk2dSpriteAnimator` must remain functional when the `Draw()` surface moves).
-
----
-
 ## Architecture Principles
 
 These apply to all future work and should be respected when implementing any planned

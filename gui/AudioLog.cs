@@ -42,55 +42,9 @@ public static class AudioLog
     private static void AudioLogWindow(int windowID)
     {
         GUIHelper.Space(16);
-
-        int maxVisible = Mathf.Clamp(Plugin.Config.AudioLogMaxVisible, 5, 50);
+        int maxVisible    = Mathf.Clamp(Plugin.Config.AudioLogMaxVisible, 5, 50);
         double fadeDuration = Plugin.Config.LogAudioDuration;
-
-        // Remove fully faded overflow entries
-        for (int i = AudioPlayEntries.Count - 1; i >= maxVisible; i--)
-        {
-            if (AudioPlayEntries[i].IsFadedOut(fadeDuration))
-                AudioPlayEntries.RemoveAt(i);
-        }
-
-        // Mark overflow entries that just got bumped
-        for (int i = maxVisible; i < AudioPlayEntries.Count; i++)
-        {
-            if (AudioPlayEntries[i].BumpedTime == null)
-                AudioPlayEntries[i].BumpedTime = DateTime.Now;
-        }
-
-        // Clear bumped time for entries that scrolled back into visible range
-        for (int i = 0; i < Math.Min(maxVisible, AudioPlayEntries.Count); i++)
-        {
-            AudioPlayEntries[i].BumpedTime = null;
-        }
-
-        int shown = 0;
-        GUILayout.BeginVertical();
-        for (int i = 0; i < AudioPlayEntries.Count; i++)
-        {
-            var entry = AudioPlayEntries[i];
-
-            if (Plugin.Config.HideModdedAudioInLog && File.Exists(Path.Combine(AudioHandler.SoundFolder, entry.ClipName + ".wav")))
-                continue;
-
-            bool isVisible = i < maxVisible;
-            float opacity = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
-
-            var color = new Color(1.0f, 1.0f, 1.0f, opacity);
-            UnityEngine.GUI.contentColor = color;
-            GUILayout.Label(entry.ClipName, GUIHelper.LabelStyle);
-            shown++;
-        }
-        if (shown == 0)
-        {
-            UnityEngine.GUI.contentColor = Color.yellow;
-            GUILayout.Label("No audio played recently.", GUIHelper.LabelStyle);
-        }
-        UnityEngine.GUI.contentColor = Color.white;
-        GUILayout.EndVertical();
-
+        DrawEntries(maxVisible, fadeDuration, Plugin.Config.HideModdedAudioInLog);
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
@@ -100,36 +54,17 @@ public static class AudioLog
     /// </summary>
     public static void DrawEntries(int maxVisible, double fadeDuration, bool hideModded)
     {
-        // Remove fully faded overflow entries
-        for (int i = AudioPlayEntries.Count - 1; i >= maxVisible; i--)
-        {
-            if (AudioPlayEntries[i].IsFadedOut(fadeDuration))
-                AudioPlayEntries.RemoveAt(i);
-        }
-
-        // Mark overflow entries that just got bumped
-        for (int i = maxVisible; i < AudioPlayEntries.Count; i++)
-        {
-            if (AudioPlayEntries[i].BumpedTime == null)
-                AudioPlayEntries[i].BumpedTime = DateTime.Now;
-        }
-
-        // Clear bumped time for entries that scrolled back into visible range
-        for (int i = 0; i < Math.Min(maxVisible, AudioPlayEntries.Count); i++)
-            AudioPlayEntries[i].BumpedTime = null;
+        UpdateEntryLifecycle(maxVisible, fadeDuration);
 
         int shown = 0;
         GUILayout.BeginVertical();
         for (int i = 0; i < AudioPlayEntries.Count; i++)
         {
             var entry = AudioPlayEntries[i];
-
             if (hideModded && File.Exists(Path.Combine(AudioHandler.SoundFolder, entry.ClipName + ".wav")))
                 continue;
 
-            bool isVisible = i < maxVisible;
-            float opacity  = isVisible ? 1.0f : entry.GetFadeOpacity(fadeDuration);
-
+            float opacity = i < maxVisible ? 1f : entry.GetFadeOpacity(fadeDuration);
             UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
             GUILayout.Label(entry.ClipName, GUIHelper.LabelStyle);
             shown++;
@@ -141,6 +76,18 @@ public static class AudioLog
         }
         UnityEngine.GUI.contentColor = Color.white;
         GUILayout.EndVertical();
+    }
+
+    private static void UpdateEntryLifecycle(int maxVisible, double fadeDuration)
+    {
+        for (int i = AudioPlayEntries.Count - 1; i >= maxVisible; i--)
+            if (AudioPlayEntries[i].IsFadedOut(fadeDuration))
+                AudioPlayEntries.RemoveAt(i);
+        for (int i = maxVisible; i < AudioPlayEntries.Count; i++)
+            if (AudioPlayEntries[i].BumpedTime == null)
+                AudioPlayEntries[i].BumpedTime = DateTime.Now;
+        for (int i = 0; i < Math.Min(maxVisible, AudioPlayEntries.Count); i++)
+            AudioPlayEntries[i].BumpedTime = null;
     }
 
     public static void LogAudio(AudioClip clip)

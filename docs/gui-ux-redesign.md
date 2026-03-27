@@ -1,6 +1,6 @@
 # GUI / UX Redesign Plan
 
-## Status: PLANNED — not yet implemented
+## Status: IMPLEMENTED — all 8 steps shipped
 
 ---
 
@@ -286,15 +286,3 @@ earlier ones being in place, but each step leaves the mod in a working state.
 - Data layer — handlers, loaders, `PlayerDataCatalog`, `PackManager`, etc.
 - Packed bundle format work (`.pwpk`) — orthogonal to this plan
 
----
-
-## Open Questions
-
-- **Status Overlay position**: top-left (near health bar) vs bottom-right (less
-  intrusive) — needs playtesting
-- **Dev mode detection**: how does Patchwork know it is in "dev mode"?  Currently
-  there is no explicit flag.  Options: a config toggle, presence of non-packed packs,
-  or an explicit `DevMode = true` in `PatchworkConfig`
-- **Animation Controller data layer**: its Harmony patches on `tk2dSpriteAnimator`
-  currently live in the same file as its UI.  Step 6 assumes clean separation is
-  possible; needs a quick read of the file to confirm
