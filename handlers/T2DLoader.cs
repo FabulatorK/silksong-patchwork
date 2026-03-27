@@ -565,6 +565,14 @@ public static partial class T2DLoader
         SkippedTextureIds.Clear();
         T2DUtil.ClearCleanNameCache();
 
+        // Clearing SkippedTextureIds removed protection from old sprite-sized textures that are
+        // still alive (referenced by oldSprites). Their names match atlas names in SpritesheetOverrides
+        // so TrySwapTexture would find them, fail the size check, and log spurious warnings.
+        // Re-add them now so they're skipped during the spritesheet swap below.
+        foreach (var sprite in oldSprites)
+            if (sprite?.texture != null)
+                SkippedTextureIds.Add(sprite.texture.GetInstanceID());
+
         // Clear tracking state so stale renderer/sprite associations from the old pack
         // cannot interfere with the new one.  Renderers will be re-tracked as HandleLoad
         // processes them in the sweep below.
