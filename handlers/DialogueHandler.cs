@@ -173,15 +173,20 @@ public class DialogueHandler
             if (lang != currentLang)
                 continue;
 
-            Plugin.Logger.LogWarning(
-                $"[Patchwork] Text override key \"{key}\" in sheet \"{sheet}\" ({lang}) " +
-                $"was never requested by the game — key may have been renamed by a game update. " +
-                $"Consider re-dumping text with DumpText enabled.");
             staleCount++;
+
+            // Per-key warnings are verbose and fire on every scene load before the game
+            // has had a chance to request keys from menus/rooms not yet visited.
+            // Only log them when DumpText is enabled (developer workflow).
+            if (Plugin.Config.DumpText)
+                Plugin.Logger.LogWarning(
+                    $"[Patchwork] Text override key \"{key}\" in sheet \"{sheet}\" ({lang}) " +
+                    $"was never requested by the game — key may have been renamed by a game update. " +
+                    $"Consider re-dumping text with DumpText enabled.");
         }
         StaleKeyCount = staleCount;
         if (staleCount > 0)
-            Plugin.Logger.LogWarning($"[Patchwork] {staleCount} stale text override key(s) detected. These overrides are not being applied.");
+            Plugin.Logger.LogInfo($"[Patchwork] {staleCount} text override key(s) not yet seen this session (enable DumpText for details).");
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang, string basePath)
