@@ -517,6 +517,14 @@ public static partial class T2DLoader
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
+        // Re-protect replacement sprite textures that are still alive in _loadedSprites.
+        // These are sprite-sized Texture2D objects named after their parent atlas; without
+        // this they'd be matched by TrySwapTexture on the next ApplyReplacementsInScene
+        // Pass 1 and produce spurious size-mismatch warnings.
+        foreach (var sprite in _loadedSprites.Values)
+            if (sprite?.texture != null)
+                SkippedTextureIds.Add(sprite.texture.GetInstanceID());
+
         // Remove dead SpriteRenderer/Image instance IDs from the name-tracking dict.
         // These accumulate as enemies/objects are destroyed during gameplay.
         if (_trackedSpriteNames.Count > 0)
