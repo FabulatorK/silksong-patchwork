@@ -298,6 +298,10 @@ public static partial class T2DLoader
                     if (spriteTex != null)
                     {
                         spriteTex.name = sprite.texture.name;
+                        // Our created texture shares the atlas name but is sprite-sized.
+                        // Pre-mark it so TrySwapTexture never tries to match it against
+                        // a full-atlas spritesheet override (which would log a size-mismatch warning).
+                        SkippedTextureIds.Add(spriteTex.GetInstanceID());
 
                         Sprite newSprite = Sprite.Create(spriteTex,
                             new Rect(0, 0, spriteTex.width, spriteTex.height),
@@ -334,6 +338,7 @@ public static partial class T2DLoader
                     return;
                 }
                 spriteTex.name = texName;
+                SkippedTextureIds.Add(spriteTex.GetInstanceID()); // same atlas-name / wrong-size guard
                 Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                 newSprite.name = sprite.name;
 
