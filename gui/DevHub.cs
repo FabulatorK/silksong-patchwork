@@ -59,6 +59,9 @@ public static class DevHub
 
             UnityEngine.GUI.backgroundColor = prev;
         }
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(28), GUIHelper.Height(28)))
+            Plugin.ShowDevHub = false;
         GUILayout.EndHorizontal();
         GUIHelper.Space(6);
 
@@ -80,5 +83,17 @@ public static class DevHub
     {
         Plugin.ShowDevHub = true;
         Plugin.DevHubTab  = tab;
+    }
+
+    /// <summary>
+    /// Open at <paramref name="tab"/>, switch to it if already open on another tab,
+    /// or close if already open on that tab (keybind toggle behaviour).
+    /// </summary>
+    public static void ToggleAt(int tab)
+    {
+        if (Plugin.ShowDevHub && Plugin.DevHubTab == tab)
+            Plugin.ShowDevHub = false;
+        else
+            OpenAt(tab);
     }
 }

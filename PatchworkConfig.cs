@@ -22,12 +22,6 @@ public class PatchworkConfig
     private readonly ConfigEntry<bool> _HideModdedAudioInLog;
     public bool HideModdedAudioInLog { get { return _HideModdedAudioInLog.Value; } }
 
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAudioLog;
-    public UnityEngine.KeyCode ShowAudioLogKey { get { return _ShowAudioLog.Value; } }
-
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAudioList;
-    public UnityEngine.KeyCode ShowAudioListKey { get { return _ShowAudioList.Value; } }
-
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowAnimationController;
     public UnityEngine.KeyCode ShowAnimationControllerKey { get { return _ShowAnimationController.Value; } }
 
@@ -43,25 +37,13 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerFreezeKey;
     public UnityEngine.KeyCode AnimationControllerFreezeKey { get { return _AnimationControllerFreezeKey.Value; } }
 
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowTextLog;
-    public UnityEngine.KeyCode ShowTextLogKey { get { return _ShowTextLog.Value; } }
-
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowSkinStatus;
-    public UnityEngine.KeyCode ShowSkinStatusKey { get { return _ShowSkinStatus.Value; } }
-
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDevProfiler;
     public UnityEngine.KeyCode ShowDevProfilerKey { get { return _ShowDevProfiler.Value; } }
-
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDialogueEditor;
-    public UnityEngine.KeyCode ShowDialogueEditorKey { get { return _ShowDialogueEditor.Value; } }
 
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowPackManager;
     public UnityEngine.KeyCode ShowPackManagerKey { get { return _ShowPackManager.Value; } }
 
     // ── Dev Hub keybinds (new unified UI) ────────────────────────────────────
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDevHub;
-    public UnityEngine.KeyCode ShowDevHubKey { get { return _ShowDevHub.Value; } }
-
     private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubGraphicsKey;
     public UnityEngine.KeyCode DevHubGraphicsKey { get { return _DevHubGraphicsKey.Value; } }
 
@@ -107,18 +89,13 @@ public class PatchworkConfig
         _ConvertSpritesheets = config.Bind("Dumping", "ConvertSpritesheets", false, "Automatically convert modded spritesheets to individual Patchwork-compatible PNGs.");
 
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
-        _ShowAudioLog = config.Bind("Keybinds", "ShowAudioLog", UnityEngine.KeyCode.Alpha1, "Key to toggle the audio log display.");
-        _ShowAudioList = config.Bind("Keybinds", "ShowAudioList", UnityEngine.KeyCode.Alpha2, "Key to toggle the audio list display.");
-        _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller display.");
-        _ShowTextLog = config.Bind("Keybinds", "ShowTextLog", UnityEngine.KeyCode.Alpha4, "Key to toggle the text log display.");
-        _ShowSkinStatus = config.Bind("Keybinds", "ShowSkinStatus", UnityEngine.KeyCode.Alpha5, "Key to toggle the skin status overlay.");
-        _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler overlay.");
-        _ShowDialogueEditor = config.Bind("Keybinds", "ShowDialogueEditor", UnityEngine.KeyCode.Alpha7, "Key to toggle the in-game dialogue editor.");
-        _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha1, "Key to toggle the Pack Manager (end-user window).");
+        _ShowAnimationController = config.Bind("Keybinds", "ShowAnimationController", UnityEngine.KeyCode.Alpha3, "Key to toggle the animation controller (legacy shim, one release only).");
+        _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler (legacy shim, one release only).");
+        _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha1, "Key to toggle the Pack Manager.");
 
-        // New Dev Hub keybinds
-        _ShowDevHub         = config.Bind("Keybinds", "ShowDevHub",         UnityEngine.KeyCode.Alpha2, "Key to toggle the Dev Hub (creator tools window).");
-        _DevHubGraphicsKey  = config.Bind("Keybinds", "DevHubGraphics",     UnityEngine.KeyCode.Alpha2, "Open Dev Hub directly on the Graphics tab.");
+        // Dev Hub tab keybinds — pressing the active tab's key closes the Hub;
+        // pressing any tab key while closed opens the Hub at that tab.
+        _DevHubGraphicsKey  = config.Bind("Keybinds", "DevHubGraphics",     UnityEngine.KeyCode.Alpha2, "Open Dev Hub at Graphics tab (press again to close).");
         _DevHubAudioKey     = config.Bind("Keybinds", "DevHubAudio",        UnityEngine.KeyCode.Alpha3, "Open Dev Hub directly on the Audio tab.");
         _DevHubTextKey      = config.Bind("Keybinds", "DevHubText",         UnityEngine.KeyCode.Alpha4, "Open Dev Hub directly on the Text tab.");
         _DevHubPerformanceKey = config.Bind("Keybinds", "DevHubPerformance", UnityEngine.KeyCode.Alpha5, "Open Dev Hub directly on the Performance tab.");

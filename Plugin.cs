@@ -30,14 +30,10 @@ public class Plugin : BaseUnityPlugin
     /// Forwards to PackManager — all handlers iterate this.</summary>
     public static IEnumerable<string> PluginPackPaths => PackManager.ActivePackPaths;
 
-    // ── Legacy per-window toggles (kept for DevProfiler standalone shim) ──────
-    public static bool ShowAudioLog = false;
-    public static bool ShowAudioList = false;
-    public static bool ShowAnimationController = false;
-    public static bool ShowTextLog = false;
-    public static bool ShowSkinStatus = false;
+    // ── Legacy standalone shims (one release only, then removed) ─────────────
     public static bool ShowDevProfiler = false;
-    public static bool ShowDialogueEditor = false;
+    public static bool ShowAnimationController = false;
+    public static bool ShowDialogueEditor = false;  // set by TextLogWindow (dead path); kept to avoid compile error
     public static bool ShowPackManager = false;
 
     // ── New unified UI ────────────────────────────────────────────────────────
@@ -192,19 +188,16 @@ public class Plugin : BaseUnityPlugin
             if (Input.GetKeyDown(Config.ShowPackManagerKey))
                 ShowPackManager = !ShowPackManager;
 
-            if (Input.GetKeyDown(Config.ShowDevHubKey))
-                ShowDevHub = !ShowDevHub;
-
-            // Tab shortcuts: press while Dev Hub is open to switch tabs,
-            // or open directly at the selected tab.
+            // Tab keys: open at tab, switch tab if already open, or close if
+            // already open on that tab (acts as toggle for the active tab).
             if (Input.GetKeyDown(Config.DevHubGraphicsKey))
-                DevHub.OpenAt(DevHub.TabGraphics);
+                DevHub.ToggleAt(DevHub.TabGraphics);
             if (Input.GetKeyDown(Config.DevHubAudioKey))
-                DevHub.OpenAt(DevHub.TabAudio);
+                DevHub.ToggleAt(DevHub.TabAudio);
             if (Input.GetKeyDown(Config.DevHubTextKey))
-                DevHub.OpenAt(DevHub.TabText);
+                DevHub.ToggleAt(DevHub.TabText);
             if (Input.GetKeyDown(Config.DevHubPerformanceKey))
-                DevHub.OpenAt(DevHub.TabPerformance);
+                DevHub.ToggleAt(DevHub.TabPerformance);
 
             // Legacy: DevProfiler standalone shim (kept for one release)
             if (Input.GetKeyDown(Config.ShowDevProfilerKey))
