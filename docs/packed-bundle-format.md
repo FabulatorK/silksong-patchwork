@@ -100,14 +100,32 @@ agreement between what the creator sees and what end users load.
 ```
 for each file in pack folder (sprites, spritesheets, audio):
     read PNG bytes
-    create Texture2D, LoadImage (PNG decode)
-    read back GetRawTextureData() → RGBA32 bytes
-    [optional v2: compress to DXT5 via software encoder]
-    write entry to index
+    create Texture2D, LoadImage()        ← Unity runtime PNG decode
+    [v2] tex.Compress(highQuality)       ← Unity runtime DXT encoder, no external deps
+    record tex.format                    ← actual format chosen by Unity (don't assume DXT5)
+    rawBytes = tex.GetRawTextureData()   ← platform-native block data
+    sha256   = SHA256.ComputeHash(rawBytes)   ← System.Security.Cryptography, no deps
+    write entry to index  (pixel_format byte = Unity TextureFormat cast to byte)
     write raw bytes to data block
 destroy all temporary Texture2D objects
 write header + entry table + key block + data block → pack_root/pack.pwpk
 ```
+
+**All dependencies are self-contained — no native plugins, no side tools, no install
+step.  The entire toolchain ships inside the mod DLL:**
+
+| Capability | Source |
+|---|---|
+| PNG decode | `Texture2D.LoadImage()` — Unity runtime |
+| DXT5 / platform-native encode | `Texture2D.Compress()` — Unity runtime |
+| Raw pixel read-back | `Texture2D.GetRawTextureData()` — Unity runtime |
+| Data block compression (optional) | `System.IO.Compression.DeflateStream` — .NET BCL |
+| Integrity checksum | `System.Security.Cryptography.SHA256` — .NET BCL |
+| Manifest JSON | existing `SimpleJSON` or `System.Text.Json` — already in project |
+
+`Texture2D.Compress()` selects the correct GPU-native format per platform automatically
+(DXT5 on desktop, ASTC on mobile).  Recording `tex.format` after the call — rather than
+hardcoding DXT5 — keeps the `pixel_format` entry byte honest across platforms.
 
 The packer also writes a **manifest sidecar** (`pack.pwpk.json`) for human inspection:
 
@@ -182,15 +200,36 @@ loader.GetSprite(key) → already-created Sprite, no further work
 - Packed packs skip all file watching and index rebuilding
 - Manifest sidecar for inspection
 
-### v2 — DXT5/BC3 compression
-- Software DXT5 encoder in packer (libsquish or Crunch via P/Invoke, or a pure C# port)
-- ~4× GPU memory reduction, sub-millisecond upload per texture
+### v2 — GPU-native compression
+- `Texture2D.Compress(highQuality)` in packer — Unity runtime API, **no external
+  dependencies**, ships inside the mod DLL
+- Unity selects the correct block format per platform (DXT5/BC3 on desktop, ASTC on
+  mobile); `pixel_format` byte records the actual `TextureFormat` value
+- ~4× GPU memory reduction over RGBA32; sub-millisecond upload per texture
 - `pixel_format = 1` entries in existing format (no format version bump needed)
+- Optional: wrap data block in `DeflateStream` for smaller distribution size (also
+  zero external deps — `System.IO.Compression` is part of the .NET BCL)
 
 ### v3 — Streaming / partial load
 - Load only assets referenced in the current scene
 - Scene manifest pre-computed at pack time
 - Near-zero startup cost, assets stream in during scene load
+
+---
+
+## Self-Containment Guarantee
+
+Every version of this format — v1 through v3 and beyond — is designed to be
+implemented entirely within the Patchwork mod DLL with no external native plugins,
+no NuGet packages, and no Unity Editor requirement.  All encoding, decoding,
+compression, checksumming, and streaming rely exclusively on:
+
+- The Unity runtime API (available in any built Unity game)
+- The .NET base class library (ships with BepInEx / Mono)
+- Code written for Patchwork itself
+
+This is a hard constraint, not a preference.  If a future feature cannot be
+implemented within these bounds, it is deferred until a self-contained path exists.
 
 ---
 
