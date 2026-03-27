@@ -126,8 +126,36 @@ public static class PackManagerWindow
                 _staged = null;
             }
             UnityEngine.GUI.enabled = true;
+
+            GUIHelper.Space(6);
+            DrawPinButton();
         }
         GUILayout.EndHorizontal();
+    }
+
+    private static void DrawPinButton()
+    {
+        Color prev = UnityEngine.GUI.backgroundColor;
+
+        if (PackRamCache.IsPinned)
+        {
+            // Pinned — green button shows size, click to unpin
+            UnityEngine.GUI.backgroundColor = new Color(0.15f, 0.55f, 0.15f);
+            string label = $"Unpin ({PackRamCache.PinnedSizeLabel})";
+            if (GUILayout.Button(label, GUIHelper.ButtonStyle, GUIHelper.Height(22)))
+                PackRamCache.Unpin();
+        }
+        else
+        {
+            // Unpinned — amber experimental button
+            UnityEngine.GUI.backgroundColor = new Color(0.6f, 0.45f, 0.0f);
+            UnityEngine.GUI.contentColor    = new Color(1f, 0.9f, 0.5f);
+            if (GUILayout.Button("⚠ Pin to RAM", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
+                PackRamCache.Pin(PackManager.ActivePackPaths);
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+
+        UnityEngine.GUI.backgroundColor = prev;
     }
 
     private static void DrawPackList(List<PackInfo> list)
