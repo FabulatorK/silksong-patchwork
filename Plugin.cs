@@ -32,7 +32,6 @@ public class Plugin : BaseUnityPlugin
 
     // ── Legacy standalone shims (one release only, then removed) ─────────────
     public static bool ShowDevProfiler = false;
-    public static bool ShowAnimationController = false;
     public static bool ShowDialogueEditor = false;  // set by TextLogWindow (dead path); kept to avoid compile error
     public static bool ShowPackManager = false;
 
@@ -203,9 +202,6 @@ public class Plugin : BaseUnityPlugin
             if (Input.GetKeyDown(Config.ShowDevProfilerKey))
                 ShowDevProfiler = !ShowDevProfiler;
 
-            // Legacy: AnimationController standalone (kept for one release)
-            if (Input.GetKeyDown(Config.ShowAnimationControllerKey))
-                ShowAnimationController = !ShowAnimationController;
         }
 
         if (SpriteFileWatcher.ReloadSprites)
@@ -273,8 +269,6 @@ public class Plugin : BaseUnityPlugin
         // ── Legacy standalone shims (kept for one release, then removed) ──────
         if (ShowDevProfiler)
             DevProfiler.Draw();
-        if (ShowAnimationController)
-            AnimationController.DrawAnimationController();
     }
     
     private void InitializeFolders()
