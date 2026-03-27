@@ -12,33 +12,10 @@ namespace Patchwork.Handlers;
 [HarmonyPatch]
 public static class T2DHandler
 {
-    // [PW-PERF] Per-frame call counters for Harmony patches
-    private static int _perfSpriteSetterCalls;
-    private static int _perfImageSetterCalls;
-    private static int _perfMatSetterCalls;
-    private static int _perfLastFrame = -1;
-
-    private static void PerfTickFrame()
-    {
-        if (!Plugin.ShowDevProfiler) return;
-        int frame = Time.frameCount;
-        if (frame != _perfLastFrame)
-        {
-            if (_perfSpriteSetterCalls > 20 || _perfImageSetterCalls > 20 || _perfMatSetterCalls > 20)
-                Plugin.Logger.LogWarning($"[PW-PERF] T2D patch calls in frame {_perfLastFrame}: SpriteSet={_perfSpriteSetterCalls}, ImageSet={_perfImageSetterCalls}, MatSet={_perfMatSetterCalls}");
-            _perfSpriteSetterCalls = 0;
-            _perfImageSetterCalls = 0;
-            _perfMatSetterCalls = 0;
-            _perfLastFrame = frame;
-        }
-    }
-
     [HarmonyPostfix]
     [HarmonyPatch(typeof(SpriteRenderer), nameof(SpriteRenderer.sprite), MethodType.Setter)]
     public static void SetSpritePostfix(SpriteRenderer __instance, Sprite value)
     {
-        PerfTickFrame();
-        _perfSpriteSetterCalls++;
         if (T2DLoader.IsHandlingOrEnforcing || __instance == null || value == null || __instance.gameObject.name == "TempSpriteRenderer")
             return;
 
@@ -55,8 +32,6 @@ public static class T2DHandler
     [HarmonyPatch(typeof(Image), nameof(Image.sprite), MethodType.Setter)]
     public static void SetImageSpritePostfix(Image __instance, Sprite value)
     {
-        PerfTickFrame();
-        _perfImageSetterCalls++;
         if (T2DLoader.IsHandlingOrEnforcing || __instance == null || value == null)
             return;
 
@@ -73,8 +48,6 @@ public static class T2DHandler
     [HarmonyPatch(typeof(Material), nameof(Material.mainTexture), MethodType.Setter)]
     public static void SetMaterialTexturePostfix(Texture value)
     {
-        PerfTickFrame();
-        _perfMatSetterCalls++;
         if (!T2DLoader.HasT2DReplacements)
             return;
 

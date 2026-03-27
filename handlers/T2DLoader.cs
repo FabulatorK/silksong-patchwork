@@ -477,6 +477,45 @@ public static partial class T2DLoader
             : sprite.name;
 
     // ================================================================
+    //  Scene-transition cleanup
+    // ================================================================
+
+    /// <summary>
+    /// Clears per-scene transient state after a scene unloads.
+    /// - Texture instance ID sets are flushed: IDs are recycled by Unity across scenes,
+    ///   so a stale "skipped" entry could silently suppress a valid replacement next scene.
+    /// - Dead instance IDs in _trackedSpriteNames are pruned to prevent unbounded growth.
+    /// Call on SceneManager.sceneUnloaded alongside PruneStaleOriginals.
+    /// </summary>
+    public static void PruneSceneState()
+    {
+        // Clear texture ID sets — scene textures are about to be destroyed and their
+        // IDs may be reused. Force fresh evaluation next scene.
+        ReplacedTextureIds.Clear();
+        SkippedTextureIds.Clear();
+
+        // Remove dead SpriteRenderer/Image instance IDs from the name-tracking dict.
+        // These accumulate as enemies/objects are destroyed during gameplay.
+        if (_trackedSpriteNames.Count > 0)
+        {
+            var deadKeys = new List<int>();
+            foreach (var id in _trackedSpriteNames.Keys)
+            {
+                bool isLive = false;
+                foreach (var sr in _knownRenderers)
+                    if (sr != null && sr.GetInstanceID() == id) { isLive = true; break; }
+                if (!isLive)
+                    foreach (var img in _knownImages)
+                        if (img != null && img.GetInstanceID() == id) { isLive = true; break; }
+                if (!isLive) deadKeys.Add(id);
+            }
+            foreach (var k in deadKeys) _trackedSpriteNames.Remove(k);
+            if (deadKeys.Count > 0)
+                Plugin.Logger.LogInfo($"[T2D] Pruned {deadKeys.Count} stale tracked name(s) after scene unload");
+        }
+    }
+
+    // ================================================================
     //  Hot reload and cache invalidation
     // ================================================================
 
