@@ -34,9 +34,6 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _AnimationControllerFreezeKey;
     public UnityEngine.KeyCode AnimationControllerFreezeKey { get { return _AnimationControllerFreezeKey.Value; } }
 
-    private readonly ConfigEntry<UnityEngine.KeyCode> _ShowDevProfiler;
-    public UnityEngine.KeyCode ShowDevProfilerKey { get { return _ShowDevProfiler.Value; } }
-
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowPackManager;
     public UnityEngine.KeyCode ShowPackManagerKey { get { return _ShowPackManager.Value; } }
 
@@ -86,7 +83,6 @@ public class PatchworkConfig
         _ConvertSpritesheets = config.Bind("Dumping", "ConvertSpritesheets", false, "Automatically convert modded spritesheets to individual Patchwork-compatible PNGs.");
 
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
-        _ShowDevProfiler = config.Bind("Keybinds", "ShowDevProfiler", UnityEngine.KeyCode.Alpha6, "Key to toggle the dev profiler (legacy shim, one release only).");
         _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha1, "Key to toggle the Pack Manager.");
 
         // Dev Hub tab keybinds (Alpha2–5 = first four tabs; Audio/Performance via hub only).

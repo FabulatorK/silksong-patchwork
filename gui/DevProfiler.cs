@@ -205,9 +205,8 @@ public static class DevProfiler
 
     private static void DrawFrameGraph()
     {
-        float graphW = GUIHelper.Scaled(WindowWidth - 20);
         float graphH = GUIHelper.Scaled(GraphHeight);
-        Rect graphRect = GUILayoutUtility.GetRect(graphW, graphH);
+        Rect graphRect = GUILayoutUtility.GetRect(0, float.MaxValue, graphH, graphH);
 
         if (graphTex == null)
         {
@@ -230,8 +229,8 @@ public static class DevProfiler
         const float targetMs = 16.667f;
         const float maxDisplayMs = 50f;
 
-        float barW = GUIHelper.Scaled(GraphBarWidth);
-        int barsToShow = Mathf.Min(sampleCount, Mathf.FloorToInt(graphRect.width / barW));
+        float barW = graphRect.width / FrameSampleCount;
+        int barsToShow = Mathf.Min(sampleCount, FrameSampleCount);
 
         for (int i = 0; i < barsToShow; i++)
         {

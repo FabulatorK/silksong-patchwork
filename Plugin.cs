@@ -31,7 +31,6 @@ public class Plugin : BaseUnityPlugin
     public static IEnumerable<string> PluginPackPaths => PackManager.ActivePackPaths;
 
     // ── Legacy standalone shims (one release only, then removed) ─────────────
-    public static bool ShowDevProfiler = false;
     public static bool ShowDialogueEditor = false;  // set by TextLogWindow (dead path); kept to avoid compile error
     public static bool ShowPackManager = false;
 
@@ -198,9 +197,6 @@ public class Plugin : BaseUnityPlugin
             if (Input.GetKeyDown(Config.DevHubVideoKey))
                 DevHub.ToggleAt(DevHub.TabVideo);
 
-            // Legacy: DevProfiler standalone shim (kept for one release)
-            if (Input.GetKeyDown(Config.ShowDevProfilerKey))
-                ShowDevProfiler = !ShowDevProfiler;
 
         }
 
@@ -266,9 +262,6 @@ public class Plugin : BaseUnityPlugin
         if (ShowPackManager)
             PackManagerWindow.Draw();
 
-        // ── Legacy standalone shims (kept for one release, then removed) ──────
-        if (ShowDevProfiler)
-            DevProfiler.Draw();
     }
     
     private void InitializeFolders()
