@@ -83,6 +83,41 @@ public static class TextLog
         GUILayout.EndVertical();
     }
 
+    /// <summary>
+    /// Renders all entries matching <paramref name="filter"/> (sheet, key, or text).
+    /// No fade/bump — intended for the search pane where order is alphabetical not temporal.
+    /// Pass null or empty to show all entries.
+    /// </summary>
+    public static void DrawFilteredEntries(string filter, Action<string, string, string> onEntryClick)
+    {
+        bool hasFilter = !string.IsNullOrEmpty(filter);
+        GUILayout.BeginVertical();
+        bool any = false;
+        foreach (var entry in TextLogEntries)
+        {
+            if (hasFilter &&
+                entry.SheetName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                entry.KeyName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                entry.Text.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            string preview = entry.Text.Replace("\n", "\\n").Replace("\r", "\\r");
+            if (preview.Length > MaxPreviewLength)
+                preview = preview.Substring(0, MaxPreviewLength - 3) + "...";
+
+            if (GUILayout.Button($"{entry.SheetName}.{entry.KeyName}: {preview}", GUIHelper.LabelStyle))
+                onEntryClick?.Invoke(entry.SheetName, entry.KeyName, entry.Text);
+            any = true;
+        }
+        if (!any)
+        {
+            UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
+            GUILayout.Label(hasFilter ? "No matches." : "No entries yet.", GUIHelper.LabelStyle);
+            UnityEngine.GUI.contentColor = Color.white;
+        }
+        GUILayout.EndVertical();
+    }
+
     private static void UpdateEntryLifecycle(int maxVisible, double fadeDuration)
     {
         for (int i = TextLogEntries.Count - 1; i >= maxVisible; i--)

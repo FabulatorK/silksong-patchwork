@@ -5,21 +5,24 @@ namespace Patchwork.GUI;
 
 /// <summary>
 /// Tabbed Dev Hub window for asset creators.
-/// Five pillars: Graphics, Audio, Text, Performance, Video.
-/// Opened via Plugin.ShowDevHub; tab selected via Plugin.DevHubTab.
+/// Six pillars in order: Dashboard, Graphics, Text, Video, Audio, Performance.
+/// Alpha2–5 open the first four tabs directly.
 /// </summary>
 public static class DevHub
 {
-    public const int TabGraphics    = 0;
-    public const int TabAudio       = 1;
+    public const int TabDashboard   = 0;
+    public const int TabGraphics    = 1;
     public const int TabText        = 2;
-    public const int TabPerformance = 3;
-    public const int TabVideo       = 4;
+    public const int TabVideo       = 3;
+    public const int TabAudio       = 4;
+    public const int TabPerformance = 5;
 
-    private static readonly string[] TabNames = { "Graphics", "Audio", "Text", "Performance", "Video" };
+    private static readonly string[] TabNames =
+        { "Dashboard", "Graphics", "Text", "Video", "Audio", "Performance" };
 
     private const float WindowWidth  = 720f;
     private const float WindowHeight = 620f;
+    private const float TabWidth     = 92f;  // consistent width for all tab buttons
 
     private static Rect _windowRect;
     private static bool _initialized;
@@ -54,7 +57,8 @@ public static class DevHub
             Color prev  = UnityEngine.GUI.backgroundColor;
             if (active) UnityEngine.GUI.backgroundColor = new Color(0.25f, 0.55f, 1f);
 
-            if (GUILayout.Button(TabNames[i], GUIHelper.ButtonStyle, GUIHelper.Height(28)))
+            if (GUILayout.Button(TabNames[i], GUIHelper.ButtonStyle,
+                    GUIHelper.Width(TabWidth), GUIHelper.Height(28)))
                 Plugin.DevHubTab = i;
 
             UnityEngine.GUI.backgroundColor = prev;
@@ -68,11 +72,12 @@ public static class DevHub
         // ── Dispatch to active pillar ─────────────────────────────────────────
         switch (Plugin.DevHubTab)
         {
+            case TabDashboard:   DashboardPillar.Draw();   break;
             case TabGraphics:    GraphicsPillar.Draw();    break;
-            case TabAudio:       AudioPillar.Draw();       break;
             case TabText:        TextPillar.Draw();        break;
-            case TabPerformance: PerformancePillar.Draw(); break;
             case TabVideo:       VideoPillar.Draw();       break;
+            case TabAudio:       AudioPillar.Draw();       break;
+            case TabPerformance: PerformancePillar.Draw(); break;
         }
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);

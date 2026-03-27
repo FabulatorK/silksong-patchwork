@@ -188,16 +188,16 @@ public class Plugin : BaseUnityPlugin
             if (Input.GetKeyDown(Config.ShowPackManagerKey))
                 ShowPackManager = !ShowPackManager;
 
-            // Tab keys: open at tab, switch tab if already open, or close if
-            // already open on that tab (acts as toggle for the active tab).
+            // Alpha2–5: open Dev Hub at the first four tabs.
+            // Pressing the active tab's key closes the hub.
+            if (Input.GetKeyDown(Config.DevHubDashboardKey))
+                DevHub.ToggleAt(DevHub.TabDashboard);
             if (Input.GetKeyDown(Config.DevHubGraphicsKey))
                 DevHub.ToggleAt(DevHub.TabGraphics);
-            if (Input.GetKeyDown(Config.DevHubAudioKey))
-                DevHub.ToggleAt(DevHub.TabAudio);
             if (Input.GetKeyDown(Config.DevHubTextKey))
                 DevHub.ToggleAt(DevHub.TabText);
-            if (Input.GetKeyDown(Config.DevHubPerformanceKey))
-                DevHub.ToggleAt(DevHub.TabPerformance);
+            if (Input.GetKeyDown(Config.DevHubVideoKey))
+                DevHub.ToggleAt(DevHub.TabVideo);
 
             // Legacy: DevProfiler standalone shim (kept for one release)
             if (Input.GetKeyDown(Config.ShowDevProfilerKey))
