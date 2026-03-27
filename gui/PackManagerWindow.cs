@@ -278,8 +278,19 @@ public static class PackManagerWindow
         GUILayout.Label(status, GUIHelper.LabelStyle);
         GUILayout.FlexibleSpace();
 
-        // Dev Tools button — opens the Dev Hub for creators
+        // HUD overlay toggle
         Color prev = UnityEngine.GUI.backgroundColor;
+        UnityEngine.GUI.backgroundColor = Plugin.ShowStatusOverlay
+            ? new Color(0.2f, 0.6f, 0.2f)
+            : new Color(0.35f, 0.35f, 0.35f);
+        if (GUILayout.Button("HUD", GUIHelper.ButtonStyle, GUIHelper.Height(22), GUIHelper.Width(40)))
+            Plugin.ShowStatusOverlay = !Plugin.ShowStatusOverlay;
+        UnityEngine.GUI.backgroundColor = prev;
+
+        GUIHelper.Space(4);
+
+        // Dev Tools button — opens the Dev Hub for creators
+        prev = UnityEngine.GUI.backgroundColor;
         UnityEngine.GUI.backgroundColor = new Color(0.25f, 0.45f, 0.8f);
         if (GUILayout.Button("Dev Tools \u2192", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             DevHub.OpenAt(DevHub.TabGraphics);
