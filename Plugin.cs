@@ -187,7 +187,7 @@ public class Plugin : BaseUnityPlugin
                 ShowPackManager = !ShowPackManager;
 
             // Alpha2–5: open Dev Hub at the first four tabs.
-            // Pressing the active tab's key closes the hub.
+            // Alpha2–7 → Dev Hub tabs. Pressing the active tab's key closes the hub.
             if (Input.GetKeyDown(Config.DevHubDashboardKey))
                 DevHub.ToggleAt(DevHub.TabDashboard);
             if (Input.GetKeyDown(Config.DevHubGraphicsKey))
@@ -196,8 +196,10 @@ public class Plugin : BaseUnityPlugin
                 DevHub.ToggleAt(DevHub.TabText);
             if (Input.GetKeyDown(Config.DevHubVideoKey))
                 DevHub.ToggleAt(DevHub.TabVideo);
-
-
+            if (Input.GetKeyDown(Config.DevHubAudioKey))
+                DevHub.ToggleAt(DevHub.TabAudio);
+            if (Input.GetKeyDown(Config.DevHubPerformanceKey))
+                DevHub.ToggleAt(DevHub.TabPerformance);
         }
 
         if (SpriteFileWatcher.ReloadSprites)

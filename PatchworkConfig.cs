@@ -37,7 +37,7 @@ public class PatchworkConfig
     private readonly ConfigEntry<UnityEngine.KeyCode> _ShowPackManager;
     public UnityEngine.KeyCode ShowPackManagerKey { get { return _ShowPackManager.Value; } }
 
-    // ── Dev Hub keybinds — Alpha2–5 map to first four tabs ───────────────────
+    // ── Dev Hub keybinds — Alpha2–7 map to all six tabs ─────────────────────
     private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubDashboardKey;
     public UnityEngine.KeyCode DevHubDashboardKey { get { return _DevHubDashboardKey.Value; } }
 
@@ -49,6 +49,12 @@ public class PatchworkConfig
 
     private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubVideoKey;
     public UnityEngine.KeyCode DevHubVideoKey { get { return _DevHubVideoKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubAudioKey;
+    public UnityEngine.KeyCode DevHubAudioKey { get { return _DevHubAudioKey.Value; } }
+
+    private readonly ConfigEntry<UnityEngine.KeyCode> _DevHubPerformanceKey;
+    public UnityEngine.KeyCode DevHubPerformanceKey { get { return _DevHubPerformanceKey.Value; } }
 
     private readonly ConfigEntry<double> _TextLogDuration;
     public double TextLogDuration { get { return _TextLogDuration.Value; } }
@@ -85,12 +91,13 @@ public class PatchworkConfig
         _FullDumpKey = config.Bind("Keybinds", "FullDumpKey", UnityEngine.KeyCode.F6, "Key to load all scenes in the game and dump all their sprites. Only works when DumpSprites is enabled.");
         _ShowPackManager = config.Bind("Keybinds", "ShowPackManager", UnityEngine.KeyCode.Alpha1, "Key to toggle the Pack Manager.");
 
-        // Dev Hub tab keybinds (Alpha2–5 = first four tabs; Audio/Performance via hub only).
-        // Pressing the active tab's key closes the Hub.
-        _DevHubDashboardKey = config.Bind("Keybinds", "DevHubDashboard",  UnityEngine.KeyCode.Alpha2, "Open Dev Hub at Dashboard tab (press again to close).");
-        _DevHubGraphicsKey  = config.Bind("Keybinds", "DevHubGraphics",   UnityEngine.KeyCode.Alpha3, "Open Dev Hub at Graphics tab (press again to close).");
-        _DevHubTextKey      = config.Bind("Keybinds", "DevHubText",       UnityEngine.KeyCode.Alpha4, "Open Dev Hub at Text tab (press again to close).");
-        _DevHubVideoKey     = config.Bind("Keybinds", "DevHubVideo",      UnityEngine.KeyCode.Alpha5, "Open Dev Hub at Video tab (press again to close).");
+        // Dev Hub tab keybinds (Alpha2–7 = all six tabs). Pressing the active tab's key closes the Hub.
+        _DevHubDashboardKey   = config.Bind("Keybinds", "DevHubDashboard",   UnityEngine.KeyCode.Alpha2, "Open Dev Hub at Dashboard tab (press again to close).");
+        _DevHubGraphicsKey    = config.Bind("Keybinds", "DevHubGraphics",    UnityEngine.KeyCode.Alpha3, "Open Dev Hub at Graphics tab (press again to close).");
+        _DevHubTextKey        = config.Bind("Keybinds", "DevHubText",        UnityEngine.KeyCode.Alpha4, "Open Dev Hub at Text tab (press again to close).");
+        _DevHubVideoKey       = config.Bind("Keybinds", "DevHubVideo",       UnityEngine.KeyCode.Alpha5, "Open Dev Hub at Video tab (press again to close).");
+        _DevHubAudioKey       = config.Bind("Keybinds", "DevHubAudio",       UnityEngine.KeyCode.Alpha6, "Open Dev Hub at Audio tab (press again to close).");
+        _DevHubPerformanceKey = config.Bind("Keybinds", "DevHubPerformance", UnityEngine.KeyCode.Alpha7, "Open Dev Hub at Performance tab (press again to close).");
 
         _AnimationControllerPauseKey = config.Bind("Keybinds", "AnimationControllerPauseKey", UnityEngine.KeyCode.Home, "Key to pause/unpause the selected animator in the animation controller.");
         _AnimationControllerNextFrameKey = config.Bind("Keybinds", "AnimationControllerNextFrameKey", UnityEngine.KeyCode.PageUp, "Key to advance one frame in the selected animator in the animation controller when paused.");
