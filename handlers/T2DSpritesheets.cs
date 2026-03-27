@@ -291,8 +291,19 @@ public static partial class T2DLoader
 
         int before = _originalTextureData.Count;
         foreach (var key in new List<string>(_originalTextureData.Keys))
-            if (!liveNames.Contains(key))
-                _originalTextureData.Remove(key);
+        {
+            if (liveNames.Contains(key)) continue; // texture still alive, keep
+            // Even if the texture is gone, keep its original-data entry when an active
+            // spritesheet override covers it. If we pruned it and the atlas is later reloaded
+            // (e.g. Inventory scene reopened) with replacement pixels still in-memory, TrySwapTexture
+            // would recapture replacement pixels as "original" → permanent cascade failure.
+            // When the pack is disabled SpritesheetOverrides is empty, so stale entries are
+            // pruned normally and no memory leak occurs.
+            string cleanKey = T2DUtil.CleanTextureName(key);
+            if (SpritesheetOverrides.ContainsKey(key) || SpritesheetOverrides.ContainsKey(cleanKey))
+                continue;
+            _originalTextureData.Remove(key);
+        }
 
         int pruned = before - _originalTextureData.Count;
         if (pruned > 0)

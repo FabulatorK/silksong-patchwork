@@ -673,6 +673,37 @@ public static partial class T2DLoader
             $"{srCount} SpriteRenderers ({srLoaded} new loads), " +
             $"{imgCount} Images ({imgLoaded} new loads)");
 
+        // If the pack was just disabled, any renderer still holding an old replacement sprite
+        // must be reverted to vanilla before we destroy the old sprites. Otherwise destroying
+        // the textures leaves renderers with null texture references → black silhouettes.
+        // (HandleLoad returns early above when !HasT2DReplacements, so it can't do this.)
+        if (!HasT2DReplacements && oldSprites.Count > 0)
+        {
+            var oldSpriteSet = new HashSet<Sprite>(oldSprites);
+            // Index all live sprites that are NOT our replacements, keyed by name.
+            var vanillaByName = new Dictionary<string, Sprite>(System.StringComparer.OrdinalIgnoreCase);
+            foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
+            {
+                if (s != null && !oldSpriteSet.Contains(s) && !vanillaByName.ContainsKey(s.name))
+                    vanillaByName[s.name] = s;
+            }
+            int revertCount = 0;
+            foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+            {
+                if (sr == null || sr.sprite == null) continue;
+                if (oldSpriteSet.Contains(sr.sprite) && vanillaByName.TryGetValue(sr.sprite.name, out var vanilla))
+                { sr.sprite = vanilla; revertCount++; }
+            }
+            foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
+            {
+                if (img == null || img.sprite == null) continue;
+                if (oldSpriteSet.Contains(img.sprite) && vanillaByName.TryGetValue(img.sprite.name, out var vanilla))
+                { img.sprite = vanilla; revertCount++; }
+            }
+            if (revertCount > 0)
+                Plugin.Logger.LogInfo($"[T2D-Reload] Reverted {revertCount} renderer(s) to vanilla sprites on pack disable");
+        }
+
         // NOW destroy old sprites — renderers have been updated with new replacements
         foreach (var sprite in oldSprites)
         {
