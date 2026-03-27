@@ -608,28 +608,60 @@ public static partial class T2DLoader
         if (!HasT2DReplacements && oldSprites.Count > 0)
         {
             var oldSpriteSet = new HashSet<Sprite>(oldSprites);
+
+            // Log what we have in oldSprites
+            var oldNames = new System.Text.StringBuilder();
+            foreach (var s in oldSprites)
+                oldNames.Append(s != null ? $"'{s.name}' " : "<null> ");
+            Plugin.Logger.LogInfo($"[T2D-Debug] Revert block entered. oldSprites ({oldSprites.Count}): {oldNames}");
+
             // Index all live sprites that are NOT our replacements, keyed by name.
             var vanillaByName = new Dictionary<string, Sprite>(System.StringComparer.OrdinalIgnoreCase);
+            int totalLiveSprites = 0;
             foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
             {
+                totalLiveSprites++;
                 if (s != null && !oldSpriteSet.Contains(s) && !vanillaByName.ContainsKey(s.name))
                     vanillaByName[s.name] = s;
             }
-            int revertCount = 0;
+            Plugin.Logger.LogInfo($"[T2D-Debug] Total live sprites: {totalLiveSprites}, vanilla candidates by name: {vanillaByName.Count}");
+
+            // Log which old sprite names have vanilla matches and which don't
+            foreach (var s in oldSprites)
+            {
+                if (s == null) continue;
+                bool found = vanillaByName.ContainsKey(s.name);
+                Plugin.Logger.LogInfo($"[T2D-Debug]   old sprite '{s.name}' → vanilla match: {found}");
+            }
+
+            int revertCount = 0, srMissCount = 0, imgMissCount = 0;
             foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
             {
                 if (sr == null || sr.sprite == null) continue;
-                if (oldSpriteSet.Contains(sr.sprite) && vanillaByName.TryGetValue(sr.sprite.name, out var vanilla))
-                { sr.sprite = vanilla; revertCount++; }
+                if (oldSpriteSet.Contains(sr.sprite))
+                {
+                    if (vanillaByName.TryGetValue(sr.sprite.name, out var vanilla))
+                    { sr.sprite = vanilla; revertCount++; }
+                    else
+                    { Plugin.Logger.LogWarning($"[T2D-Debug]   SpriteRenderer '{sr.name}' has old sprite '{sr.sprite.name}' but NO vanilla found — will go black"); srMissCount++; }
+                }
             }
             foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
             {
                 if (img == null || img.sprite == null) continue;
-                if (oldSpriteSet.Contains(img.sprite) && vanillaByName.TryGetValue(img.sprite.name, out var vanilla))
-                { img.sprite = vanilla; revertCount++; }
+                if (oldSpriteSet.Contains(img.sprite))
+                {
+                    if (vanillaByName.TryGetValue(img.sprite.name, out var vanilla))
+                    { img.sprite = vanilla; revertCount++; }
+                    else
+                    { Plugin.Logger.LogWarning($"[T2D-Debug]   Image '{img.name}' has old sprite '{img.sprite.name}' but NO vanilla found — will go black"); imgMissCount++; }
+                }
             }
-            if (revertCount > 0)
-                Plugin.Logger.LogInfo($"[T2D-Reload] Reverted {revertCount} renderer(s) to vanilla sprites on pack disable");
+            Plugin.Logger.LogInfo($"[T2D-Debug] Revert complete: {revertCount} reverted, {srMissCount + imgMissCount} missed (no vanilla found)");
+        }
+        else
+        {
+            Plugin.Logger.LogInfo($"[T2D-Debug] Revert block SKIPPED. HasT2DReplacements={HasT2DReplacements}, oldSprites.Count={oldSprites.Count}");
         }
 
         // NOW destroy old sprites — renderers have been updated with new replacements
