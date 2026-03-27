@@ -625,25 +625,33 @@ public static partial class T2DLoader
             Plugin.Logger.LogInfo($"[T2D-Debug] Revert sweep: {oldSprites.Count} old sprites, {totalLiveSprites} live sprites, {vanillaByName.Count} vanilla candidates");
 
             int revertCount = 0, missCount = 0;
-            foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+            // Guard against the Harmony postfixes (OnSpriteSet → TrySwapTexture + HandleLoad)
+            // re-entering during sprite assignment. We handle the lookup explicitly here.
+            _enforcing = true;
+            try
             {
-                if (sr == null || sr.sprite == null) continue;
-                if (!oldSpriteSet.Contains(sr.sprite)) continue; // HandleLoad already updated this one
-                if (vanillaByName.TryGetValue(sr.sprite.name, out var vanilla))
-                { sr.sprite = vanilla; revertCount++; }
-                else
-                { Plugin.Logger.LogWarning($"[T2D-Debug] SpriteRenderer '{sr.name}': old sprite '{sr.sprite.name}' has no vanilla match"); missCount++; }
+                foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+                {
+                    if (sr == null || sr.sprite == null) continue;
+                    if (!oldSpriteSet.Contains(sr.sprite)) continue; // HandleLoad already updated this one
+                    // Prefer a freshly-loaded individual replacement; fall back to vanilla.
+                    Sprite target = _loadedSprites.TryGetValue(KeyForSprite(sr.sprite), out var cached) ? cached
+                        : vanillaByName.TryGetValue(sr.sprite.name, out var v) ? v : null;
+                    if (target != null) { sr.sprite = target; revertCount++; }
+                    else { Plugin.Logger.LogWarning($"[T2D-Debug] SpriteRenderer '{sr.name}': old sprite '{sr.sprite.name}' has no replacement or vanilla match"); missCount++; }
+                }
+                foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
+                {
+                    if (img == null || img.sprite == null) continue;
+                    if (!oldSpriteSet.Contains(img.sprite)) continue; // HandleLoad already updated this one
+                    Sprite target = _loadedSprites.TryGetValue(KeyForSprite(img.sprite), out var cached) ? cached
+                        : vanillaByName.TryGetValue(img.sprite.name, out var v) ? v : null;
+                    if (target != null) { img.sprite = target; revertCount++; }
+                    else { Plugin.Logger.LogWarning($"[T2D-Debug] Image '{img.name}': old sprite '{img.sprite.name}' has no replacement or vanilla match"); missCount++; }
+                }
             }
-            foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
-            {
-                if (img == null || img.sprite == null) continue;
-                if (!oldSpriteSet.Contains(img.sprite)) continue; // HandleLoad already updated this one
-                if (vanillaByName.TryGetValue(img.sprite.name, out var vanilla))
-                { img.sprite = vanilla; revertCount++; }
-                else
-                { Plugin.Logger.LogWarning($"[T2D-Debug] Image '{img.name}': old sprite '{img.sprite.name}' has no vanilla match"); missCount++; }
-            }
-            Plugin.Logger.LogInfo($"[T2D-Debug] Revert sweep done: {revertCount} reverted to vanilla, {missCount} missed");
+            finally { _enforcing = false; }
+            Plugin.Logger.LogInfo($"[T2D-Debug] Revert sweep done: {revertCount} reverted, {missCount} missed");
         }
 
         // NOW destroy old sprites — renderers have been updated with new replacements
