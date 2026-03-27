@@ -124,11 +124,10 @@ public class DialogueHandler
             RequestedOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
         }
 
-        // Only log/track when the respective GUI panels are open to avoid
-        // per-request allocations (closure, TextLogEntry, string interpolation)
-        // on every Language.Get call — hundreds of times per frame in UI-heavy scenes.
-        if (Plugin.ShowTextLog)
-            TextLog.LogText(sheetTitle, key, __result);
+        // Always log into TextLog — it deduplicates by key so repeat calls
+        // only update the existing entry (no new allocation for known keys).
+        // TrackText is still gated: only needed when the editor pane is active.
+        TextLog.LogText(sheetTitle, key, __result);
         if (Plugin.ShowDialogueEditor)
             DialogueEditor.TrackText(sheetTitle, key, __result);
     }
