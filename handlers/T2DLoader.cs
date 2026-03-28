@@ -113,6 +113,21 @@ public static partial class T2DLoader
 
     public static void ApplyReplacementsInScene()
     {
+        // Health-check: how many cached replacement sprites survived the scene transition.
+        // If stale > 0, DontUnloadUnusedAsset is not preventing destruction and we need a
+        // different survival strategy. If stale == 0 but sprites still don't appear, the
+        // problem is in HandleLoad's lookup or the game overwriting sprites after we set them.
+        if (_loadedSprites.Count > 0)
+        {
+            int alive = 0, stale = 0;
+            foreach (var s in _loadedSprites.Values)
+            {
+                if (s != null && s.texture != null) alive++;
+                else stale++;
+            }
+            Plugin.Logger.LogInfo($"[T2D] ApplyReplacementsInScene: cache health {alive} alive / {stale} stale (total {_loadedSprites.Count})");
+        }
+
         // Pass 1: In-place texture replacement for spritesheets.
         if (SpritesheetOverrides.Count > 0)
         {
