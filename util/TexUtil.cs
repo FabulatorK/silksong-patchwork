@@ -35,6 +35,9 @@ public static class TexUtil
             Plugin.Logger.LogWarning($"LoadFromPNG: Failed to decode image data from '{path}'");
             return null;
         }
+        // Prevent Unity's UnloadUnusedAssets (auto-triggered on scene transitions) from
+        // destroying runtime-created textures while our dictionaries still reference them.
+        tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
         return tex;
     }
 
@@ -50,6 +53,7 @@ public static class TexUtil
             Plugin.Logger.LogWarning("CreateTextureFromBytes: Failed to load image data");
             return null;
         }
+        tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
         return tex;
     }
 }

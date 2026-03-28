@@ -147,6 +147,7 @@ public static partial class T2DLoader
                     new Rect(0, 0, tex.width, tex.height),
                     new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
                 newSprite.name = original.name;
+                newSprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
 
                 _loadedSprites[key] = newSprite;
                 _preloadedBytes.Remove(key);
@@ -313,9 +314,17 @@ public static partial class T2DLoader
 
                 if (_loadedSprites.TryGetValue(key, out var cached))
                 {
-                    SetSprite(spriteContainer, cached);
-                    TrackContainer(spriteContainer);
-                    return;
+                    if (cached != null && cached.texture != null)
+                    {
+                        SetSprite(spriteContainer, cached);
+                        TrackContainer(spriteContainer);
+                        return;
+                    }
+                    // Sprite/texture was destroyed by Unity despite DontUnloadUnusedAsset — clear
+                    // stale entries so the code falls through to recreate from disk.
+                    _loadedSprites.Remove(key);
+                    _spriteAtlasMap.Remove(sprite.texture.name);
+                    Plugin.Logger.LogWarning($"[T2D] Stale cached sprite for '{sprite.name}' — recreating");
                 }
 
                 if (!_spriteAtlasMap.ContainsKey(sprite.texture.name))
@@ -343,6 +352,7 @@ public static partial class T2DLoader
                             new Rect(0, 0, spriteTex.width, spriteTex.height),
                             new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                         newSprite.name = sprite.name;
+                        newSprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
 
                         _loadedSprites[key] = newSprite;
                         _preloadedBytes.Remove(matchedKey);
@@ -377,6 +387,7 @@ public static partial class T2DLoader
                 SkippedTextureIds.Add(spriteTex.GetInstanceID()); // same atlas-name / wrong-size guard
                 Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                 newSprite.name = sprite.name;
+                newSprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 _loadedSprites[texName] = newSprite;
                 SetSprite(spriteContainer, newSprite);
                 TrackContainer(spriteContainer);
@@ -695,6 +706,7 @@ public static partial class T2DLoader
                     new Rect(0, 0, tex.width, tex.height),
                     new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
                 newSprite.name = original.name;
+                newSprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 _loadedSprites[key] = newSprite;
                 _preloadedBytes.Remove(key);
                 if (!_spriteAtlasMap.ContainsKey(original.texture.name))
@@ -833,6 +845,7 @@ public static partial class T2DLoader
                 new Rect(0, 0, tex.width, tex.height),
                 new Vector2(0.5f, 0.5f), ppu);
             newSprite.name = spriteName;
+            newSprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
 
             _loadedSprites[kvp.Key] = newSprite;
             _preloadedBytes.Remove(kvp.Key);
