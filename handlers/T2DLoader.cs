@@ -145,13 +145,21 @@ public static partial class T2DLoader
                 return;
 
             // Structured path: T2D/[AtlasName]/[SpriteName].png
+            // Special case: T2D/_standalone/[SpriteName].png — for sprites on textures that
+            // don't pass IsT2DTexture (no BC7/DXT5 suffix). Stored under flat "spriteName" key,
+            // identical to the flat T2D/[SpriteName].png path, so HandleLoad finds them on the
+            // non-T2D branch (sprite.name or texName lookup) as well as the flat fallback.
             foreach (var atlasDir in Directory.GetDirectories(t2dRoot))
             {
                 string atlasName = Path.GetFileName(atlasDir);
+                bool isStandalone = atlasName.Equals("_standalone", System.StringComparison.OrdinalIgnoreCase);
                 foreach (var file in Directory.GetFiles(atlasDir, "*.png"))
                 {
                     string spriteName = Path.GetFileNameWithoutExtension(file);
-                    string key = T2DUtil.SpriteKey(atlasName, spriteName);
+                    // _standalone sprites use a flat key — the same as placing the PNG directly
+                    // in the T2D root. This lets them be found by both the atlas-qualified T2D
+                    // path and the non-T2D (texName) fallback in HandleLoad.
+                    string key = isStandalone ? spriteName : T2DUtil.SpriteKey(atlasName, spriteName);
                     if (_preloadedBytes.ContainsKey(key) || _loadedSprites.ContainsKey(key))
                     {
                         ConflictTracker.Record("t2d-sprite", key,
@@ -348,10 +356,17 @@ public static partial class T2DLoader
             _knownImages.Add(img);
     }
 
+    private static bool IsT2DDirectory(string dirPath)
+    {
+        string name = Path.GetFileName(dirPath);
+        return name.Equals("T2D", System.StringComparison.OrdinalIgnoreCase)
+            || name.Equals("_standalone", System.StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Texture2D FindSprite(string spriteName)
     {
         var baseFile = Directory.GetFiles(SpriteLoader.LoadPath, spriteName + ".png", SearchOption.AllDirectories)
-            .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"))
+            .Where(f => IsT2DDirectory(Path.GetDirectoryName(f)))
             .FirstOrDefault();
         if (baseFile != null)
             return TexUtil.LoadFromPNG(baseFile);
@@ -362,7 +377,7 @@ public static partial class T2DLoader
             if (!Directory.Exists(packSprites))
                 continue;
             var matches = Directory.GetFiles(packSprites, spriteName + ".png", SearchOption.AllDirectories)
-                .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"))
+                .Where(f => IsT2DDirectory(Path.GetDirectoryName(f)))
                 .ToList();
             if (matches.Count == 0)
                 continue;
@@ -644,8 +659,6 @@ public static partial class T2DLoader
                 if (s != null && !oldSpriteSet.Contains(s) && !vanillaByName.ContainsKey(s.name))
                     vanillaByName[s.name] = s;
             }
-            Plugin.Logger.LogInfo($"[T2D-Debug] Revert sweep: {oldSprites.Count} old sprites, {totalLiveSprites} live sprites, {vanillaByName.Count} vanilla candidates");
-
             int revertCount = 0, missCount = 0;
             // Guard against the Harmony postfixes (OnSpriteSet → TrySwapTexture + HandleLoad)
             // re-entering during sprite assignment. We handle the lookup explicitly here.
@@ -660,7 +673,7 @@ public static partial class T2DLoader
                     Sprite target = _loadedSprites.TryGetValue(KeyForSprite(sr.sprite), out var cached) ? cached
                         : vanillaByName.TryGetValue(sr.sprite.name, out var v) ? v : null;
                     if (target != null) { sr.sprite = target; revertCount++; }
-                    else { Plugin.Logger.LogWarning($"[T2D-Debug] SpriteRenderer '{sr.name}': old sprite '{sr.sprite.name}' has no replacement or vanilla match"); missCount++; }
+                    else { Plugin.Logger.LogWarning($"[T2D-Revert] SpriteRenderer '{sr.name}': old sprite '{sr.sprite.name}' has no replacement or vanilla match"); missCount++; }
                 }
                 foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
                 {
@@ -669,11 +682,12 @@ public static partial class T2DLoader
                     Sprite target = _loadedSprites.TryGetValue(KeyForSprite(img.sprite), out var cached) ? cached
                         : vanillaByName.TryGetValue(img.sprite.name, out var v) ? v : null;
                     if (target != null) { img.sprite = target; revertCount++; }
-                    else { Plugin.Logger.LogWarning($"[T2D-Debug] Image '{img.name}': old sprite '{img.sprite.name}' has no replacement or vanilla match"); missCount++; }
+                    else { Plugin.Logger.LogWarning($"[T2D-Revert] Image '{img.name}': old sprite '{img.sprite.name}' has no replacement or vanilla match"); missCount++; }
                 }
             }
             finally { _enforcing = false; }
-            Plugin.Logger.LogInfo($"[T2D-Debug] Revert sweep done: {revertCount} reverted, {missCount} missed");
+            if (missCount > 0)
+                Plugin.Logger.LogWarning($"[T2D-Reload] Revert sweep: {revertCount} reverted, {missCount} missed");
         }
 
         // NOW destroy old sprites — renderers have been updated with new replacements

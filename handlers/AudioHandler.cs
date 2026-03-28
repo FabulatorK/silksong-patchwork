@@ -26,6 +26,10 @@ public static class AudioHandler
         new(StringComparer.OrdinalIgnoreCase);
     private static bool _indexBuilt;
 
+    // Set to true while Reload() is writing vanilla clips back to AudioSources.
+    // Blocks ClipSetterPatch from immediately re-applying a replacement and undoing the revert.
+    private static bool _reverting;
+
     /// <summary>True when at least one audio replacement file exists across all active packs.</summary>
     public static bool HasAudioReplacements => _indexBuilt && _soundIndex.Count > 0;
 
@@ -70,7 +74,8 @@ public static class AudioHandler
         if (value != null)
         {
             AudioLog.LogAudio(value);
-            if (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", "")))
+            if (!_reverting &&
+                (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", ""))))
                 LoadAudio(__instance);
         }
     }
@@ -110,8 +115,13 @@ public static class AudioHandler
                 else if (source.clip.name.StartsWith("PATCHWORK_"))
                 {
                     // No active pack covers this sound anymore — restore the vanilla clip.
+                    // _reverting prevents ClipSetterPatch from immediately re-applying a replacement.
                     if (_originalClips.TryGetValue(source.GetInstanceID(), out var orig) && orig != null)
+                    {
+                        _reverting = true;
                         source.clip = orig;
+                        _reverting = false;
+                    }
                 }
             }
 

@@ -72,14 +72,9 @@ public static partial class T2DLoader
         // Capture original pixel data before the first overwrite so we can restore it later.
         if (!_originalTextureData.ContainsKey(tex.name))
         {
-            Plugin.Logger.LogInfo($"[T2D-Debug] TrySwapTexture: capturing original for '{tex.name}' ({tex.width}x{tex.height})");
             byte[] original = CaptureTextureAsPng(tex);
             if (original != null)
                 _originalTextureData[tex.name] = original;
-        }
-        else
-        {
-            Plugin.Logger.LogInfo($"[T2D-Debug] TrySwapTexture: reusing existing original for '{tex.name}'");
         }
 
         if (tex.LoadImage(data.PngData))
@@ -270,9 +265,6 @@ public static partial class T2DLoader
         if (tex == null) return false;
         if (!_originalTextureData.TryGetValue(tex.name, out var png))
         {
-            // Only log for textures that look like T2D atlases to avoid noise.
-            if (T2DUtil.IsT2DTexture(tex.name))
-                Plugin.Logger.LogInfo($"[T2D-Debug] TryRestoreTexture: no entry for '{tex.name}' (stored originals: {_originalTextureData.Count})");
             return false;
         }
 
@@ -312,11 +304,7 @@ public static partial class T2DLoader
             // pruned normally and no memory leak occurs.
             string cleanKey = T2DUtil.CleanTextureName(key);
             if (SpritesheetOverrides.ContainsKey(key) || SpritesheetOverrides.ContainsKey(cleanKey))
-            {
-                Plugin.Logger.LogInfo($"[T2D-Debug] PruneStaleOriginals: KEEPING entry '{key}' (active spritesheet override '{cleanKey}')");
                 continue;
-            }
-            Plugin.Logger.LogInfo($"[T2D-Debug] PruneStaleOriginals: pruning stale entry '{key}'");
             _originalTextureData.Remove(key);
         }
 
