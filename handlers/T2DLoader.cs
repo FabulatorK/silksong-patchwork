@@ -42,6 +42,9 @@ public static partial class T2DLoader
     // Prevents repeated filesystem scans for the same missing sprite.
     private static readonly HashSet<string> _negativeCache = new();
 
+    // T2D keys that have been logged as missing — suppresses repeat logs per session.
+    private static readonly HashSet<string> _t2dMissLogged = new();
+
     private static readonly Dictionary<int, string> _trackedSpriteNames = new();
     private static readonly HashSet<SpriteRenderer> _knownRenderers = new();
     private static readonly HashSet<Image> _knownImages = new();
@@ -187,6 +190,7 @@ public static partial class T2DLoader
             if (!Directory.Exists(t2dRoot))
                 return;
 
+            int added = 0;
             // Structured path: T2D/[AtlasName]/[SpriteName].png
             // Special case: T2D/_standalone/[SpriteName].png — for sprites on textures that
             // don't pass IsT2DTexture (no BC7/DXT5 suffix). Stored under flat "spriteName" key,
@@ -215,6 +219,7 @@ public static partial class T2DLoader
                     {
                         _preloadedBytes[key] = bytes;
                         _t2dProviders[key] = sourcePack;
+                        added++;
                     }
                 }
             }
@@ -235,8 +240,11 @@ public static partial class T2DLoader
                 {
                     _preloadedBytes[spriteName] = bytes;
                     _t2dProviders[spriteName] = sourcePack;
+                    added++;
                 }
             }
+
+            Plugin.Logger.LogInfo($"[T2D-Trace] ScanDirectory: added {added} key(s) from '{t2dRoot}'");
         }
 
         var packPaths = Plugin.PluginPackPaths.ToList();
@@ -360,6 +368,15 @@ public static partial class T2DLoader
                         SetSprite(spriteContainer, newSprite);
                         TrackContainer(spriteContainer);
                     }
+                }
+                else if (_t2dMissLogged.Add(key))
+                {
+                    // First time this T2D key was looked up with no match. Logs once per key per session.
+                    // If the key appears here but not in [T2D-Trace] ScanDirectory output, the pack's
+                    // file name or folder structure doesn't match what the code expects.
+                    Plugin.Logger.LogInfo(
+                        $"[T2D-Miss] sprite='{sprite.name}' tex='{T2DUtil.CleanTextureName(sprite.texture.name)}' " +
+                        $"key='{key}' preloaded={_preloadedBytes.Count} loaded={_loadedSprites.Count}");
                 }
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
@@ -643,6 +660,7 @@ public static partial class T2DLoader
         _knownImages.Clear();
         _confirmedSpriteNames.Clear();
         _trackedSpriteNames.Clear();
+        _t2dMissLogged.Clear();
 
         // Rebuild everything from disk
         PreloadAllTextures();
