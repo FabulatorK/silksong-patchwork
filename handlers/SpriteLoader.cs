@@ -84,7 +84,16 @@ public static class SpriteLoader
                 if (!(unreadableTex is RenderTexture))
                     origMap[matname] = unreadableTex;          // fresh game texture — update
                 else if (!origMap.ContainsKey(matname))
+                {
+                    // Best-effort: mat.mainTexture is already an RT (overwritten by a previous load)
+                    // and we have no stored original for this mat yet.  Storing an RT as "original"
+                    // will permanently break vanilla-restore — log so we can diagnose.
+                    Plugin.Logger.LogWarning(
+                        $"[tk2d-Restore] BEST-EFFORT TRIGGERED for '{collection.name}'/'{matname}': " +
+                        $"mat.mainTexture is already a RenderTexture ({unreadableTex.width}x{unreadableTex.height}) " +
+                        $"on first visit.  Vanilla restore for this material will be broken.");
                     origMap[matname] = unreadableTex;          // already overwritten; best-effort
+                }
 
                 var sheetResult = FindSpritesheet(collection, matnameAbbr, origMap[matname]);
                 if (sheetResult.FromCustom)
@@ -218,6 +227,14 @@ public static class SpriteLoader
         }
 
         // No custom sheet — restore from the original game texture.
+        if (originalTex is RenderTexture)
+            Plugin.Logger.LogWarning(
+                $"[tk2d-Restore] Vanilla restore for '{collection.name}'/'{key}': " +
+                $"originalTex is a RenderTexture ({originalTex.width}x{originalTex.height}) — " +
+                $"stored original was already an overwritten RT, restore may produce wrong pixels.");
+        else
+            Plugin.Logger.LogDebug(
+                $"[tk2d-Restore] Vanilla restore for '{collection.name}'/'{key}' from native texture.");
         return new SpritesheetResult { Texture = TexUtil.GetReadable(originalTex), FromCustom = false };
     }
 
