@@ -163,7 +163,7 @@ public class Plugin : BaseUnityPlugin
     private static int _conditionPollFrames = 0;
     private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
     private static int _uninitFrames = 0;
-    private const  int UninitInterval = 300; // ~5 s at 60 fps — catches sprites spawned mid-scene
+    private const  int UninitInterval = 30;  // ~0.5 s at 60 fps — catches Object.Instantiate clones mid-scene
 
     private void Update()
     {

@@ -175,6 +175,15 @@ public static partial class T2DLoader
                 _spriteAtlasMap[original.texture.name].Add(original.name);
             }
         }
+        else if (_loadedSprites.Count > 0)
+        {
+            // _preloadedBytes were already fully promoted in a prior scene (WarmSprites consumed
+            // them). PruneSceneState cleared _confirmedSpriteNames, but Pass 2 above was skipped.
+            // Rebuild from _loadedSprites so CheckForUninitializedSprites can catch
+            // Object.Instantiate clones whose setter never fires (Unity copies fields directly).
+            foreach (var key in _loadedSprites.Keys)
+                _confirmedSpriteNames.Add(key.Contains('/') ? key.Substring(key.LastIndexOf('/') + 1) : key);
+        }
 
         // Pass 3: Apply individual sprite replacements to all renderers/images (including inactive).
         if (!HasT2DReplacements)
