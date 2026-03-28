@@ -197,6 +197,26 @@ public static partial class T2DLoader
     //  Individual sprite loading (HandleLoad)
     // ================================================================
 
+    /// <summary>
+    /// Returns the cached sprite with its PPU matched to <paramref name="targetPPU"/>.
+    /// On the first encounter the preloaded 100f placeholder is re-created at the game's
+    /// native PPU; subsequent calls are a no-op.
+    /// </summary>
+    private static Sprite EnsurePPU(string key, Sprite cached, float targetPPU)
+    {
+        if (System.Math.Abs(cached.pixelsPerUnit - targetPPU) <= 0.5f)
+            return cached;
+
+        var corrected = Sprite.Create(cached.texture,
+            new Rect(0, 0, cached.texture.width, cached.texture.height),
+            new Vector2(0.5f, 0.5f), targetPPU);
+        corrected.name = cached.name;
+        corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
+        Object.Destroy(cached);
+        _loadedSprites[key] = corrected;
+        return corrected;
+    }
+
     internal static void HandleLoad(object spriteContainer, Sprite sprite)
     {
         if (_handling || !HasT2DReplacements)
@@ -216,25 +236,7 @@ public static partial class T2DLoader
                 string key = T2DUtil.SpriteKey(cleanTexName, sprite.name);
 
                 if (_loadedSprites.TryGetValue(key, out var cached) && cached != null && cached.texture != null)
-                {
-                    // Lazily match the replacement sprite's PPU to the game's native PPU on first
-                    // encounter. Preload uses 100f as a placeholder; the real value comes from the
-                    // first intercepted sprite setter where we have the live atlas sprite in hand.
-                    // We use sprite.pixelsPerUnit directly — pack authors control visual size through
-                    // PNG dimensions, not by matching the original atlas sub-rect world size.
-                    if (System.Math.Abs(cached.pixelsPerUnit - sprite.pixelsPerUnit) > 0.5f)
-                    {
-                        var corrected = Sprite.Create(cached.texture,
-                            new Rect(0, 0, cached.texture.width, cached.texture.height),
-                            new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
-                        corrected.name = cached.name;
-                        corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
-                        Object.Destroy(cached);
-                        _loadedSprites[key] = corrected;
-                        cached = corrected;
-                    }
-                    replacement = cached;
-                }
+                    replacement = EnsurePPU(key, cached, sprite.pixelsPerUnit);
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
 
@@ -247,7 +249,7 @@ public static partial class T2DLoader
             if (replacement == null && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey)
                 && _loadedSprites.TryGetValue(fallbackKey, out var fallback) && fallback != null && fallback.texture != null)
             {
-                replacement = fallback;
+                replacement = EnsurePPU(fallbackKey, fallback, sprite.pixelsPerUnit);
             }
 
             if (replacement != null)
