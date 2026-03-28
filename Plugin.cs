@@ -158,11 +158,21 @@ public class Plugin : BaseUnityPlugin
 
     private static int _conditionPollFrames = 0;
     private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
+    private static int _uninitFrames = 0;
+    private const  int UninitInterval = 300; // ~5 s at 60 fps — catches sprites spawned mid-scene
 
     private void Update()
     {
         DevProfiler.RecordFrame();
         DevProfiler.BeginUpdateTiming();
+
+        // Periodic catch-up for Instantiate-cloned SpriteRenderers that spawn mid-scene
+        // and therefore miss the sceneLoaded CheckForUninitializedSprites call.
+        if (++_uninitFrames >= UninitInterval)
+        {
+            _uninitFrames = 0;
+            T2DLoader.CheckForUninitializedSprites();
+        }
 
         // Poll hot-reload conditions periodically (for future non-scene condition types).
         if (++_conditionPollFrames >= ConditionPollInterval)

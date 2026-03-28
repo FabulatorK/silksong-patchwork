@@ -123,16 +123,20 @@ public static partial class T2DLoader
         if (!HasT2DReplacements)
             return;
 
+        int srCount = 0, imgCount = 0;
         foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
         {
             if (sr == null || sr.sprite == null) continue;
+            srCount++;
             HandleLoad(sr, sr.sprite);
         }
         foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
         {
             if (img == null || img.sprite == null) continue;
+            imgCount++;
             HandleLoad(img, img.sprite);
         }
+        Plugin.Logger.LogInfo($"[T2D-Trace] ApplyReplacementsInScene pass 2: {srCount} SpriteRenderers, {imgCount} Images processed");
     }
 
     public static void PreloadAllTextures()
@@ -199,6 +203,10 @@ public static partial class T2DLoader
         ScanDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D"), null);
         foreach (var packPath in Plugin.PluginPackPaths)
             ScanDirectory(Path.Combine(packPath, "Sprites", "T2D"), packPath);
+
+        Plugin.Logger.LogInfo($"[T2D-Trace] PreloadAllTextures done: {_preloadedBytes.Count} preloaded keys");
+        foreach (var k in _preloadedBytes.Keys)
+            Plugin.Logger.LogInfo($"[T2D-Trace]   preloaded key: '{k}'");
     }
 
     // ================================================================
@@ -260,10 +268,13 @@ public static partial class T2DLoader
                 string cleanTexName = T2DUtil.CleanTextureName(sprite.texture.name);
                 string key = T2DUtil.SpriteKey(cleanTexName, sprite.name);
 
+                Plugin.Logger.LogInfo($"[T2D-Trace] HandleLoad T2D: sprite='{sprite.name}' tex='{sprite.texture.name}' clean='{cleanTexName}' key='{key}'");
+
                 _confirmedSpriteNames.Add(sprite.name);
 
                 if (_loadedSprites.TryGetValue(key, out var cached))
                 {
+                    Plugin.Logger.LogInfo($"[T2D-Trace]   → already in _loadedSprites, applying cached replacement");
                     SetSprite(spriteContainer, cached);
                     TrackContainer(spriteContainer);
                     return;
@@ -278,6 +289,8 @@ public static partial class T2DLoader
                     matchedKey = key;
                 else if (_preloadedBytes.TryGetValue(sprite.name, out spriteBytes))
                     matchedKey = sprite.name;
+
+                Plugin.Logger.LogInfo($"[T2D-Trace]   → _preloadedBytes lookup: matchedKey='{matchedKey ?? "(none)"}' found={spriteBytes != null}");
 
                 if (spriteBytes != null)
                 {
@@ -298,9 +311,18 @@ public static partial class T2DLoader
                         _loadedSprites[key] = newSprite;
                         _preloadedBytes.Remove(matchedKey);
 
+                        Plugin.Logger.LogInfo($"[T2D-Trace]   → created replacement sprite for key='{key}', applying");
                         SetSprite(spriteContainer, newSprite);
                         TrackContainer(spriteContainer);
                     }
+                    else
+                    {
+                        Plugin.Logger.LogWarning($"[T2D-Trace]   → CreateTextureFromBytes returned null for key='{key}'");
+                    }
+                }
+                else
+                {
+                    Plugin.Logger.LogInfo($"[T2D-Trace]   → no individual replacement found in _preloadedBytes (will use spritesheet if applicable)");
                 }
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
@@ -308,19 +330,26 @@ public static partial class T2DLoader
             {
                 string texName = sprite.texture.name;
 
+                Plugin.Logger.LogInfo($"[T2D-Trace] HandleLoad non-T2D: sprite='{sprite.name}' tex='{texName}'");
+
                 if (_loadedSprites.TryGetValue(texName, out var existing))
                 {
+                    Plugin.Logger.LogInfo($"[T2D-Trace]   → cached in _loadedSprites");
                     SetSprite(spriteContainer, existing);
                     TrackContainer(spriteContainer);
                     return;
                 }
 
                 if (_negativeCache.Contains(texName))
+                {
+                    Plugin.Logger.LogInfo($"[T2D-Trace]   → in negative cache, skipping");
                     return;
+                }
 
                 Texture2D spriteTex = FindSprite(texName);
                 if (spriteTex == null)
                 {
+                    Plugin.Logger.LogInfo($"[T2D-Trace]   → FindSprite returned null, adding to negative cache");
                     _negativeCache.Add(texName);
                     return;
                 }
@@ -329,6 +358,7 @@ public static partial class T2DLoader
                 Sprite newSprite = Sprite.Create(spriteTex, new Rect(0, 0, spriteTex.width, spriteTex.height), new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
                 newSprite.name = sprite.name;
 
+                Plugin.Logger.LogInfo($"[T2D-Trace]   → loaded from disk via FindSprite, applying");
                 _loadedSprites[texName] = newSprite;
                 SetSprite(spriteContainer, newSprite);
                 TrackContainer(spriteContainer);
@@ -398,12 +428,17 @@ public static partial class T2DLoader
         if (!HasT2DReplacements)
             return;
 
+        int triggered = 0;
         foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (sr == null || sr.sprite == null) continue;
             CheckSprite(sr.GetInstanceID(), sr.sprite, out bool changed, out _);
             if (changed)
+            {
+                Plugin.Logger.LogInfo($"[T2D-Trace] CheckForUninitializedSprites: triggering HandleLoad on SR '{sr.name}' sprite='{sr.sprite.name}'");
                 sr.sprite = sr.sprite;
+                triggered++;
+            }
         }
 
         foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
@@ -411,8 +446,15 @@ public static partial class T2DLoader
             if (img == null || img.sprite == null) continue;
             CheckSprite(img.GetInstanceID(), img.sprite, out bool changed, out _);
             if (changed)
+            {
+                Plugin.Logger.LogInfo($"[T2D-Trace] CheckForUninitializedSprites: triggering HandleLoad on Image '{img.name}' sprite='{img.sprite.name}'");
                 img.sprite = img.sprite;
+                triggered++;
+            }
         }
+
+        if (triggered > 0)
+            Plugin.Logger.LogInfo($"[T2D-Trace] CheckForUninitializedSprites: {triggered} uninitialized renderer(s) caught and triggered");
     }
 
     public static void EnforceT2DReplacements()

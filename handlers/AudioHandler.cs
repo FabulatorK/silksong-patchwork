@@ -84,10 +84,15 @@ public static class AudioHandler
     {
         RebuildSoundIndex();
 
+        Plugin.Logger.LogInfo($"[Audio-Trace] Reload: soundIndex={_soundIndex.Count} LoadedClips={LoadedClips.Count} _originalClips={_originalClips.Count}");
+
         // If there are no replacement files and no previously-loaded clips to restore,
         // skip the expensive FindObjectsOfTypeAll pass entirely.
         if (!HasAudioReplacements && LoadedClips.Count == 0)
+        {
+            Plugin.Logger.LogInfo("[Audio-Trace] Reload: early exit — no replacements and no cached clips to restore");
             return;
+        }
 
         // Clear cache so clips are re-read from disk on this reload pass.
         LoadedClips.Clear();
@@ -110,17 +115,26 @@ public static class AudioHandler
                     if (source.clip != null && !source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
                         _originalClips[id] = source.clip;
                     LoadedClips[clipName] = replacement;
+                    Plugin.Logger.LogInfo($"[Audio-Trace] Reload: APPLIED '{clipName}' on source '{source.gameObject.name}' (id={source.GetInstanceID()})");
                     source.clip = replacement;
                 }
                 else if (source.clip.name.StartsWith("PATCHWORK_"))
                 {
                     // No active pack covers this sound anymore — restore the vanilla clip.
                     // _reverting prevents ClipSetterPatch from immediately re-applying a replacement.
-                    if (_originalClips.TryGetValue(source.GetInstanceID(), out var orig) && orig != null)
+                    int id = source.GetInstanceID();
+                    bool hasOrig = _originalClips.TryGetValue(id, out var orig);
+                    Plugin.Logger.LogInfo($"[Audio-Trace] Reload: REVERT '{clipName}' on source '{source.gameObject.name}' (id={id}) hasOrig={hasOrig} orig='{(orig != null ? orig.name : "null")}'");
+                    if (hasOrig && orig != null)
                     {
                         _reverting = true;
                         source.clip = orig;
                         _reverting = false;
+                        Plugin.Logger.LogInfo($"[Audio-Trace]   → restored to '{source.clip?.name}'");
+                    }
+                    else
+                    {
+                        Plugin.Logger.LogWarning($"[Audio-Trace]   → no original clip saved, cannot revert '{clipName}'");
                     }
                 }
             }
