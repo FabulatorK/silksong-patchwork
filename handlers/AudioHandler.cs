@@ -134,8 +134,7 @@ public static class AudioHandler
                     ext != ".aiff" && ext != ".aif")
                     continue;
                 string name = Path.GetFileNameWithoutExtension(file);
-                if (!_soundIndex.ContainsKey(name))
-                    _soundIndex[name] = file;
+                _soundIndex.TryAdd(name, file);
             }
         }
 
@@ -146,7 +145,7 @@ public static class AudioHandler
 
     public static void LoadAudio(AudioSource source)
     {
-        if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip?.name))
+        if (source == null || source.clip == null || string.IsNullOrEmpty(source.clip.name))
             return;
         string clipName = source.clip.name.Replace("PATCHWORK_", "");
 
@@ -155,9 +154,9 @@ public static class AudioHandler
         if (!source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
             _originalClips[id] = source.clip;
 
-        if (LoadedClips.ContainsKey(clipName))
+        if (LoadedClips.TryGetValue(clipName, out var cachedForSource))
         {
-            source.clip = LoadedClips[clipName];
+            source.clip = cachedForSource;
             return;
         }
 
@@ -171,13 +170,13 @@ public static class AudioHandler
 
     public static void LoadAudio(ref AudioClip clip)
     {
-        if (clip == null || string.IsNullOrEmpty(clip?.name))
+        if (clip == null || string.IsNullOrEmpty(clip.name))
             return;
         string clipName = clip.name.Replace("PATCHWORK_", "");
 
-        if (LoadedClips.ContainsKey(clipName))
+        if (LoadedClips.TryGetValue(clipName, out var cachedForClip))
         {
-            clip = LoadedClips[clipName];
+            clip = cachedForClip;
             return;
         }
 

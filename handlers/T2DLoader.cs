@@ -350,20 +350,25 @@ public static partial class T2DLoader
 
     private static Texture2D FindSprite(string spriteName)
     {
-        var files = Directory.GetFiles(SpriteLoader.LoadPath, spriteName + ".png", SearchOption.AllDirectories)
-            .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"));
-        if (files.Any())
-            return TexUtil.LoadFromPNG(files.First());
+        var baseFile = Directory.GetFiles(SpriteLoader.LoadPath, spriteName + ".png", SearchOption.AllDirectories)
+            .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"))
+            .FirstOrDefault();
+        if (baseFile != null)
+            return TexUtil.LoadFromPNG(baseFile);
 
         foreach (var packPath in Plugin.PluginPackPaths)
         {
             string packSprites = Path.Combine(packPath, "Sprites");
             if (!Directory.Exists(packSprites))
                 continue;
-            var packFiles = Directory.GetFiles(packSprites, spriteName + ".png", SearchOption.AllDirectories)
-                .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"));
-            if (packFiles.Any())
-                return TexUtil.LoadFromPNG(packFiles.First());
+            var matches = Directory.GetFiles(packSprites, spriteName + ".png", SearchOption.AllDirectories)
+                .Where(f => Path.GetDirectoryName(f).EndsWith("T2D"))
+                .ToList();
+            if (matches.Count == 0)
+                continue;
+            if (matches.Count > 1)
+                Plugin.Logger.LogWarning($"[T2D] Multiple T2D files for '{spriteName}' in pack '{packPath}'; using first: {matches[0]}");
+            return TexUtil.LoadFromPNG(matches[0]);
         }
 
         return null;
@@ -478,6 +483,11 @@ public static partial class T2DLoader
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
 
+        // Confirmed names are per-scene: a sprite confirmed in Scene A may not exist in
+        // Scene B. Clearing here prevents stale entries from gating enforcement in the
+        // new scene before renderers have been re-tracked.
+        _confirmedSpriteNames.Clear();
+
         // Re-protect replacement sprite textures that are still alive in _loadedSprites.
         // These are sprite-sized Texture2D objects named after their parent atlas; without
         // this they'd be matched by TrySwapTexture on the next ApplyReplacementsInScene
@@ -576,6 +586,18 @@ public static partial class T2DLoader
                     restoreCount++;
             }
             Plugin.Logger.LogInfo($"[T2D-Reload] Swapped {swapCount} textures via spritesheets, restored {restoreCount} to vanilla");
+
+            // If no spritesheet overrides remain active, TryRestoreTexture has written vanilla
+            // pixels back into all previously-replaced atlases. The stored PNG bytes are no longer
+            // needed and would otherwise persist in memory until the next scene unload (PruneStaleOriginals
+            // skips live textures). Clear them now so the memory is reclaimed immediately.
+            if (SpritesheetOverrides.Count == 0)
+            {
+                int freed = _originalTextureData.Count;
+                _originalTextureData.Clear();
+                if (freed > 0)
+                    Plugin.Logger.LogInfo($"[T2D-Reload] Freed {freed} stored original(s) — no active spritesheet overrides");
+            }
         }
 
         // Re-apply individual sprite replacements to all renderers
