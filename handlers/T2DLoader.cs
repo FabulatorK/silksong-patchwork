@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -119,7 +120,44 @@ public static partial class T2DLoader
             }
         }
 
-        // Pass 2: Apply individual sprite replacements to all renderers/images (including inactive).
+        // Pass 2: Promote preloaded byte arrays into Sprites for all Sprite assets currently
+        // in memory (animation clips, prefabs, inactive objects — anything FindObjectsOfTypeAll
+        // returns). This is load-correctness: without it, _confirmedSpriteNames is only
+        // populated by Harmony setter calls, so CheckForUninitializedSprites and
+        // EnforceT2DReplacements are blind to sprites that haven't fired a setter yet.
+        if (_preloadedBytes.Count > 0)
+        {
+            foreach (var original in Resources.FindObjectsOfTypeAll<Sprite>())
+            {
+                if (original == null || original.texture == null) continue;
+                if (!T2DUtil.IsT2DTexture(original.texture.name)) continue;
+
+                _confirmedSpriteNames.Add(original.name);
+
+                string cleanTexName = T2DUtil.CleanTextureName(original.texture.name);
+                string key = T2DUtil.SpriteKey(cleanTexName, original.name);
+                if (!_preloadedBytes.TryGetValue(key, out var bytes)) continue;
+
+                Texture2D tex = TexUtil.CreateTextureFromBytes(bytes);
+                if (tex == null) continue;
+                tex.name = original.texture.name;
+                SkippedTextureIds.Add(tex.GetInstanceID());
+
+                Sprite newSprite = Sprite.Create(tex,
+                    new Rect(0, 0, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
+                newSprite.name = original.name;
+
+                _loadedSprites[key] = newSprite;
+                _preloadedBytes.Remove(key);
+
+                if (!_spriteAtlasMap.ContainsKey(original.texture.name))
+                    _spriteAtlasMap[original.texture.name] = new HashSet<string>();
+                _spriteAtlasMap[original.texture.name].Add(original.name);
+            }
+        }
+
+        // Pass 3: Apply individual sprite replacements to all renderers/images (including inactive).
         if (!HasT2DReplacements)
             return;
 
@@ -657,6 +695,38 @@ public static partial class T2DLoader
             }
         }
 
+        // Pass 2: Promote preloaded byte arrays into Sprites for all Sprite assets in memory.
+        // Same rationale as ApplyReplacementsInScene Pass 2 — ensures _confirmedSpriteNames
+        // is complete before the renderer sweep and before CheckForUninitializedSprites runs.
+        if (_preloadedBytes.Count > 0)
+        {
+            int promoteCount = 0;
+            foreach (var original in Resources.FindObjectsOfTypeAll<Sprite>())
+            {
+                if (original == null || original.texture == null) continue;
+                if (!T2DUtil.IsT2DTexture(original.texture.name)) continue;
+                _confirmedSpriteNames.Add(original.name);
+                string cleanTexName = T2DUtil.CleanTextureName(original.texture.name);
+                string key = T2DUtil.SpriteKey(cleanTexName, original.name);
+                if (!_preloadedBytes.TryGetValue(key, out var bytes)) continue;
+                Texture2D tex = TexUtil.CreateTextureFromBytes(bytes);
+                if (tex == null) continue;
+                tex.name = original.texture.name;
+                SkippedTextureIds.Add(tex.GetInstanceID());
+                Sprite newSprite = Sprite.Create(tex,
+                    new Rect(0, 0, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f), original.pixelsPerUnit);
+                newSprite.name = original.name;
+                _loadedSprites[key] = newSprite;
+                _preloadedBytes.Remove(key);
+                if (!_spriteAtlasMap.ContainsKey(original.texture.name))
+                    _spriteAtlasMap[original.texture.name] = new HashSet<string>();
+                _spriteAtlasMap[original.texture.name].Add(original.name);
+                promoteCount++;
+            }
+            Plugin.Logger.LogInfo($"[T2D-Reload] Byte promotion pass: promoted {promoteCount} sprite(s) from byte cache");
+        }
+
         // Re-apply individual sprite replacements to all renderers
         int srCount = 0, srLoaded = 0;
         foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
@@ -748,7 +818,56 @@ public static partial class T2DLoader
             $"Destroyed {oldSprites.Count} old sprites");
     }
 
-public static void InvalidateSpritesheet(string texName)
+    /// <summary>
+    /// Coroutine: promotes remaining preloaded byte arrays into Sprites one per frame.
+    /// Run after each scene load to warm up sprites that weren't in memory during
+    /// ApplyReplacementsInScene Pass 2 (deferred/lazy-loaded atlas content).
+    /// </summary>
+    public static IEnumerator WarmSprites()
+    {
+        if (_preloadedBytes.Count == 0)
+            yield break;
+
+        // Build a name→PPU lookup from sprites currently in memory for correct scaling.
+        var ppuLookup = new Dictionary<string, float>();
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (sprite != null && !ppuLookup.ContainsKey(sprite.name))
+                ppuLookup[sprite.name] = sprite.pixelsPerUnit;
+        }
+
+        int warmed = 0;
+        foreach (var kvp in _preloadedBytes.ToList())
+        {
+            if (_loadedSprites.ContainsKey(kvp.Key))
+                continue; // already promoted by ApplyReplacementsInScene
+
+            Texture2D tex = TexUtil.CreateTextureFromBytes(kvp.Value);
+            if (tex == null)
+                continue;
+
+            string spriteName = kvp.Key.Contains('/')
+                ? kvp.Key.Substring(kvp.Key.LastIndexOf('/') + 1)
+                : kvp.Key;
+            float ppu = ppuLookup.TryGetValue(spriteName, out float p) ? p : 100f;
+
+            Sprite newSprite = Sprite.Create(tex,
+                new Rect(0, 0, tex.width, tex.height),
+                new Vector2(0.5f, 0.5f), ppu);
+            newSprite.name = spriteName;
+
+            _loadedSprites[kvp.Key] = newSprite;
+            _preloadedBytes.Remove(kvp.Key);
+            warmed++;
+
+            yield return null;
+        }
+
+        if (warmed > 0)
+            Plugin.Logger.LogInfo($"[T2D-Warm] WarmSprites complete: promoted {warmed} sprites from byte cache");
+    }
+
+    public static void InvalidateSpritesheet(string texName)
     {
         // NOTE: May be called from the file watcher's background thread.
         // Do NOT call Object.Destroy here — only clear caches.

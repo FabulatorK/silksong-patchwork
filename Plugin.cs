@@ -113,10 +113,14 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => PackManager.OnSceneLoaded(scene.name);
 
+        // After ApplyReplacementsInScene has run its eager passes, WarmSprites promotes any
+        // remaining _preloadedBytes entries (sprites not yet in memory) one-per-frame so GPU
+        // upload cost is spread over the loading window instead of stalling the scene transition.
+        SceneManager.sceneLoaded += (scene, mode) => StartCoroutine(T2DLoader.WarmSprites());
+
         // Discovery sweep for Instantiate-cloned renderers that bypass the Harmony sprite-setter
-        // postfix. Running once per scene load is sufficient: clones created after scene load are
-        // tracked immediately by the postfix, and LateUpdate EnforceT2DReplacements re-checks all
-        // known renderers every frame.
+        // postfix. Runs once at scene load to catch clones already present, and periodically
+        // from Update() to catch clones spawned mid-scene.
         SceneManager.sceneLoaded += (scene, mode) => T2DLoader.CheckForUninitializedSprites();
 
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
