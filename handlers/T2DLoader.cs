@@ -36,9 +36,6 @@ public static partial class T2DLoader
     // Maps asset key → source pack path (null = base Patchwork folder). Used for conflict reporting.
     private static readonly Dictionary<string, string>  _t2dProviders     = new();
 
-    // T2D keys that have been logged as missing — suppresses repeat logs per session.
-    private static readonly HashSet<string> _t2dMissLogged = new();
-
     private static readonly Dictionary<int, string> _trackedSpriteNames = new();
     private static readonly HashSet<SpriteRenderer> _knownRenderers = new();
     private static readonly HashSet<Image> _knownImages = new();
@@ -238,10 +235,6 @@ public static partial class T2DLoader
                     }
                     replacement = cached;
                 }
-                else if (_t2dMissLogged.Add(key))
-                    Plugin.Logger.LogInfo(
-                        $"[T2D-Miss] sprite='{sprite.name}' tex='{cleanTexName}' " +
-                        $"key='{key}' loaded={_loadedSprites.Count}");
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
 
@@ -455,7 +448,6 @@ public static partial class T2DLoader
         _knownRenderers.Clear();
         _knownImages.Clear();
         _trackedSpriteNames.Clear();
-        _t2dMissLogged.Clear();
 
         PreloadAllTextures();
 
