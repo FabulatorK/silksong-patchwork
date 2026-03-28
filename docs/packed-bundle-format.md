@@ -172,9 +172,8 @@ loader.GetSprite(key) → already-created Sprite, no further work
 - `FileCache` timestamp checks
 - `SpriteFileWatcher` / `TextFileWatcher` startup
 - PNG IHDR dimension reads in `T2DSpritesheets`
-- `_preloadedBytes` deferred-promotion coroutine (`WarmSprites`)
 - Hot-reload condition polling (`PollHotReloadConditions` for packed packs)
-- `CheckForUninitializedSprites` sweep (all sprites loaded at scene entry)
+- `CheckForUninitializedSprites` sweep (all sprites loaded at scene entry; sweep runs once on `sceneLoaded` in dev mode but is skippable when the bundle pre-populates `_loadedSprites`)
 
 ---
 

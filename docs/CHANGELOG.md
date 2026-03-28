@@ -1,4 +1,17 @@
-### v2.5.0
+### Unreleased
+* Fixed T2D revert sweep breaking individual sprite priority — revert sweep now sets `_enforcing` and explicitly prefers `_loadedSprites` over vanilla, preventing the Harmony setter chain from corrupting priority during pack reload
+* Fixed T2D revert block being skipped when base-path T2D files kept `HasT2DReplacements` true with no active pack
+* Fixed T2D spritesheet and audio revert cascade failures on pack disable
+* Fixed T2D Inventory/UI sprites going black when unloading a pack
+* Fixed spurious spritesheet size-mismatch warnings across scene transitions
+* Removed eager byte-promotion Pass 2 and `WarmSprites` coroutine (accepted one-frame vanilla flash trade-off)
+* Fixed `_confirmedSpriteNames` accumulating unboundedly across scene transitions — now cleared on `sceneUnloaded`
+* Fixed `_originalTextureData` holding vanilla PNG bytes until next scene unload after pack disable — freed immediately when no spritesheet overrides remain
+* Fixed `AudioHandler` using `ContainsKey`+indexer pattern instead of `TryGetValue`
+* Fixed `FindSprite` enumerating its file list twice; added warning log for ambiguous multi-file matches in a pack
+* Moved `CheckForUninitializedSprites` from a 30-frame Update timer to `sceneLoaded` — eliminates a recurring `FindObjectsByType` sweep every 0.5 s
+
+
 * Added text replacement
 * Massive update to Texture2D handling, adding support for more textures & sprites
 

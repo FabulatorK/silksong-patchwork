@@ -12,8 +12,7 @@ item is implemented or a new plan is recorded.
 
 | Feature | Files | Notes |
 |---------|-------|-------|
-| T2D deferred GPU upload | `handlers/T2DLoader.cs` | Bytes stored at startup; `Texture2D` promoted lazily at scene load or via `WarmSprites` coroutine |
-| WarmSprites coroutine | `handlers/T2DLoader.cs` | Spreads GPU uploads one-per-frame after scene load; PPU lookup from `Resources.FindObjectsOfTypeAll<Sprite>()` |
+| T2D deferred GPU upload | `handlers/T2DLoader.cs` | Bytes stored at startup; `Texture2D` promoted lazily on first scene encounter (one-frame vanilla flash accepted trade-off; `WarmSprites` removed) |
 | PNG IHDR dimension read | `handlers/T2DSpritesheets.cs` | Reads width/height from 24-byte header; no GPU upload for metadata |
 | Sprite file index | `handlers/SpriteLoader.cs` | `RebuildFileIndex()` builds two `Dictionary<string,(FullPath,Pack)>` at reload time; `FindSprite`/`FindSpritesheet` are O(1) |
 | FileCache | `util/FileCache.cs` | Timestamp-fingerprinted byte cache; `ReadBytes` checks `GetLastWriteTimeUtc` before re-reading |
@@ -26,11 +25,20 @@ item is implemented or a new plan is recorded.
 | Mono heap pre-warm | `util/GcUtil.cs`, `Plugin.cs` | Allocates and releases a configurable block at startup to raise GC high-water mark before gameplay |
 | Scene-transition GC collect | `util/GcUtil.cs`, `Plugin.cs` | `GC.Collect(Optimized)` on `sceneUnloaded`; lands during loading screen |
 | Main menu stutter fix | `handlers/T2DHandler.cs` | `PerfTickFrame()` (which allocates a format string + calls `LogWarning` when >20 setter calls/frame) now returns immediately unless `ShowDevProfiler` is true |
+| `CheckForUninitializedSprites` moved to scene load | `Plugin.cs` | Removes recurring `FindObjectsByType` sweep every 30 frames (~0.5 s); single call on `sceneLoaded` is sufficient since Harmony setter postfixes track mid-scene spawns immediately |
 
 ### Bug fixes
 
 | Fix | Files | Notes |
 |-----|-------|-------|
+| T2D individual sprite priority broken by revert sweep | `handlers/T2DLoader.cs` | Revert sweep now sets `_enforcing = true` and looks up `_loadedSprites` first — prevents Harmony setter chain (`OnSpriteSet` → `TrySwapTexture` + `HandleLoad`) from re-entering during the sweep and corrupting priority |
+| T2D revert block skipped with no active pack | `handlers/T2DLoader.cs` | Removed `!HasT2DReplacements` gate; base-path T2D files kept `_preloadedBytes` non-empty even with no pack, causing the entire revert sweep to be skipped |
+| T2D spritesheet and audio revert cascade on pack disable | `handlers/T2DLoader.cs`, `handlers/T2DSpritesheets.cs`, `handlers/AudioHandler.cs` | `TryRestoreTexture` now guarded with `preSkipped` check; `_originalClips` now saved before `source.clip` assignment to avoid Harmony postfix guard blocking the save |
+| T2D Inventory/UI sprites black after pack disable | `handlers/T2DLoader.cs`, `handlers/T2DSpritesheets.cs` | Added revert sweep (vanilla lookup by name) before old sprites destroyed; `PruneStaleOriginals` now preserves entries covered by active `SpritesheetOverrides` |
+| `_confirmedSpriteNames` accumulation across scenes | `handlers/T2DLoader.cs` | Cleared in `PruneSceneState` (on `sceneUnloaded`) — was previously only cleared by `ReloadSpritesInScene`, so names grew unboundedly during normal play |
+| `_originalTextureData` not freed on pack disable | `handlers/T2DSpritesheets.cs`, `handlers/T2DLoader.cs` | After the restore pass in `ReloadSpritesInScene`, `_originalTextureData` is cleared immediately when `SpritesheetOverrides` is empty — `PruneStaleOriginals` skips live textures so without this the bytes lingered until next scene unload |
+| `AudioHandler` `ContainsKey`+indexer race | `handlers/AudioHandler.cs` | Both `LoadAudio` overloads now use `TryGetValue`; `_soundIndex` population uses `TryAdd` |
+| `FindSprite` double enumeration | `handlers/T2DLoader.cs` | `Any()`+`First()` replaced with single `FirstOrDefault()`; warns if multiple T2D files match the same sprite name in a pack |
 | T2D effects stuck after pack reload | `handlers/T2DLoader.cs` | `ReloadSpritesInScene` now clears `_knownRenderers`, `_knownImages`, `_confirmedSpriteNames`, `_trackedSpriteNames` before rebuild — stale tracking from the old pack can no longer interfere |
 | `Object` ambiguous reference | `handlers/SpriteLoader.cs` | Qualified as `UnityEngine.Object.Destroy` after `using System` was added |
 | Missing `using System.IO` | `util/TexUtil.cs` | Required for `Path.Combine` |
