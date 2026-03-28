@@ -123,7 +123,42 @@ public static class AudioHandler
                     // _reverting prevents ClipSetterPatch from immediately re-applying a replacement.
                     int id = source.GetInstanceID();
                     bool hasOrig = _originalClips.TryGetValue(id, out var orig);
-                    if (hasOrig && orig != null)
+
+                    if (!hasOrig || orig == null)
+                    {
+                        // Cloned AudioSources inherit the PATCHWORK_ clip from the prefab and were
+                        // never saved in _originalClips. The vanilla clip is still alive — either
+                        // under a different instance ID in _originalClips, or as a game asset.
+                        // Search _originalClips.Values first (cheap, already in memory), then fall
+                        // back to a full Resources scan.
+                        foreach (var saved in _originalClips.Values)
+                        {
+                            if (saved != null && string.Equals(saved.name, clipName, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                orig = saved;
+                                break;
+                            }
+                        }
+
+                        if (orig == null)
+                        {
+                            foreach (var ac in Resources.FindObjectsOfTypeAll<AudioClip>())
+                            {
+                                if (ac != null && !ac.name.StartsWith("PATCHWORK_") &&
+                                    string.Equals(ac.name, clipName, System.StringComparison.OrdinalIgnoreCase))
+                                {
+                                    orig = ac;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Cache the found vanilla clip so subsequent reloads don't re-scan.
+                        if (orig != null)
+                            _originalClips[id] = orig;
+                    }
+
+                    if (orig != null)
                     {
                         _reverting = true;
                         source.clip = orig;
@@ -131,7 +166,7 @@ public static class AudioHandler
                     }
                     else
                     {
-                        Plugin.Logger.LogWarning($"[Audio] Reload: cannot revert '{clipName}' on '{source.gameObject.name}' — no original clip saved (cloned AudioSource?)");
+                        Plugin.Logger.LogWarning($"[Audio] Reload: cannot revert '{clipName}' on '{source.gameObject.name}' — vanilla clip not found in memory");
                     }
                 }
             }
