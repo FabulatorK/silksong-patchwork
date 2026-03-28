@@ -124,6 +124,12 @@ public static partial class T2DLoader
             if (img == null || img.sprite == null) continue;
             HandleLoad(img, img.sprite);
         }
+
+        // Pass 3: Pre-correct PPU and stamp atlas names for ALL vanilla sprites in memory,
+        // including those on inactive/unspawned objects. Mirrors T2DHandler Pass 2 from the
+        // original Ashiepaws implementation. Ensures effect sprites and other rarely-seen
+        // sprites have the correct PPU before they're first rendered.
+        PreCorrectAllPPU();
     }
 
     public static void PreloadAllTextures()
@@ -201,20 +207,68 @@ public static partial class T2DLoader
     /// Returns the cached sprite with its PPU matched to <paramref name="targetPPU"/>.
     /// On the first encounter the preloaded 100f placeholder is re-created at the game's
     /// native PPU; subsequent calls are a no-op.
+    /// <para>
+    /// If <paramref name="vanillaTextureName"/> is provided (non-null) and the replacement
+    /// texture still has no name, the atlas name is stamped onto it. This allows
+    /// <see cref="EnforceT2DReplacements"/> and subsequent <see cref="HandleLoad"/> calls
+    /// to find the replacement via the primary atlas-qualified path — matching the behaviour
+    /// of the original T2DHandler (Ashiepaws) which sets <c>spriteTex.name = sprite.texture.name</c>.
+    /// </para>
     /// </summary>
-    private static Sprite EnsurePPU(string key, Sprite cached, float targetPPU)
+    private static Sprite EnsurePPU(string key, Sprite cached, float targetPPU,
+        string vanillaTextureName = null)
     {
+        Sprite result;
         if (System.Math.Abs(cached.pixelsPerUnit - targetPPU) <= 0.5f)
-            return cached;
+        {
+            result = cached;
+        }
+        else
+        {
+            var corrected = Sprite.Create(cached.texture,
+                new Rect(0, 0, cached.texture.width, cached.texture.height),
+                new Vector2(0.5f, 0.5f), targetPPU);
+            corrected.name = cached.name;
+            corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            Object.Destroy(cached);
+            _loadedSprites[key] = corrected;
+            result = corrected;
+        }
 
-        var corrected = Sprite.Create(cached.texture,
-            new Rect(0, 0, cached.texture.width, cached.texture.height),
-            new Vector2(0.5f, 0.5f), targetPPU);
-        corrected.name = cached.name;
-        corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
-        Object.Destroy(cached);
-        _loadedSprites[key] = corrected;
-        return corrected;
+        // Stamp the atlas name onto the replacement texture so that enforcement
+        // (EnforceT2DReplacements → KeyForSprite) can locate this sprite via
+        // the primary T2D path rather than the plain-name fallback.
+        if (vanillaTextureName != null && result.texture != null
+            && string.IsNullOrEmpty(result.texture.name))
+            result.texture.name = vanillaTextureName;
+
+        return result;
+    }
+
+    /// <summary>
+    /// Pre-corrects PPU for every replacement sprite whose vanilla counterpart is currently
+    /// in memory, and stamps the atlas name onto each replacement texture.
+    /// <para>
+    /// Mirrors <em>ApplyReplacementsInScene Pass 2</em> from the original T2DHandler: by
+    /// scanning <c>Resources.FindObjectsOfTypeAll&lt;Sprite&gt;()</c> we reach sprites on
+    /// inactive objects and unspawned effects — not just the active renderers visited by the
+    /// <see cref="HandleLoad"/> sweep. Without this pass, sprites that were preloaded at
+    /// the 100 PPU placeholder and haven't been seen by <see cref="HandleLoad"/> yet would
+    /// display at the wrong size on first spawn.
+    /// </para>
+    /// </summary>
+    private static void PreCorrectAllPPU()
+    {
+        if (_loadedSprites.Count == 0) return;
+        foreach (var vanilla in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (vanilla == null || vanilla.texture == null) continue;
+            if (!T2DUtil.IsT2DTexture(vanilla.texture.name)) continue;
+            string cleanTexName = T2DUtil.CleanTextureName(vanilla.texture.name);
+            string key = T2DUtil.SpriteKey(cleanTexName, vanilla.name);
+            if (!_loadedSprites.TryGetValue(key, out var cached) || cached == null) continue;
+            EnsurePPU(key, cached, vanilla.pixelsPerUnit, vanilla.texture.name);
+        }
     }
 
     internal static void HandleLoad(object spriteContainer, Sprite sprite)
@@ -236,7 +290,7 @@ public static partial class T2DLoader
                 string key = T2DUtil.SpriteKey(cleanTexName, sprite.name);
 
                 if (_loadedSprites.TryGetValue(key, out var cached) && cached != null && cached.texture != null)
-                    replacement = EnsurePPU(key, cached, sprite.pixelsPerUnit);
+                    replacement = EnsurePPU(key, cached, sprite.pixelsPerUnit, sprite.texture.name);
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
 
@@ -249,7 +303,7 @@ public static partial class T2DLoader
             if (replacement == null && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey)
                 && _loadedSprites.TryGetValue(fallbackKey, out var fallback) && fallback != null && fallback.texture != null)
             {
-                replacement = EnsurePPU(fallbackKey, fallback, sprite.pixelsPerUnit);
+                replacement = EnsurePPU(fallbackKey, fallback, sprite.pixelsPerUnit, sprite.texture.name);
             }
 
             if (replacement != null)
@@ -478,6 +532,12 @@ public static partial class T2DLoader
             if (img == null || img.sprite == null || img.sprite.texture == null) continue;
             HandleLoad(img, img.sprite);
         }
+
+        // Pre-correct PPU for ALL vanilla sprites in memory (including unspawned effects).
+        // The HandleLoad sweep above only reaches active renderers, so effect sprites on
+        // inactive objects or pooled prefabs would keep the 100f placeholder until first spawn.
+        // This pass fixes them upfront — exactly as master's ApplyReplacementsInScene Pass 2 does.
+        PreCorrectAllPPU();
 
         // Any renderer that still holds an old replacement sprite after the HandleLoad sweep
         // above was not updated (no new replacement exists for it). Revert it to the vanilla
