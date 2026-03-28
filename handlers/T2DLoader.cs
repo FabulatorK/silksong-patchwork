@@ -237,19 +237,28 @@ public static partial class T2DLoader
 
                 if (_loadedSprites.TryGetValue(key, out var cached) && cached != null && cached.texture != null)
                 {
-                    // PPU correction: sprites are created at startup with 100f PPU (game sprites
-                    // aren't in memory yet). On first Harmony-intercepted setter call we know the
-                    // real PPU. Recreate if there's a meaningful difference so size is correct.
-                    if (System.Math.Abs(cached.pixelsPerUnit - sprite.pixelsPerUnit) > 0.5f)
+                    // Size correction: our replacement is a full-texture sprite (rect = entire PNG),
+                    // but the original is a trimmed sub-rect of the atlas. Different frames have
+                    // different rect dimensions (tight packing), so a uniform PNG size renders each
+                    // frame at a different scale unless we adjust PPU to match the original world size.
+                    //
+                    // effectivePPU = tex.width * sprite.pixelsPerUnit / sprite.rect.width
+                    //   → makes (tex.width / effectivePPU) == (sprite.rect.width / sprite.pixelsPerUnit)
+                    //   → replacement renders at the same world-space width as the original atlas sub-rect.
+                    if (sprite.rect.width > 0)
                     {
-                        var corrected = Sprite.Create(cached.texture,
-                            new Rect(0, 0, cached.texture.width, cached.texture.height),
-                            new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
-                        corrected.name = cached.name;
-                        corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
-                        Object.Destroy(cached);
-                        _loadedSprites[key] = corrected;
-                        cached = corrected;
+                        float effectivePPU = cached.texture.width * sprite.pixelsPerUnit / sprite.rect.width;
+                        if (System.Math.Abs(cached.pixelsPerUnit - effectivePPU) > 0.5f)
+                        {
+                            var corrected = Sprite.Create(cached.texture,
+                                new Rect(0, 0, cached.texture.width, cached.texture.height),
+                                new Vector2(0.5f, 0.5f), effectivePPU);
+                            corrected.name = cached.name;
+                            corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                            Object.Destroy(cached);
+                            _loadedSprites[key] = corrected;
+                            cached = corrected;
+                        }
                     }
                     replacement = cached;
                 }

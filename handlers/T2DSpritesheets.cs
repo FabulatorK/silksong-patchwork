@@ -271,8 +271,11 @@ public static partial class T2DLoader
         if (tex.LoadImage(png))
         {
             Plugin.Logger.LogInfo($"[T2D] Restored vanilla pixels for '{tex.name}'");
-            // Remove so re-enabling the pack can capture fresh original data next time.
-            _originalTextureData.Remove(tex.name);
+            // Do NOT remove the entry: during scene transitions Unity can have two instances
+            // of the same atlas name in memory simultaneously. Removing after the first
+            // restore leaves the second instance unrestorable. The stored PNG is the true
+            // vanilla data and never changes, so keeping it is safe. PruneStaleOriginals
+            // handles eviction once the texture is no longer in memory.
             return true;
         }
 
