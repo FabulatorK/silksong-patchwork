@@ -394,10 +394,7 @@ public static class GUIHelper
     private static MethodInfo _mapDisableMethod;
     private static MethodInfo _mapEnableMethod;
 
-    private static Type _playerInputType;
-
     private static readonly List<object> _disabledMaps = new();
-    private static readonly List<MonoBehaviour> _disabledPlayerInputs = new();
 
     public static void InitInputBlocking()
     {
@@ -420,8 +417,6 @@ public static class GUIHelper
                 _mapEnableMethod = mapType.GetMethod("Enable", Type.EmptyTypes);
             }
 
-            _playerInputType = AccessTools.TypeByName("UnityEngine.InputSystem.PlayerInput");
-
             bool hasAssetPath =
                 _systemActionsProp != null &&
                 _assetActionMapsProp != null &&
@@ -429,18 +424,14 @@ public static class GUIHelper
                 _mapDisableMethod != null &&
                 _mapEnableMethod != null;
 
-            bool hasPlayerInputPath = _playerInputType != null;
-
-            if (!hasAssetPath && !hasPlayerInputPath)
+            if (!hasAssetPath)
             {
                 Plugin.Logger.LogWarning("[InputBlock] No usable Input System path found.");
                 return;
             }
 
             _inputSystemAvailable = true;
-            Plugin.Logger.LogInfo(
-                $"[InputBlock] Ready (asset path: {hasAssetPath}, playerInput path: {hasPlayerInputPath})"
-            );
+            Plugin.Logger.LogInfo($"[InputBlock] Ready (asset path: {hasAssetPath})");
         }
         catch (Exception ex)
         {
@@ -479,9 +470,8 @@ public static class GUIHelper
     private static void DisableGameActions()
     {
         _disabledMaps.Clear();
-        _disabledPlayerInputs.Clear();
 
-        // Strategy 1: Disable InputSystem.actions maps, if available.
+        // Disable InputSystem.actions maps so game hotkeys don't fire while typing.
         if (_systemActionsProp != null &&
             _assetActionMapsProp != null &&
             _mapEnabledProp != null &&
@@ -524,19 +514,11 @@ public static class GUIHelper
             }
         }
 
-        // Strategy 2: Disable PlayerInput components too, in case the game owns separate assets.
-        if (_playerInputType != null)
-        {
-            var allPlayerInputs = UnityEngine.Object.FindObjectsByType(_playerInputType, FindObjectsSortMode.None);
-            foreach (var obj in allPlayerInputs)
-            {
-                if (obj is MonoBehaviour mb && mb != null && mb.enabled)
-                {
-                    mb.enabled = false;
-                    _disabledPlayerInputs.Add(mb);
-                }
-            }
-        }
+        // Note: we intentionally do NOT disable PlayerInput components here.
+        // Toggling PlayerInput.enabled triggers OnDisable/OnEnable lifecycle events
+        // that can corrupt Input System device bindings (including controller touchpad
+        // mappings). The InputActionMap approach above is sufficient to block gameplay
+        // hotkeys while a text field is focused.
     }
 
     private static void RestoreGameActions()
@@ -557,21 +539,6 @@ public static class GUIHelper
         }
 
         _disabledMaps.Clear();
-
-        foreach (MonoBehaviour mb in _disabledPlayerInputs)
-        {
-            try
-            {
-                if (mb != null)
-                    mb.enabled = true;
-            }
-            catch
-            {
-                // Object may have been destroyed.
-            }
-        }
-
-        _disabledPlayerInputs.Clear();
     }
 
     /// <summary>
