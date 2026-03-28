@@ -28,9 +28,13 @@ public static partial class T2DLoader
     // All replacement sprites are created upfront in PreloadAllTextures and stored here.
     // Key = T2DUtil.SpriteKey(cleanTexName, spriteName) for T2D atlas sprites,
     //       spriteName alone for flat/standalone sprites.
-    private static readonly Dictionary<string, Sprite>  _loadedSprites = new();
+    private static readonly Dictionary<string, Sprite>  _loadedSprites    = new();
+    // Reverse index: spriteName → loadedSprites key. Built at preload time.
+    // Enables O(1) name-based lookup when the renderer holds one of our own replacement
+    // sprites (whose texture has no T2D-recognizable name after the first apply).
+    private static readonly Dictionary<string, string>  _spriteNameToKey  = new();
     // Maps asset key → source pack path (null = base Patchwork folder). Used for conflict reporting.
-    private static readonly Dictionary<string, string>  _t2dProviders  = new();
+    private static readonly Dictionary<string, string>  _t2dProviders     = new();
 
     // T2D keys that have been logged as missing — suppresses repeat logs per session.
     private static readonly HashSet<string> _t2dMissLogged = new();
@@ -162,6 +166,11 @@ public static partial class T2DLoader
                 sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 _loadedSprites[key] = sprite;
                 _t2dProviders[key] = sourcePack;
+                // Reverse index so HandleLoad can find atlas-qualified keys from sprite name alone
+                // (needed when a renderer holds our own replacement sprite whose texture name is
+                // no longer a T2D atlas identifier — IsT2DTexture returns false on second pass).
+                if (!_spriteNameToKey.ContainsKey(spriteName))
+                    _spriteNameToKey[spriteName] = key;
                 return sprite;
             }
 
@@ -218,35 +227,55 @@ public static partial class T2DLoader
         _handling = true;
         try
         {
+            Sprite replacement = null;
+
             if (T2DUtil.IsT2DTexture(sprite.texture.name))
             {
-                // All individual sprite replacements are pre-loaded in _loadedSprites at startup.
-                // This is a pure dictionary lookup — no disk I/O, no staging.
+                // Primary path: atlas-qualified key lookup.
                 string cleanTexName = T2DUtil.CleanTextureName(sprite.texture.name);
                 string key = T2DUtil.SpriteKey(cleanTexName, sprite.name);
 
                 if (_loadedSprites.TryGetValue(key, out var cached) && cached != null && cached.texture != null)
                 {
-                    SetSprite(spriteContainer, cached);
-                    TrackContainer(spriteContainer);
-                    return;
+                    // PPU correction: sprites are created at startup with 100f PPU (game sprites
+                    // aren't in memory yet). On first Harmony-intercepted setter call we know the
+                    // real PPU. Recreate if there's a meaningful difference so size is correct.
+                    if (System.Math.Abs(cached.pixelsPerUnit - sprite.pixelsPerUnit) > 0.5f)
+                    {
+                        var corrected = Sprite.Create(cached.texture,
+                            new Rect(0, 0, cached.texture.width, cached.texture.height),
+                            new Vector2(0.5f, 0.5f), sprite.pixelsPerUnit);
+                        corrected.name = cached.name;
+                        corrected.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                        Object.Destroy(cached);
+                        _loadedSprites[key] = corrected;
+                        cached = corrected;
+                    }
+                    replacement = cached;
                 }
-
-                if (_t2dMissLogged.Add(key))
+                else if (_t2dMissLogged.Add(key))
                     Plugin.Logger.LogInfo(
                         $"[T2D-Miss] sprite='{sprite.name}' tex='{cleanTexName}' " +
                         $"key='{key}' loaded={_loadedSprites.Count}");
                 // Spritesheet replacement is handled by TrySwapTexture in-place.
             }
-            else
+
+            // Name-index fallback: handles two cases:
+            //   1. Non-T2D texture (flat layout or _standalone sprites)
+            //   2. Our own replacement sprites on the renderer — their texture has no T2D-style
+            //      name so IsT2DTexture returns false; the T2D branch above was skipped entirely.
+            //      _spriteNameToKey maps sprite.name → atlas-qualified key so we find the right
+            //      replacement even on subsequent pack-switches or vanilla-revert attempts.
+            if (replacement == null && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey)
+                && _loadedSprites.TryGetValue(fallbackKey, out var fallback) && fallback != null && fallback.texture != null)
             {
-                // Non-T2D: flat-key lookup (sprite name or texture name).
-                // Flat-layout sprites preloaded under their sprite name as key.
-                if (_loadedSprites.TryGetValue(sprite.name, out var existing) && existing != null)
-                {
-                    SetSprite(spriteContainer, existing);
-                    TrackContainer(spriteContainer);
-                }
+                replacement = fallback;
+            }
+
+            if (replacement != null)
+            {
+                SetSprite(spriteContainer, replacement);
+                TrackContainer(spriteContainer);
             }
         }
         finally
@@ -429,6 +458,7 @@ public static partial class T2DLoader
 
         // Clear all caches
         _loadedSprites.Clear();
+        _spriteNameToKey.Clear();
         _t2dProviders.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
@@ -618,5 +648,6 @@ public static partial class T2DLoader
             foreach (var key in _loadedSprites.Keys.Where(k => k == spriteName || k.EndsWith($"/{spriteName}")).ToList())
                 _loadedSprites.Remove(key);
         }
+        _spriteNameToKey.Remove(spriteName);
     }
 }
