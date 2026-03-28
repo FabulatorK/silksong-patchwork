@@ -40,7 +40,7 @@ public static class DashboardPillar
         UnityEngine.GUI.contentColor = new Color(0.6f, 0.85f, 1f);
         GUILayout.Label(
             $"tk2d sprites: {SpriteLoader.LoadedSpriteCount} in {SpriteLoader.LoadedCollectionCount} collections  " +
-            $"T2D: {T2DLoader.LoadedT2DSpriteCount} loaded / {T2DLoader.PreloadedT2DTextureCount} pending  " +
+            $"T2D: {T2DLoader.LoadedT2DSpriteCount} loaded  " +
             $"Sheets: {T2DLoader.SpritesheetOverrideCount}",
             GUIHelper.LabelStyle);
         UnityEngine.GUI.contentColor = Color.white;
@@ -86,14 +86,11 @@ public static class DashboardPillar
         var t2d = new List<FileEntry>();
         ScanPng(T2DLoader.AtlasLoadPath, t2d);
         var loadedT2D  = new HashSet<string>(T2DLoader.LoadedT2DSpriteNames);
-        var pendingT2D = new HashSet<string>(T2DLoader.PreloadedT2DTextureNames);
         var sheetNames = new HashSet<string>(T2DLoader.SpritesheetOverrideNames);
         foreach (var e in t2d)
         {
             if (loadedT2D.Contains(e.Name) || sheetNames.Contains(e.Name))
                 e.Status = FileStatus.Loaded;
-            else if (pendingT2D.Contains(e.Name))
-                e.Status = FileStatus.Pending;
         }
         _scannedFiles["t2d"] = t2d;
 
