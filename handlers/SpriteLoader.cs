@@ -263,6 +263,7 @@ public static class SpriteLoader
         LoadedSprites.Clear();
         foreach (var collection in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
             LoadCollection(collection);
+        Plugin.Logger.LogInfo($"[SpriteLoader] Reload complete: {LoadedSpriteCount} sprite(s) blitted across {LoadedAtlases.Count} atlas(es)");
     }
 
     internal class SpritesheetResult

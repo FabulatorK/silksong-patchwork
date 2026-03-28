@@ -493,10 +493,8 @@ public static partial class T2DLoader
 
             // Index all live sprites that are NOT our replacements, keyed by name.
             var vanillaByName = new Dictionary<string, Sprite>(System.StringComparer.OrdinalIgnoreCase);
-            int totalLiveSprites = 0;
             foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
             {
-                totalLiveSprites++;
                 if (s != null && !oldSpriteSet.Contains(s) && !vanillaByName.ContainsKey(s.name))
                     vanillaByName[s.name] = s;
             }
@@ -527,8 +525,9 @@ public static partial class T2DLoader
                 }
             }
             finally { _enforcing = false; }
+            Plugin.Logger.LogInfo($"[T2D-Reload] Revert sweep: {oldSprites.Count} old sprites, {vanillaByName.Count} vanilla candidates, {revertCount} reverted, {missCount} missed");
             if (missCount > 0)
-                Plugin.Logger.LogWarning($"[T2D-Reload] Revert sweep: {revertCount} reverted, {missCount} missed");
+                Plugin.Logger.LogWarning($"[T2D-Reload] {missCount} sprite(s) could not be reverted — see [T2D-Revert] warnings above for names");
         }
 
         // NOW destroy old sprites — renderers have been updated with new replacements
