@@ -113,6 +113,12 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => PackManager.OnSceneLoaded(scene.name);
 
+        // Discovery sweep for Instantiate-cloned renderers that bypass the Harmony sprite-setter
+        // postfix. Running once per scene load is sufficient: clones created after scene load are
+        // tracked immediately by the postfix, and LateUpdate EnforceT2DReplacements re-checks all
+        // known renderers every frame.
+        SceneManager.sceneLoaded += (scene, mode) => T2DLoader.CheckForUninitializedSprites();
+
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneSceneState();
         SceneManager.sceneUnloaded += _ => GcUtil.CollectAtTransition();
@@ -149,7 +155,7 @@ public class Plugin : BaseUnityPlugin
     }
 
 
-    private static int _frameCounter = 0;
+
     private static int _conditionPollFrames = 0;
     private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
 
@@ -228,13 +234,6 @@ public class Plugin : BaseUnityPlugin
         }
 
         AnimationController.Update();
-
-        // Periodic discovery sweep: find newly-instantiated renderers (Object.Instantiate
-        // clones bypass the C# sprite setter, so our Harmony postfix never fires for them).
-        // This uses FindObjectsByType which is expensive, so run it every 30 frames (~0.5s)
-        // rather than every frame. LateUpdate enforcement only re-checks tracked renderers.
-        if (++_frameCounter % 30 == 0)
-            T2DLoader.CheckForUninitializedSprites();
 
         DevProfiler.EndUpdateTiming();
     }
