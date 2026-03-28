@@ -115,7 +115,6 @@ public static class AudioHandler
                     if (source.clip != null && !source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
                         _originalClips[id] = source.clip;
                     LoadedClips[clipName] = replacement;
-                    Plugin.Logger.LogInfo($"[Audio-Trace] Reload: APPLIED '{clipName}' on source '{source.gameObject.name}' (id={source.GetInstanceID()})");
                     source.clip = replacement;
                 }
                 else if (source.clip.name.StartsWith("PATCHWORK_"))
@@ -124,17 +123,15 @@ public static class AudioHandler
                     // _reverting prevents ClipSetterPatch from immediately re-applying a replacement.
                     int id = source.GetInstanceID();
                     bool hasOrig = _originalClips.TryGetValue(id, out var orig);
-                    Plugin.Logger.LogInfo($"[Audio-Trace] Reload: REVERT '{clipName}' on source '{source.gameObject.name}' (id={id}) hasOrig={hasOrig} orig='{(orig != null ? orig.name : "null")}'");
                     if (hasOrig && orig != null)
                     {
                         _reverting = true;
                         source.clip = orig;
                         _reverting = false;
-                        Plugin.Logger.LogInfo($"[Audio-Trace]   → restored to '{source.clip?.name}'");
                     }
                     else
                     {
-                        Plugin.Logger.LogWarning($"[Audio-Trace]   → no original clip saved, cannot revert '{clipName}'");
+                        Plugin.Logger.LogWarning($"[Audio] Reload: cannot revert '{clipName}' on '{source.gameObject.name}' — no original clip saved (cloned AudioSource?)");
                     }
                 }
             }
