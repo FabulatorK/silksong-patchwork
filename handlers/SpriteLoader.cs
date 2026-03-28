@@ -209,18 +209,34 @@ public static class SpriteLoader
         if (!_fileIndexBuilt) RebuildFileIndex();
         string key = $"{collection.name}/{materialName}.png";
 
+        Texture blitSrc;
+        bool fromCustom;
+        Texture2D customTex = null;
+
         if (_sheetFileIndex.TryGetValue(key, out var entry))
         {
-            var tex2d = TexUtil.LoadFromPNG(entry.FullPath);
-            RenderTexture rt = RenderTexture.GetTemporary(
-                tex2d.width, tex2d.height, 0,
-                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-            Graphics.Blit(tex2d, rt);
-            UnityEngine.Object.Destroy(tex2d);
-            return new SpritesheetResult { Texture = rt, FromCustom = true };
+            customTex = TexUtil.LoadFromPNG(entry.FullPath);
+            blitSrc   = customTex;
+            fromCustom = true;
+        }
+        else
+        {
+            blitSrc    = originalTex;
+            fromCustom = false;
         }
 
-        return new SpritesheetResult { Texture = TexUtil.GetReadable(originalTex), FromCustom = false };
+        // Persistent RenderTexture — NOT GetTemporary.
+        // GetTemporary RTs are only valid within a single frame; Unity reclaims them
+        // from the pool across scene transitions, leaving mat.mainTexture pointing at
+        // a stale RT.  A plain `new RenderTexture` persists until explicitly destroyed.
+        var rt = new RenderTexture(blitSrc.width, blitSrc.height, 0,
+            RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
+        {
+            hideFlags = HideFlags.DontUnloadUnusedAsset
+        };
+        Graphics.Blit(blitSrc, rt);
+        if (customTex != null) UnityEngine.Object.Destroy(customTex);
+        return new SpritesheetResult { Texture = rt, FromCustom = fromCustom };
     }
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
@@ -259,10 +275,27 @@ public static class SpriteLoader
     {
         RebuildFileIndex();
         LoadedAtlases.Clear();
+
+        // Save old RTs for deferred cleanup.  We destroy them AFTER LoadCollection
+        // has already written new textures to every material, so there is never a
+        // frame where mat.mainTexture points to a released/destroyed RT.
+        var oldRTs = new List<RenderTexture>();
+        foreach (var colMap in LoadedAtlasesTextures.Values)
+            foreach (var rt in colMap.Values)
+                if (rt != null) oldRTs.Add(rt);
         LoadedAtlasesTextures.Clear();
         LoadedSprites.Clear();
+
         foreach (var collection in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
             LoadCollection(collection);
+
+        // Now safe to destroy — materials already point at fresh RTs.
+        foreach (var rt in oldRTs)
+        {
+            rt.Release();
+            UnityEngine.Object.Destroy(rt);
+        }
+
         Plugin.Logger.LogInfo($"[SpriteLoader] Reload complete: {LoadedSpriteCount} sprite(s) blitted across {LoadedAtlases.Count} atlas(es)");
     }
 
