@@ -183,6 +183,7 @@ public static partial class T2DLoader
 
         void ScanDirectory(string t2dRoot, string sourcePack)
         {
+            Plugin.Logger.LogInfo($"[T2D-Trace] ScanDirectory: '{t2dRoot}' exists={Directory.Exists(t2dRoot)}");
             if (!Directory.Exists(t2dRoot))
                 return;
 
@@ -238,8 +239,13 @@ public static partial class T2DLoader
             }
         }
 
+        var packPaths = Plugin.PluginPackPaths.ToList();
+        Plugin.Logger.LogInfo($"[T2D-Trace] PreloadAllTextures: {packPaths.Count} active pack path(s)");
+        foreach (var pp in packPaths)
+            Plugin.Logger.LogInfo($"[T2D-Trace]   pack path: '{pp}'");
+
         ScanDirectory(Path.Combine(SpriteLoader.LoadPath, "T2D"), null);
-        foreach (var packPath in Plugin.PluginPackPaths)
+        foreach (var packPath in packPaths)
             ScanDirectory(Path.Combine(packPath, "Sprites", "T2D"), packPath);
 
         Plugin.Logger.LogInfo($"[T2D-Trace] PreloadAllTextures done: {_preloadedBytes.Count} preloaded keys");
