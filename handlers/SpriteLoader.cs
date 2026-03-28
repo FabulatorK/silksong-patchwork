@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Patchwork.Util;
-using UnityEngine.SceneManagement;
 using HarmonyLib;
 
 namespace Patchwork.Handlers;
@@ -70,31 +69,24 @@ public static class SpriteLoader
 
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
+
+            // Capture vanilla texture while we have it — only a non-RT texture is the
+            // game's own atlas; an RT means we already overwrote it.  Never overwrite an
+            // existing valid entry with an RT.
+            if (!_originalTextures.TryGetValue(collection.name, out var origMap))
+                _originalTextures[collection.name] = origMap = new();
+            if (mat.mainTexture is not RenderTexture)
+                origMap[matname] = mat.mainTexture;
+
+            // If vanilla is not known yet (Reload() ran before this collection's Init()),
+            // skip — InitPostfix will process this material when Init() provides a fresh texture.
+            if (!origMap.ContainsKey(matname))
+                continue;
+
             if (!LoadedAtlases.ContainsKey(collection.name))
                 LoadedAtlases[collection.name] = new HashSet<string>();
             if (LoadedAtlases[collection.name].Add(matname))
             {
-                var unreadableTex = mat.mainTexture;
-
-                // Persist the game's original texture so it can be used as the base on
-                // future reloads — even after a previous load has overwritten mat.mainTexture
-                // with one of our RenderTextures.
-                if (!_originalTextures.TryGetValue(collection.name, out var origMap))
-                    _originalTextures[collection.name] = origMap = new();
-                if (!(unreadableTex is RenderTexture))
-                    origMap[matname] = unreadableTex;          // fresh game texture — update
-                else if (!origMap.ContainsKey(matname))
-                {
-                    // Best-effort: mat.mainTexture is already an RT (overwritten by a previous load)
-                    // and we have no stored original for this mat yet.  Storing an RT as "original"
-                    // will permanently break vanilla-restore — log so we can diagnose.
-                    Plugin.Logger.LogWarning(
-                        $"[tk2d-Restore] BEST-EFFORT TRIGGERED for '{collection.name}'/'{matname}': " +
-                        $"mat.mainTexture is already a RenderTexture ({unreadableTex.width}x{unreadableTex.height}) " +
-                        $"on first visit.  Vanilla restore for this material will be broken.");
-                    origMap[matname] = unreadableTex;          // already overwritten; best-effort
-                }
-
                 var sheetResult = FindSpritesheet(collection, matnameAbbr, origMap[matname]);
                 if (sheetResult.FromCustom)
                     hasCustomSpritesheets = true;
@@ -102,7 +94,9 @@ public static class SpriteLoader
                 if (!LoadedAtlasesTextures.ContainsKey(collection.name))
                     LoadedAtlasesTextures[collection.name] = new Dictionary<string, RenderTexture>();
                 LoadedAtlasesTextures[collection.name][matname] = mat.mainTexture as RenderTexture;
-            } else {
+            }
+            else
+            {
                 mat.mainTexture = LoadedAtlasesTextures[collection.name][matname];
             }
 
@@ -226,15 +220,6 @@ public static class SpriteLoader
             return new SpritesheetResult { Texture = rt, FromCustom = true };
         }
 
-        // No custom sheet — restore from the original game texture.
-        if (originalTex is RenderTexture)
-            Plugin.Logger.LogWarning(
-                $"[tk2d-Restore] Vanilla restore for '{collection.name}'/'{key}': " +
-                $"originalTex is a RenderTexture ({originalTex.width}x{originalTex.height}) — " +
-                $"stored original was already an overwritten RT, restore may produce wrong pixels.");
-        else
-            Plugin.Logger.LogDebug(
-                $"[tk2d-Restore] Vanilla restore for '{collection.name}'/'{key}' from native texture.");
         return new SpritesheetResult { Texture = TexUtil.GetReadable(originalTex), FromCustom = false };
     }
 
@@ -273,19 +258,11 @@ public static class SpriteLoader
     public static void Reload()
     {
         RebuildFileIndex();
-        Plugin.Logger.LogInfo($"[tk2d-Reload] Starting sprite reload for scene {SceneManager.GetActiveScene().name}. " +
-            $"Pre-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
-            $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
         LoadedAtlases.Clear();
         LoadedAtlasesTextures.Clear();
         LoadedSprites.Clear();
-        var spriteCollections = Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>();
-        Plugin.Logger.LogInfo($"[tk2d-Reload] Found {spriteCollections.Length} sprite collections to process");
-        foreach (var collection in spriteCollections)
+        foreach (var collection in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
             LoadCollection(collection);
-        Plugin.Logger.LogInfo($"[tk2d-Reload] Finished reload. " +
-            $"Post-reload: {LoadedSpriteCount} sprites in {LoadedCollectionCount} collections, " +
-            $"{LoadedAtlases.Sum(kv => kv.Value.Count)} atlas entries");
     }
 
     internal class SpritesheetResult
