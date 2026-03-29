@@ -308,6 +308,19 @@ public static partial class T2DLoader
 
             if (replacement != null)
             {
+                if (replacement != sprite)
+                {
+                    // Protect the vanilla sprite (and its texture) from eviction before we
+                    // orphan it by setting our replacement on the renderer.
+                    // Resources.UnloadUnusedAssets() — called implicitly on scene transitions
+                    // — does NOT count static C# references as "in use"; without this flag the
+                    // vanilla sprite can be evicted and the revert sweep in ReloadSpritesInScene
+                    // (which uses FindObjectsOfTypeAll<Sprite>) would silently miss it, leaving
+                    // the renderer pointing at an about-to-be-destroyed sprite object.
+                    sprite.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                    if (sprite.texture != null)
+                        sprite.texture.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                }
                 SetSprite(spriteContainer, replacement);
                 TrackContainer(spriteContainer);
             }
