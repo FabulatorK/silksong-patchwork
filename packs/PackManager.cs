@@ -483,5 +483,6 @@ public static class PackManager
         SpriteFileWatcher.ReloadT2DSprites = true;
         AudioFileWatcher.ReloadAudio       = true;
         TextFileWatcher.ReloadText         = true;
+        VideoHandler.ReloadVideos          = true;
     }
 }

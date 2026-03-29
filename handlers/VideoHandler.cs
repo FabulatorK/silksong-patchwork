@@ -11,6 +11,39 @@ public class VideoHandler
 {
     public static string VideoLoadPath { get { return Path.Combine(Plugin.BasePath, "Videos"); } }
     public static Dictionary<string, string> VideoFileMap = new Dictionary<string, string>();
+    public static bool ReloadVideos = false;
+
+    private static readonly string[] SupportedExtensions =
+        { ".mp4", ".webm", ".ogv", ".mov", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv" };
+
+    /// <summary>
+    /// Eagerly scans all Videos directories (base + active packs) and pre-populates
+    /// VideoFileMap so the Video Pillar can display replacements without waiting for
+    /// the game to actually trigger a cinematic.
+    /// </summary>
+    public static void Reload()
+    {
+        VideoFileMap.Clear();
+
+        void ScanDir(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (var file in Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories))
+            {
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                if (System.Array.IndexOf(SupportedExtensions, ext) < 0) continue;
+                string name = Path.GetFileNameWithoutExtension(file);
+                if (!VideoFileMap.ContainsKey(name))
+                    VideoFileMap[name] = "file:///" + file;
+            }
+        }
+
+        ScanDir(VideoLoadPath);
+        foreach (var packPath in Plugin.PluginPackPaths)
+            ScanDir(Path.Combine(packPath, "Videos"));
+
+        Plugin.Logger.LogInfo($"[VideoHandler] Reload: {VideoFileMap.Count} video replacement(s) found");
+    }
     
     public static void ApplyPatches(Harmony harmony)
     {

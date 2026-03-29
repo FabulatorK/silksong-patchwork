@@ -102,6 +102,7 @@ public class Plugin : BaseUnityPlugin
         }
 
         T2DLoader.PreloadAllTextures();
+        VideoHandler.Reload();
 
         SceneManager.sceneLoaded += (scene, mode) => T2DLoader.ApplyReplacementsInScene();
 
@@ -240,6 +241,12 @@ public class Plugin : BaseUnityPlugin
         {
             TextFileWatcher.ReloadText = false;
             DialogueHandler.Reload();
+        }
+
+        if (VideoHandler.ReloadVideos)
+        {
+            VideoHandler.ReloadVideos = false;
+            VideoHandler.Reload();
         }
 
         AnimationController.Update();
