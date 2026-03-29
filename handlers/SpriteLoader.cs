@@ -18,13 +18,15 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
-    // Vanilla texture references, captured before the first replacement.
+    // Vanilla texture backups, captured before the first replacement.
     // Keyed by collection name → material name.  Never cleared across reloads.
     //
-    // We store the raw Texture (not a RT copy) and set DontUnloadUnusedAsset on it so
-    // Resources.UnloadUnusedAssets() cannot evict it.  Once marked, the texture stays
-    // alive for the entire session regardless of scene transitions.
-    private static readonly Dictionary<string, Dictionary<string, Texture>> _originalTextures = new();
+    // We blit the vanilla texture into a runtime-owned RenderTexture on first encounter.
+    // Runtime RTs are NOT part of any AssetBundle, so AssetBundle.Unload(true) cannot
+    // destroy them — unlike a raw Texture reference which becomes a "fake null" after
+    // Unload(true), causing Graphics.Blit to silently write nothing (transparent atlas).
+    // DontUnloadUnusedAsset prevents Resources.UnloadUnusedAssets() from evicting them.
+    private static readonly Dictionary<string, Dictionary<string, RenderTexture>> _originalTextures = new();
 
     // Pre-built file indices: relative key (normalized, case-insensitive) → (absolute path, source pack).
     // Sprites:     key = "CollectionName/MaterialName/SpriteName.png"
@@ -74,16 +76,22 @@ public static class SpriteLoader
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
 
-            // Capture vanilla texture on first encounter.
-            // Mark it DontUnloadUnusedAsset so Resources.UnloadUnusedAssets() cannot
-            // evict it even after we orphan it by setting mat.mainTexture = our RT.
+            // Capture vanilla texture on first encounter (blit into a persistent backup RT).
             if (!_originalTextures.TryGetValue(collection.name, out var origMap))
                 _originalTextures[collection.name] = origMap = new();
             if (mat.mainTexture is not RenderTexture && mat.mainTexture != null
                 && !origMap.ContainsKey(matname))
             {
-                mat.mainTexture.hideFlags |= HideFlags.DontUnloadUnusedAsset;
-                origMap[matname] = mat.mainTexture;
+                // Blit vanilla into a new runtime-owned RT.  Runtime RTs survive
+                // AssetBundle.Unload(true); a raw Texture reference does not.
+                var backupRT = new RenderTexture(mat.mainTexture.width, mat.mainTexture.height, 0,
+                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
+                {
+                    hideFlags = HideFlags.DontUnloadUnusedAsset,
+                    name      = matname + "_vanilla"
+                };
+                Graphics.Blit(mat.mainTexture, backupRT);
+                origMap[matname] = backupRT;
             }
 
             // If vanilla is not known yet (Reload() ran before this collection's Init()),
