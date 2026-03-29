@@ -35,8 +35,12 @@ public class Plugin : BaseUnityPlugin
     public static bool ShowPackManager = false;
 
     // ── New unified UI ────────────────────────────────────────────────────────
-    /// <summary>Corner badge always-on overlay for end users.</summary>
-    public static bool ShowStatusOverlay = true;
+    /// <summary>Corner badge overlay. Persisted via config — reads/writes through PatchworkConfig.</summary>
+    public static bool ShowStatusOverlay
+    {
+        get => Config?.ShowStatusOverlay ?? true;
+        set { if (Config != null) Config.ShowStatusOverlay = value; }
+    }
     /// <summary>Tabbed Dev Hub window for creators.</summary>
     public static bool ShowDevHub = false;
     /// <summary>Currently active Dev Hub tab (0=Graphics … 4=Video).</summary>

@@ -76,6 +76,14 @@ public class PatchworkConfig
     /// </summary>
     public int HeapReserveMB => _HeapReserveMB.Value;
 
+    private readonly ConfigEntry<bool> _ShowStatusOverlay;
+    /// <summary>Show/hide the HUD status badge. Persists across sessions.</summary>
+    public bool ShowStatusOverlay
+    {
+        get => _ShowStatusOverlay.Value;
+        set => _ShowStatusOverlay.Value = value;
+    }
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -110,5 +118,8 @@ public class PatchworkConfig
             "Mono heap reserve in MB. Pre-allocates this much memory at startup to raise the GC's " +
             "high-water mark, reducing mid-gameplay stutter from heap-growth collections when custom " +
             "asset packs are loaded. -1 = auto (25% of system RAM, capped at 512 MB). 0 = disabled.");
+
+        _ShowStatusOverlay = config.Bind("GUI", "ShowStatusOverlay", true,
+            "Show the HUD status badge in the bottom-left corner. Can also be toggled from the Pack Manager.");
     }
 }
