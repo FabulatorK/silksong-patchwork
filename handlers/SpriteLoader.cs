@@ -18,17 +18,13 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
-    // Vanilla texture backups, captured as persistent RenderTextures on first encounter.
+    // Vanilla texture references, captured before the first replacement.
     // Keyed by collection name → material name.  Never cleared across reloads.
     //
-    // WHY RenderTexture instead of the raw Texture reference:
-    // Once we set mat.mainTexture = ourRT the vanilla texture has no scene-level
-    // reference remaining. Resources.UnloadUnusedAssets() (called implicitly on scene
-    // transitions) does NOT count static C# dict entries as "in use" for Unity's native
-    // asset tracking — the texture gets evicted, leaving a "fake null" Unity object.
-    // A RenderTexture we own (HideFlags.DontUnloadUnusedAsset) is immune to eviction
-    // and persists for the lifetime of the session.
-    private static readonly Dictionary<string, Dictionary<string, RenderTexture>> _originalTextures = new();
+    // We store the raw Texture (not a RT copy) and set DontUnloadUnusedAsset on it so
+    // Resources.UnloadUnusedAssets() cannot evict it.  Once marked, the texture stays
+    // alive for the entire session regardless of scene transitions.
+    private static readonly Dictionary<string, Dictionary<string, Texture>> _originalTextures = new();
 
     // Pre-built file indices: relative key (normalized, case-insensitive) → (absolute path, source pack).
     // Sprites:     key = "CollectionName/MaterialName/SpriteName.png"
@@ -78,47 +74,70 @@ public static class SpriteLoader
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
 
-            // Capture vanilla texture while we have it.
-            // We blit it into a persistent RT immediately — BEFORE orphaning it by
-            // setting mat.mainTexture = ourRT.  Only capture once (first-wins): vanilla
-            // textures are fixed, and re-capturing from a possibly-stale reference on
-            // later Init() calls would overwrite a good backup with a bad one.
+            // Capture vanilla texture on first encounter.
+            // Mark it DontUnloadUnusedAsset so Resources.UnloadUnusedAssets() cannot
+            // evict it even after we orphan it by setting mat.mainTexture = our RT.
             if (!_originalTextures.TryGetValue(collection.name, out var origMap))
                 _originalTextures[collection.name] = origMap = new();
             if (mat.mainTexture is not RenderTexture && mat.mainTexture != null
                 && !origMap.ContainsKey(matname))
             {
-                var backup = new RenderTexture(
-                    mat.mainTexture.width, mat.mainTexture.height, 0,
-                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
-                {
-                    hideFlags = HideFlags.DontUnloadUnusedAsset,
-                    name      = matname + "_vanilla"
-                };
-                Graphics.Blit(mat.mainTexture, backup);
-                origMap[matname] = backup;
+                mat.mainTexture.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                origMap[matname] = mat.mainTexture;
             }
 
             // If vanilla is not known yet (Reload() ran before this collection's Init()),
             // skip — InitPostfix will process this material when Init() provides a fresh texture.
-            if (!origMap.ContainsKey(matname))
+            if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
                 continue;
 
             if (!LoadedAtlases.ContainsKey(collection.name))
                 LoadedAtlases[collection.name] = new HashSet<string>();
+
             if (LoadedAtlases[collection.name].Add(matname))
             {
-                var sheetResult = FindSpritesheet(collection, matnameAbbr, origMap[matname]);
-                if (sheetResult.FromCustom)
-                    hasCustomSpritesheets = true;
-                mat.mainTexture = sheetResult.Texture;
-                if (!LoadedAtlasesTextures.ContainsKey(collection.name))
-                    LoadedAtlasesTextures[collection.name] = new Dictionary<string, RenderTexture>();
-                LoadedAtlasesTextures[collection.name][matname] = mat.mainTexture as RenderTexture;
+                // First time in this reload cycle: (re-)blit the atlas for this material.
+                //
+                // We REUSE the existing RenderTexture when possible (same dimensions).
+                // Blitting new content into the existing RT is safe because mat.mainTexture
+                // already points at that RT — nothing ever sees a null/destroyed texture.
+                // A new RT is only created on the very first encounter or on a dimension change.
+                Texture2D customTex = FindSpritesheetTex(collection, matnameAbbr);
+                Texture blitSrc = (Texture)customTex ?? vanillaTex;
+                if (customTex != null) hasCustomSpritesheets = true;
+
+                if (!LoadedAtlasesTextures.TryGetValue(collection.name, out var atlasMap))
+                    LoadedAtlasesTextures[collection.name] = atlasMap = new();
+
+                if (!atlasMap.TryGetValue(matname, out var atlasRT) || atlasRT == null
+                    || atlasRT.width != blitSrc.width || atlasRT.height != blitSrc.height)
+                {
+                    // Destroy the old RT only when we're about to replace it — at this point
+                    // we are still about to set mat.mainTexture immediately below, so there
+                    // is no frame where the material holds a destroyed texture.
+                    if (atlasRT != null) { atlasRT.Release(); UnityEngine.Object.Destroy(atlasRT); }
+                    atlasRT = new RenderTexture(blitSrc.width, blitSrc.height, 0,
+                        RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
+                    {
+                        hideFlags = HideFlags.DontUnloadUnusedAsset,
+                        name      = matname
+                    };
+                    atlasMap[matname] = atlasRT;
+                }
+
+                // Blit the full atlas source into the RT (replaces all previous content).
+                Graphics.Blit(blitSrc, atlasRT);
+                if (customTex != null) UnityEngine.Object.Destroy(customTex);
+
+                mat.mainTexture = atlasRT;
             }
             else
             {
-                mat.mainTexture = LoadedAtlasesTextures[collection.name][matname];
+                // Already processed in this reload cycle (duplicate collection instance).
+                // Just ensure the material points at our RT.
+                if (LoadedAtlasesTextures.TryGetValue(collection.name, out var atlasMap)
+                    && atlasMap.TryGetValue(matname, out var atlasRT))
+                    mat.mainTexture = atlasRT;
             }
 
             var previous = RenderTexture.active;
@@ -224,40 +243,19 @@ public static class SpriteLoader
             : null;
     }
 
-    private static SpritesheetResult FindSpritesheet(tk2dSpriteCollectionData collection,
-        string materialName, Texture originalTex)
+    /// <summary>
+    /// Returns a freshly loaded Texture2D for the custom spritesheet, or null if no
+    /// custom sheet is found for this collection/material.  Caller must Destroy the
+    /// returned texture when it is no longer needed.
+    /// </summary>
+    private static Texture2D FindSpritesheetTex(tk2dSpriteCollectionData collection,
+        string materialName)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
         string key = $"{collection.name}/{materialName}.png";
-
-        Texture blitSrc;
-        bool fromCustom;
-        Texture2D customTex = null;
-
-        if (_sheetFileIndex.TryGetValue(key, out var entry))
-        {
-            customTex = TexUtil.LoadFromPNG(entry.FullPath);
-            blitSrc   = customTex;
-            fromCustom = true;
-        }
-        else
-        {
-            blitSrc    = originalTex;
-            fromCustom = false;
-        }
-
-        // Persistent RenderTexture — NOT GetTemporary.
-        // GetTemporary RTs are only valid within a single frame; Unity reclaims them
-        // from the pool across scene transitions, leaving mat.mainTexture pointing at
-        // a stale RT.  A plain `new RenderTexture` persists until explicitly destroyed.
-        var rt = new RenderTexture(blitSrc.width, blitSrc.height, 0,
-            RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
-        {
-            hideFlags = HideFlags.DontUnloadUnusedAsset
-        };
-        Graphics.Blit(blitSrc, rt);
-        if (customTex != null) UnityEngine.Object.Destroy(customTex);
-        return new SpritesheetResult { Texture = rt, FromCustom = fromCustom };
+        return _sheetFileIndex.TryGetValue(key, out var entry)
+            ? TexUtil.LoadFromPNG(entry.FullPath)
+            : null;
     }
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
@@ -291,38 +289,21 @@ public static class SpriteLoader
             }
         }
     }
-    
+
     public static void Reload()
     {
         RebuildFileIndex();
         LoadedAtlases.Clear();
-
-        // Save old RTs for deferred cleanup.  We destroy them AFTER LoadCollection
-        // has already written new textures to every material, so there is never a
-        // frame where mat.mainTexture points to a released/destroyed RT.
-        var oldRTs = new List<RenderTexture>();
-        foreach (var colMap in LoadedAtlasesTextures.Values)
-            foreach (var rt in colMap.Values)
-                if (rt != null) oldRTs.Add(rt);
-        LoadedAtlasesTextures.Clear();
         LoadedSprites.Clear();
+        // LoadedAtlasesTextures is intentionally NOT cleared here.
+        // Each atlas RT is reused in-place: we blit new content into the existing RT
+        // rather than destroying and recreating it.  This means mat.mainTexture never
+        // points to a destroyed RT, regardless of which collections FindObjectsOfTypeAll
+        // happens to return at reload time (e.g. scene-scoped collections not yet loaded).
 
         foreach (var collection in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
             LoadCollection(collection);
 
-        // Now safe to destroy — materials already point at fresh RTs.
-        foreach (var rt in oldRTs)
-        {
-            rt.Release();
-            UnityEngine.Object.Destroy(rt);
-        }
-
         Plugin.Logger.LogInfo($"[SpriteLoader] Reload complete: {LoadedSpriteCount} sprite(s) blitted across {LoadedAtlases.Count} atlas(es)");
-    }
-
-    internal class SpritesheetResult
-    {
-        public RenderTexture Texture;
-        public bool FromCustom;
     }
 }
