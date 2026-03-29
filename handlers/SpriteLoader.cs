@@ -177,6 +177,13 @@ public static class SpriteLoader
 
                 TexUtil.RotateMaterial.SetVector("_Basis", new Vector4(uBasis.x, uBasis.y, vBasis.x, vBasis.y));
                 Graphics.DrawTextureImpl(spriteRect, spriteTex, new Rect(0, 0, 1, 1), 0, 0, 0, 0, Color.white, TexUtil.RotateMaterial, 0);
+                // Texture served its purpose (blitted onto the atlas RT). Destroy it now
+                // so the GPU memory is reclaimed at end-of-frame. Without this, every
+                // Reload() call (which clears LoadedSprites and redraws every sprite)
+                // leaked one DontUnloadUnusedAsset Texture2D per sprite per reload —
+                // after enough pack toggles these accumulated until the graphics system
+                // ran out of memory, causing hard failures requiring a process restart.
+                UnityEngine.Object.Destroy(spriteTex);
             }
 
             mat.mainTexture.IncrementUpdateCount();
