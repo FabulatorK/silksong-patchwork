@@ -18,9 +18,17 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
-    // Original game textures, stored before the first replacement so reloads can restore them.
+    // Vanilla texture backups, captured as persistent RenderTextures on first encounter.
     // Keyed by collection name → material name.  Never cleared across reloads.
-    private static readonly Dictionary<string, Dictionary<string, Texture>> _originalTextures = new();
+    //
+    // WHY RenderTexture instead of the raw Texture reference:
+    // Once we set mat.mainTexture = ourRT the vanilla texture has no scene-level
+    // reference remaining. Resources.UnloadUnusedAssets() (called implicitly on scene
+    // transitions) does NOT count static C# dict entries as "in use" for Unity's native
+    // asset tracking — the texture gets evicted, leaving a "fake null" Unity object.
+    // A RenderTexture we own (HideFlags.DontUnloadUnusedAsset) is immune to eviction
+    // and persists for the lifetime of the session.
+    private static readonly Dictionary<string, Dictionary<string, RenderTexture>> _originalTextures = new();
 
     // Pre-built file indices: relative key (normalized, case-insensitive) → (absolute path, source pack).
     // Sprites:     key = "CollectionName/MaterialName/SpriteName.png"
@@ -70,13 +78,26 @@ public static class SpriteLoader
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
 
-            // Capture vanilla texture while we have it — only a non-RT texture is the
-            // game's own atlas; an RT means we already overwrote it.  Never overwrite an
-            // existing valid entry with an RT.
+            // Capture vanilla texture while we have it.
+            // We blit it into a persistent RT immediately — BEFORE orphaning it by
+            // setting mat.mainTexture = ourRT.  Only capture once (first-wins): vanilla
+            // textures are fixed, and re-capturing from a possibly-stale reference on
+            // later Init() calls would overwrite a good backup with a bad one.
             if (!_originalTextures.TryGetValue(collection.name, out var origMap))
                 _originalTextures[collection.name] = origMap = new();
-            if (mat.mainTexture is not RenderTexture)
-                origMap[matname] = mat.mainTexture;
+            if (mat.mainTexture is not RenderTexture && mat.mainTexture != null
+                && !origMap.ContainsKey(matname))
+            {
+                var backup = new RenderTexture(
+                    mat.mainTexture.width, mat.mainTexture.height, 0,
+                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
+                {
+                    hideFlags = HideFlags.DontUnloadUnusedAsset,
+                    name      = matname + "_vanilla"
+                };
+                Graphics.Blit(mat.mainTexture, backup);
+                origMap[matname] = backup;
+            }
 
             // If vanilla is not known yet (Reload() ran before this collection's Init()),
             // skip — InitPostfix will process this material when Init() provides a fresh texture.
