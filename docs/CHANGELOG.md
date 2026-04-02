@@ -5,6 +5,10 @@
 * TextPillar search now covers both in-session TextLog keys and all loaded YAML cache overrides; cache-only hits are blue-tinted
 * TextPillar editor gains a direct Sheet / Key / Open row for editing any key without triggering it in-game first
 * Fixed text hot-reload: Patchwork root `Text/` is now highest priority (matches sprite/audio pipeline); pack `Text/` watchers are rebuilt when active packs change
+* Added T2D Textures tab to the Graphics pillar — searchable list of all T2D atlases and standalone textures in the current scene, with live atlas preview, per-sprite UV highlight, and one-click edit/dump workflow (mirrors Animation Controller for T2D)
+* AnimationController now shows an atlas thumbnail + yellow frame-highlight below the Edit buttons for the selected animator
+* Fixed T2DDumper standalone leak: tk2d atlas textures no longer appear in `Dumps/T2D/_standalone/` even when their texture names don't match the compression-based filter
+* Fixed T2DDumper writing duplicate individual sprite files when multiple Sprite objects reference the same atlas
 * Fixed T2D revert sweep breaking individual sprite priority — revert sweep now sets `_enforcing` and explicitly prefers `_loadedSprites` over vanilla, preventing the Harmony setter chain from corrupting priority during pack reload
 * Fixed T2D revert block being skipped when base-path T2D files kept `HasT2DReplacements` true with no active pack
 * Fixed T2D spritesheet and audio revert cascade failures on pack disable

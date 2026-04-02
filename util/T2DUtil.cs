@@ -1,6 +1,39 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Patchwork.Util;
+
+/// <summary>
+/// Immutable snapshot of one distinct texture visible in the current scene.
+/// Produced by T2DLoader.GetSceneTextureEntries() for the T2DTextureController browser.
+/// </summary>
+public sealed class T2DSceneEntry
+{
+    public readonly string  CleanName;
+    public readonly string  RawName;
+    public readonly Texture NativeTexture;
+    public readonly int     Width;
+    public readonly int     Height;
+    /// <summary>True = T2D atlas (BC7/BC3 compression name); false = standalone texture.</summary>
+    public readonly bool    IsT2D;
+    public readonly System.Collections.Generic.List<string> SpriteNames;
+    public readonly bool    HasSpritesheetOverride;
+    public readonly int     LoadedIndividualCount;
+
+    public T2DSceneEntry(string cleanName, string rawName, Texture tex, bool isT2D,
+        System.Collections.Generic.List<string> spriteNames, bool hasOverride, int loadedCount)
+    {
+        CleanName             = cleanName;
+        RawName               = rawName;
+        NativeTexture         = tex;
+        Width                 = tex != null ? tex.width  : 0;
+        Height                = tex != null ? tex.height : 0;
+        IsT2D                 = isT2D;
+        SpriteNames           = spriteNames ?? new System.Collections.Generic.List<string>();
+        HasSpritesheetOverride = hasOverride;
+        LoadedIndividualCount = loadedCount;
+    }
+}
 
 public static class T2DUtil
 {

@@ -62,6 +62,81 @@ public static partial class T2DLoader
     public static IEnumerable<string> SpritesheetOverrideNames => SpritesheetOverrides.Keys;
 
     // ================================================================
+    //  Scene texture snapshot for the T2D browser GUI
+    // ================================================================
+
+    /// <summary>
+    /// Snapshot of every distinct texture visible via tracked renderers and images,
+    /// ready for the T2DTextureController browser.  Called at most once per 2 s
+    /// (callers enforce the cooldown).
+    /// </summary>
+    public static List<T2DSceneEntry> GetSceneTextureEntries()
+    {
+        var spritesByTexId = new Dictionary<int, List<string>>();
+        var texById        = new Dictionary<int, Texture>();
+
+        void Accumulate(Sprite sprite)
+        {
+            if (sprite?.texture == null) return;
+            var tex = sprite.texture;
+            int id  = tex.GetInstanceID();
+            if (!texById.ContainsKey(id)) { texById[id] = tex; spritesByTexId[id] = new List<string>(); }
+            var names = spritesByTexId[id];
+            if (!names.Contains(sprite.name)) names.Add(sprite.name);
+        }
+
+        foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
+        foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
+
+        var result = new List<T2DSceneEntry>(texById.Count);
+        foreach (var kvp in texById)
+        {
+            var tex       = kvp.Value;
+            bool isT2D    = T2DUtil.IsT2DTexture(tex.name);
+            string clean  = isT2D ? T2DUtil.CleanTextureName(tex.name) : tex.name;
+            bool hasSheet = SpritesheetOverrides.ContainsKey(tex.name)
+                         || SpritesheetOverrides.ContainsKey(clean);
+            string prefix = clean + "/";
+            int loaded    = 0;
+            foreach (var k in _loadedSprites.Keys)
+                if (k.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase)) loaded++;
+
+            result.Add(new T2DSceneEntry(clean, tex.name, tex, isT2D,
+                spritesByTexId[kvp.Key], hasSheet, loaded));
+        }
+
+        result.Sort((a, b) =>
+        {
+            if (a.IsT2D != b.IsT2D) return a.IsT2D ? -1 : 1;
+            return string.Compare(a.CleanName, b.CleanName, System.StringComparison.OrdinalIgnoreCase);
+        });
+        return result;
+    }
+
+    /// <summary>
+    /// Returns the first Sprite in the scene whose name and atlas clean name match
+    /// the given parameters.  Used by T2DTextureController to get UV data for preview.
+    /// </summary>
+    public static Sprite FindSceneSprite(string cleanTexName, string spriteName)
+    {
+        foreach (var sr in _knownRenderers)
+        {
+            var s = sr?.sprite;
+            if (s == null) continue;
+            if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
+                return s;
+        }
+        foreach (var img in _knownImages)
+        {
+            var s = img?.sprite;
+            if (s == null) continue;
+            if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
+                return s;
+        }
+        return null;
+    }
+
+    // ================================================================
     //  Entry points called from T2DHandler harmony patches
     // ================================================================
 

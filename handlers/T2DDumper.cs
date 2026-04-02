@@ -19,6 +19,10 @@ public static class T2DDumper
         // can skip them without a redundant FindObjectsOfTypeAll<Sprite> sweep.
         HashSet<int> spriteTextureIds = new();
         HashSet<int> dumpedTextureIds = new();
+        // Per-call deduplication: prevents writing the same sprite file multiple times
+        // when several Sprite objects share the same atlas and sprite name.
+        HashSet<string> dumpedSpriteKeys = new();
+
         foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
         {
             if (sprite == null || sprite.texture == null)
@@ -29,6 +33,8 @@ public static class T2DDumper
 
             if (T2DUtil.IsT2DTexture(sprite.texture.name))
             {
+                string key = T2DUtil.SpriteKey(T2DUtil.CleanTextureName(sprite.texture.name), sprite.name);
+                if (!dumpedSpriteKeys.Add(key)) continue;
                 HandleDump(sprite);
             }
             else
@@ -55,11 +61,25 @@ public static class T2DDumper
         bool dirCreated = false;
         int count = 0;
 
+        // Collect every texture that belongs to a tk2d atlas material so they are
+        // excluded below even when the texture name doesn't match the IsT2DTexture()
+        // compression-based pattern (avoids leaking atlas PNGs into _standalone/).
+        var tk2dAtlasIds = new HashSet<int>();
+        foreach (var coll in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
+        {
+            if (coll?.materials == null) continue;
+            foreach (var mat in coll.materials)
+                if (mat?.mainTexture != null)
+                    tk2dAtlasIds.Add(mat.mainTexture.GetInstanceID());
+        }
+
         foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
         {
             if (tex == null || string.IsNullOrEmpty(tex.name))
                 continue;
             if (T2DUtil.IsT2DTexture(tex.name))
+                continue;
+            if (tk2dAtlasIds.Contains(tex.GetInstanceID()))
                 continue;
             if (spriteTextureIds.Contains(tex.GetInstanceID()))
                 continue;

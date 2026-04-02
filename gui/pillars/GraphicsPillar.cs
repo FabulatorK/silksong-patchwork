@@ -5,22 +5,35 @@ namespace Patchwork.GUI.Pillars;
 
 /// <summary>
 /// Dev Hub — Graphics tab.
-/// Shows the Animation Controller frame inspector.
+/// Sub-tabs: Animation (tk2d frame inspector) | T2D Textures (T2D browser + editor).
 /// Cross-asset file overview lives in DashboardPillar.
 /// </summary>
 public static class GraphicsPillar
 {
-    private static Vector2 _scroll;
+    private static int    _tab = 0;
+    private static Vector2 _animScroll;
+
+    private const int TabAnimation = 0;
+    private const int TabT2D       = 1;
 
     public static void Draw()
     {
-        UnityEngine.GUI.contentColor = new Color(0.6f, 0.85f, 1f);
-        GUILayout.Label("Animation Controller", GUIHelper.LabelStyle);
-        UnityEngine.GUI.contentColor = Color.white;
+        // Sub-tab strip
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Toggle(_tab == TabAnimation, "Animation",    GUIHelper.ButtonStyle)) _tab = TabAnimation;
+        if (GUILayout.Toggle(_tab == TabT2D,       "T2D Textures", GUIHelper.ButtonStyle)) _tab = TabT2D;
+        GUILayout.EndHorizontal();
         GUIHelper.Space(4);
 
-        _scroll = GUILayout.BeginScrollView(_scroll);
-        AnimationController.DrawPillarContent();
-        GUILayout.EndScrollView();
+        if (_tab == TabAnimation)
+        {
+            _animScroll = GUILayout.BeginScrollView(_animScroll);
+            AnimationController.DrawPillarContent();
+            GUILayout.EndScrollView();
+        }
+        else
+        {
+            T2DTextureController.DrawPillarContent();
+        }
     }
 }

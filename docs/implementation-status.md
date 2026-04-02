@@ -69,10 +69,26 @@ item is implemented or a new plan is recorded.
 | PerformancePillar | `gui/pillars/PerformancePillar.cs`, `gui/DevProfiler.cs` | Absorbs DevProfiler content; `DevProfiler.DrawPillarContent()` exposed; DevProfiler.Draw() kept as transition shim |
 | AudioPillar | `gui/pillars/AudioPillar.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs` | Two-pane: loaded clips (left) + live log (right); `AudioLog.DrawEntries()` + `AudioList.GetClipNames()` exposed |
 | TextPillar | `gui/pillars/TextPillar.cs`, `gui/TextLog.cs`, `gui/DialogueEditor.cs` | Two-pane: accessed keys (left, clickable) + editor surface (right); click bridges to editor in-pillar |
-| GraphicsPillar | `gui/pillars/GraphicsPillar.cs`, `gui/AnimationController.cs` | Sub-tabs: Overview (file scan, counts) + Animated (AnimationController content); `SkinStatus.cs` deleted |
+| GraphicsPillar | `gui/pillars/GraphicsPillar.cs`, `gui/AnimationController.cs`, `gui/T2DTextureController.cs` | Sub-tabs: Animation (frame inspector + atlas preview) + T2D Textures (scene browser, edit/dump workflow, live preview) |
 | VideoPillar stub | `gui/pillars/VideoPillar.cs` | Placeholder until VideoHandler has content; reads `VideoHandler.VideoFileMap` |
 | Pack Manager "Dev Tools →" footer | `gui/PackManagerWindow.cs` | Blue button in footer opens Dev Hub at Graphics tab |
 | Keybind consolidation | `PatchworkConfig.cs`, `Plugin.cs` | Alpha1=PackManager; Alpha2–5 open DevHub at Graphics/Audio/Text/Performance; legacy shims kept one release |
+
+### T2D Texture Browser
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| T2DSceneEntry snapshot struct | `util/T2DUtil.cs` | Immutable per-texture record: cleanName, rawName, NativeTexture, W×H, isT2D, spriteNames, override flags |
+| `T2DLoader.GetSceneTextureEntries()` | `handlers/T2DLoader.cs` | Walks `_knownRenderers` + `_knownImages`, groups by texture ID, annotates with spritesheet/individual override counts; sorted T2D-first |
+| `T2DLoader.FindSceneSprite()` | `handlers/T2DLoader.cs` | Returns first live Sprite matching (cleanTexName, spriteName) — used for UV highlight in preview |
+| T2DTextureController | `gui/T2DTextureController.cs` | Two-pane browser: searchable atlas list (left) + live preview + sprite list + edit/dump buttons (right); 2 s refresh cooldown |
+| Atlas preview + UV highlight | `gui/T2DTextureController.cs` | `GUI.DrawTexture` on NativeTexture; yellow overlay on selected sprite's textureRect (Y-flipped for IMGUI) |
+| Edit Atlas | `gui/T2DTextureController.cs` | Dumps atlas PNG if needed → copies to `Sprites/T2D/{name}/{name}.png` → `Process.Start` |
+| Edit Sprite | `gui/T2DTextureController.cs` | Dumps individual sprite if needed → copies to `Sprites/T2D/{atlas}/{sprite}.png` → `Process.Start` |
+| AnimationController frame preview | `gui/AnimationController.cs` | Atlas thumbnail below Edit buttons for selected animator; yellow highlight on current frame's UV quad |
+| GraphicsPillar sub-tabs | `gui/pillars/GraphicsPillar.cs` | Animation tab (existing) + T2D Textures tab (new) |
+| T2DDumper standalone filter fix | `handlers/T2DDumper.cs` | Collects all tk2d material texture IDs before standalone sweep — excludes atlas textures even when their names don't match the `-BC7-` pattern |
+| T2DDumper duplicate fix | `handlers/T2DDumper.cs` | `dumpedSpriteKeys` HashSet prevents writing the same T2D sprite file multiple times per `DumpAllT2DSprites()` call |
 
 ### Technical debt resolved
 

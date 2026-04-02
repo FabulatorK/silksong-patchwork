@@ -402,6 +402,9 @@ public static class AnimationController
                     }
                 }
                 GUILayout.EndHorizontal();
+
+                // ── Atlas preview with current-frame highlight ────────────
+                DrawFramePreview(currentFrameDef);
             }
         }
 
@@ -411,6 +414,54 @@ public static class AnimationController
             GUILayout.Label("No animators registered.", GUIHelper.LabelStyle);
             GUI.contentColor = Color.white;
         }
+    }
+
+    private static Texture2D _previewWhite;
+
+    private static void DrawFramePreview(tk2dSpriteDefinition frameDef)
+    {
+        var mat = frameDef.materialInst ?? frameDef.material;
+        if (mat?.mainTexture == null) return;
+
+        float previewH = GUIHelper.Scaled(110f);
+        Rect atlasRect = GUILayoutUtility.GetRect(0f, float.MaxValue, previewH, previewH);
+        GUI.DrawTexture(atlasRect, mat.mainTexture, ScaleMode.ScaleToFit, true);
+
+        // Highlight the current frame's region on the atlas
+        var uvs = frameDef.uvs;
+        if (uvs == null || uvs.Length < 4) return;
+
+        float minU = uvs.Min(v => v.x), maxU = uvs.Max(v => v.x);
+        float minV = uvs.Min(v => v.y), maxV = uvs.Max(v => v.y);
+
+        // Compute letterboxed rect that ScaleToFit actually occupies
+        Texture tex = mat.mainTexture;
+        float scaleW = atlasRect.width  / tex.width;
+        float scaleH = atlasRect.height / tex.height;
+        float scale  = Mathf.Min(scaleW, scaleH);
+        float fw = tex.width  * scale;
+        float fh = tex.height * scale;
+        Rect fitted = new Rect(
+            atlasRect.x + (atlasRect.width  - fw) * 0.5f,
+            atlasRect.y + (atlasRect.height - fh) * 0.5f,
+            fw, fh);
+
+        // UV → IMGUI pixel rect (flip V: Unity is bottom-left, IMGUI is top-left)
+        float hx = fitted.x + minU * fitted.width;
+        float hy = fitted.y + (1f - maxV) * fitted.height;
+        float hw = (maxU - minU) * fitted.width;
+        float hh = (maxV - minV) * fitted.height;
+
+        if (_previewWhite == null)
+        {
+            _previewWhite = new Texture2D(1, 1);
+            _previewWhite.SetPixel(0, 0, Color.white);
+            _previewWhite.Apply();
+        }
+
+        GUI.color = new Color(1f, 1f, 0f, 0.4f);
+        GUI.DrawTexture(new Rect(hx, hy, hw, hh), _previewWhite);
+        GUI.color = Color.white;
     }
 
     #endregion
