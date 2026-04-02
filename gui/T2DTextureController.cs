@@ -273,8 +273,8 @@ public static class T2DTextureController
 
     private static void EditAtlas(T2DSceneEntry entry)
     {
-        // Spritesheet slot: Sprites/T2D/{cleanName}/{cleanName}.png
-        string loadDir  = Path.Combine(T2DLoader.AtlasLoadPath, entry.CleanName);
+        // Spritesheet slot: Spritesheets/T2D/{cleanName}.png
+        string loadDir  = T2DLoader.AtlasLoadPath;
         string loadPath = Path.Combine(loadDir, entry.CleanName + ".png");
 
         if (!File.Exists(loadPath))
@@ -308,7 +308,8 @@ public static class T2DTextureController
 
     private static void EditSprite(T2DSceneEntry entry, string spriteName)
     {
-        string loadDir  = Path.Combine(T2DLoader.AtlasLoadPath, entry.CleanName);
+        // Individual sprite slot: Sprites/T2D/{cleanName}/{spriteName}.png
+        string loadDir  = Path.Combine(SpriteLoader.LoadPath, "T2D", entry.CleanName);
         string loadPath = Path.Combine(loadDir, spriteName + ".png");
 
         if (!File.Exists(loadPath))

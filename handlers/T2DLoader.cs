@@ -85,8 +85,10 @@ public static partial class T2DLoader
             if (!names.Contains(sprite.name)) names.Add(sprite.name);
         }
 
-        foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
-        foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
+        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+            { if (sr != null) Accumulate(sr.sprite); }
+        foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
+            { if (img != null) Accumulate(img.sprite); }
 
         var result = new List<T2DSceneEntry>(texById.Count);
         foreach (var kvp in texById)
@@ -119,14 +121,14 @@ public static partial class T2DLoader
     /// </summary>
     public static Sprite FindSceneSprite(string cleanTexName, string spriteName)
     {
-        foreach (var sr in _knownRenderers)
+        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
         {
             var s = sr?.sprite;
             if (s == null) continue;
             if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
                 return s;
         }
-        foreach (var img in _knownImages)
+        foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
         {
             var s = img?.sprite;
             if (s == null) continue;
