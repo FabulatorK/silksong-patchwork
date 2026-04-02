@@ -22,6 +22,8 @@ public static class T2DHandler
         if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && value.texture != null && !string.IsNullOrEmpty(value.texture.name))
             T2DDumper.HandleDump(value);
 
+        T2DLoader.TrackRenderer(__instance);  // always track for T2D browser
+
         if (!T2DLoader.HasT2DReplacements)
             return;
 
@@ -37,6 +39,8 @@ public static class T2DHandler
 
         if (Plugin.Config.DumpSprites && !string.IsNullOrEmpty(value.name) && value.texture != null && !string.IsNullOrEmpty(value.texture.name))
             T2DDumper.HandleDump(value);
+
+        T2DLoader.TrackImage(__instance);  // always track for T2D browser
 
         if (!T2DLoader.HasT2DReplacements)
             return;

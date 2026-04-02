@@ -61,6 +61,32 @@ public static partial class T2DLoader
     public static IEnumerable<string> LoadedT2DSpriteNames => _loadedSprites.Keys;
     public static IEnumerable<string> SpritesheetOverrideNames => SpritesheetOverrides.Keys;
 
+    /// <summary>
+    /// Unconditionally adds a renderer to the tracking set so the T2D browser
+    /// can enumerate it even when no replacement pack is loaded.
+    /// </summary>
+    public static void TrackRenderer(SpriteRenderer sr) { if (sr != null) _knownRenderers.Add(sr); }
+    public static void TrackImage(UnityEngine.UI.Image img) { if (img != null) _knownImages.Add(img); }
+
+    /// <summary>
+    /// Seeds _knownRenderers/_knownImages from the live scene on first browser open.
+    /// Catches sprites that were assigned before Harmony patches fired (e.g. during
+    /// scene initialisation before BepInEx loaded).  Safe to call repeatedly — the
+    /// HashSets deduplicate and the flag prevents re-scanning.
+    /// </summary>
+    private static bool _sceneSeedDone;
+    public static void SeedFromScene()
+    {
+        if (_sceneSeedDone) return;
+        _sceneSeedDone = true;
+        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+            if (sr != null && sr.sprite?.texture != null) _knownRenderers.Add(sr);
+        foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
+            if (img != null && img.sprite?.texture != null) _knownImages.Add(img);
+    }
+
+    public static void ResetSceneSeed() => _sceneSeedDone = false;
+
     // ================================================================
     //  Scene texture snapshot for the T2D browser GUI
     // ================================================================
@@ -85,10 +111,9 @@ public static partial class T2DLoader
             if (!names.Contains(sprite.name)) names.Add(sprite.name);
         }
 
-        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
-            { if (sr != null) Accumulate(sr.sprite); }
-        foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
-            { if (img != null) Accumulate(img.sprite); }
+        SeedFromScene();  // no-op after first call; catches pre-patch sprites
+        foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
+        foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
 
         var result = new List<T2DSceneEntry>(texById.Count);
         foreach (var kvp in texById)
@@ -121,14 +146,14 @@ public static partial class T2DLoader
     /// </summary>
     public static Sprite FindSceneSprite(string cleanTexName, string spriteName)
     {
-        foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
+        foreach (var sr in _knownRenderers)
         {
             var s = sr?.sprite;
             if (s == null) continue;
             if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
                 return s;
         }
-        foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
+        foreach (var img in _knownImages)
         {
             var s = img?.sprite;
             if (s == null) continue;
