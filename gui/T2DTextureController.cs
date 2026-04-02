@@ -5,6 +5,7 @@ using System.Linq;
 using Patchwork.Handlers;
 using Patchwork.Util;
 using UnityEngine;
+using GUI = UnityEngine.GUI;
 
 namespace Patchwork.GUI;
 

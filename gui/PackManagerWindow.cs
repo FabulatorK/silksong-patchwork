@@ -190,6 +190,11 @@ public static class PackManagerWindow
     {
         var pack = list[i];
 
+        // Resolved against live list (not staged) so condition editor always operates
+        // on committed state, avoiding stale-reference issues during staged edits.
+        var livePack = PackManager.AllPacks.FirstOrDefault(p =>
+            string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
+
         GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
         {
             // ── Main row ─────────────────────────────────────────
@@ -220,8 +225,6 @@ public static class PackManagerWindow
                 }
 
                 // Conditions toggle button (works on live list, not staged)
-                var livePack = PackManager.AllPacks.FirstOrDefault(p =>
-                    string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
                 if (livePack != null)
                 {
                     bool condOpen = _conditionsOpen.Contains(pack.Path);
