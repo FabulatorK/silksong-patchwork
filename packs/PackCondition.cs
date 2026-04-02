@@ -175,11 +175,11 @@ public class PackCondition
 
     private static int ParseNailLevel(string s) => s.ToLowerInvariant() switch
     {
-        "0" or "old"         => 0,
-        "1" or "sharpened"   => 1,
-        "2" or "channelled"  => 2,
-        "3" or "coiled"      => 3,
-        "4" or "pure"        => 4,
+        "0" or "needle"     => 0,
+        "1" or "sharpened"  => 1,
+        "2" or "shining"    => 2,
+        "3" or "hivesteel"  => 3,
+        "4" or "pale"       => 4,
         _ => int.TryParse(s, out int n) && n >= 0 ? n : -1,
     };
 
@@ -237,15 +237,15 @@ public class PackCondition
     /// </summary>
     public static readonly (string Value, string DisplayName)[] KnownNailLevels =
     {
-        ("pure",         "Pure Nail"),
-        ("coiled",       "Coiled Nail"),
-        ("channelled",   "Channelled Nail"),
-        ("sharpened",    "Sharpened Nail"),
-        ("old",          "Old Nail"),
-        (">=pure",       "≥ Pure Nail"),
-        (">=coiled",     "≥ Coiled Nail"),
-        (">=channelled", "≥ Channelled Nail"),
-        (">=sharpened",  "≥ Sharpened Nail"),
+        ("pale",          "Pale Steel Needle"),
+        ("hivesteel",     "Hivesteel Needle"),
+        ("shining",       "Shining Needle"),
+        ("sharpened",     "Sharpened Needle"),
+        ("needle",        "Needle"),
+        (">=pale",        "≥ Pale Steel Needle"),
+        (">=hivesteel",   "≥ Hivesteel Needle"),
+        (">=shining",     "≥ Shining Needle"),
+        (">=sharpened",   "≥ Sharpened Needle"),
     };
 
     /// <summary>Returns the display name for a known nail value, or the raw value if custom.</summary>
