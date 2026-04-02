@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
+using System.Text;
 using Patchwork.Handlers;
 using Patchwork.Util;
 using Patchwork.Watchers;
@@ -109,16 +109,14 @@ public static class PackManager
 
         try
         {
-            string json             = File.ReadAllText(manifestPath);
-            var (name, author, ver, desc) = ReadManifestFields(json);
+            string json = File.ReadAllText(manifestPath);
+            string name    = ParseJsonString(json, "name");
+            string author  = ParseJsonString(json, "author");
+            string version = ParseJsonString(json, "version");
+            string desc    = ParseJsonString(json, "description");
             if (name == null)
                 Plugin.Logger.LogWarning($"[PackManager] pack.json at '{manifestPath}' has no 'name' field — using folder name");
-            return new PackInfo(path, name ?? Path.GetFileName(path), isLocal, author, ver, desc);
-        }
-        catch (JsonException ex)
-        {
-            Plugin.Logger.LogWarning($"[PackManager] Malformed JSON in '{manifestPath}': {ex.Message} — using folder name");
-            return new PackInfo(path, Path.GetFileName(path), isLocal);
+            return new PackInfo(path, name ?? Path.GetFileName(path), isLocal, author, version, desc);
         }
         catch (Exception ex)
         {
@@ -127,14 +125,54 @@ public static class PackManager
         }
     }
 
-    private static (string name, string author, string version, string desc) ReadManifestFields(string json)
+    /// <summary>
+    /// Extracts a string value from flat JSON by key. Handles whitespace and
+    /// backslash escape sequences (including escaped quotes).
+    /// Returns null if the key is absent or the value is not a string.
+    /// </summary>
+    private static string ParseJsonString(string json, string key)
     {
-        using var doc  = JsonDocument.Parse(json);
-        var root       = doc.RootElement;
-        static string GetStr(JsonElement el, string key)
-            => el.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String
-               ? p.GetString() : null;
-        return (GetStr(root, "name"), GetStr(root, "author"), GetStr(root, "version"), GetStr(root, "description"));
+        string searchKey = $"\"{key}\"";
+        int ki = json.IndexOf(searchKey, StringComparison.OrdinalIgnoreCase);
+        if (ki < 0) return null;
+
+        int colon = json.IndexOf(':', ki + searchKey.Length);
+        if (colon < 0) return null;
+
+        // Skip whitespace to find the opening quote
+        int q1 = -1;
+        for (int i = colon + 1; i < json.Length; i++)
+        {
+            char c = json[i];
+            if (c == '"') { q1 = i; break; }
+            if (c != ' ' && c != '\t' && c != '\r' && c != '\n') return null; // not a string value
+        }
+        if (q1 < 0) return null;
+
+        // Read until unescaped closing quote, processing backslash escapes
+        var sb = new StringBuilder();
+        for (int i = q1 + 1; i < json.Length; i++)
+        {
+            char c = json[i];
+            if (c == '\\' && i + 1 < json.Length)
+            {
+                char next = json[++i];
+                switch (next)
+                {
+                    case '"':  sb.Append('"');  break;
+                    case '\\': sb.Append('\\'); break;
+                    case '/':  sb.Append('/');  break;
+                    case 'n':  sb.Append('\n'); break;
+                    case 'r':  sb.Append('\r'); break;
+                    case 't':  sb.Append('\t'); break;
+                    default:   sb.Append('\\'); sb.Append(next); break;
+                }
+                continue;
+            }
+            if (c == '"') return sb.ToString();
+            sb.Append(c);
+        }
+        return null; // unterminated string
     }
 
     // ================================================================
