@@ -136,16 +136,25 @@ public class DialogueHandler
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang)
     {
-        Dictionary<string, string> sheetData = new Dictionary<string, string>();
-        sheetData.AddRange(LoadTextSheet(sheetTitle, lang, TextLoadPath));
+        var sheetData = new Dictionary<string, string>();
+
+        // Packs loaded first, in priority order.  First-wins: a higher-priority pack's
+        // entry is never overwritten by a lower-priority pack.
         foreach (var packPath in Plugin.PluginPackPaths)
         {
-            var packSheetData = LoadTextSheet(sheetTitle, lang, Path.Combine(packPath, "Text"));
-            foreach (var kvp in packSheetData)
-                sheetData[kvp.Key] = kvp.Value;
+            var packSheet = LoadTextSheet(sheetTitle, lang, Path.Combine(packPath, "Text"));
+            foreach (var kvp in packSheet)
+                if (!sheetData.ContainsKey(kvp.Key))
+                    sheetData[kvp.Key] = kvp.Value;
         }
 
-        // Register all user-override keys for stale-key detection
+        // Root (Patchwork/Text/) loaded last and always wins — unconditionally
+        // overwrites any pack entry for the same key.  Mirrors the sprite/audio
+        // pipeline where Patchwork/Sprites/ (root) beats every pack.
+        foreach (var kvp in LoadTextSheet(sheetTitle, lang, TextLoadPath))
+            sheetData[kvp.Key] = kvp.Value;
+
+        // Register all user-override keys for stale-key detection.
         foreach (var key in sheetData.Keys)
             AllOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
 

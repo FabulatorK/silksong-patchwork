@@ -37,6 +37,24 @@ public class TextFileWatcher
         return watcher;
     }
 
+    /// <summary>
+    /// Disposes all pack watchers and rebuilds them for the current active pack list.
+    /// Call whenever the active pack set changes (e.g. from PackManager.TriggerFullReload)
+    /// so that newly-enabled packs' Text/ directories are watched for hot reload.
+    /// </summary>
+    public void RebuildPackWatchers()
+    {
+        foreach (var w in PackWatchers) { w.EnableRaisingEvents = false; w.Dispose(); }
+        PackWatchers.Clear();
+        foreach (var packPath in Plugin.PluginPackPaths)
+        {
+            string textDir = Path.Combine(packPath, "Text");
+            if (Directory.Exists(textDir))
+                PackWatchers.Add(CreateWatcher(textDir));
+        }
+        Plugin.Logger.LogInfo($"[TextFileWatcher] Rebuilt pack watchers: {PackWatchers.Count} dir(s)");
+    }
+
     private void OnTextChanged(object sender, FileSystemEventArgs e)
     {
         Plugin.Logger.LogInfo($"[FileWatcher] Text file event: {e.ChangeType} — {e.FullPath}");

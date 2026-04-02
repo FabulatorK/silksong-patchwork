@@ -479,6 +479,9 @@ public static class PackManager
 
     public static void TriggerFullReload()
     {
+        // Rebuild text pack watchers so newly-enabled packs have their Text/ dirs watched.
+        Plugin.TextFileWatcher?.RebuildPackWatchers();
+
         SpriteFileWatcher.ReloadSprites    = true;
         SpriteFileWatcher.ReloadT2DSprites = true;
         AudioFileWatcher.ReloadAudio       = true;
