@@ -111,8 +111,25 @@ public static class DashboardPillar
         _scannedFiles["videos"] = videos;
 
         var text = new List<FileEntry>();
-        if (Directory.Exists(DialogueHandler.TextLoadPath))
-            ScanExt(DialogueHandler.TextLoadPath, text, new[] { ".yml" });
+        // Scan root Text/ then every active pack's Text/ — relative path gives Sheet/LANG.yml.
+        // First-seen wins for deduplication (root takes priority, matching load-order).
+        ScanTextDir(DialogueHandler.TextLoadPath, text);
+        foreach (string packPath in Plugin.PluginPackPaths)
+            ScanTextDir(Path.Combine(packPath, "Text"), text);
+        // Mark as loaded when the sheet is already in the current-language cache.
+        string curLang = DialogueHandler.CurrentLangCode;
+        if (DialogueHandler.TextCache.TryGetValue(curLang, out var langCache))
+        {
+            foreach (var e in text)
+            {
+                int slash = e.Name.IndexOf('/');
+                if (slash < 0) continue;
+                string sheet   = e.Name.Substring(0, slash);
+                string fileLang = Path.GetFileNameWithoutExtension(e.Name.Substring(slash + 1));
+                if (fileLang == curLang && langCache.ContainsKey(sheet))
+                    e.Status = FileStatus.Loaded;
+            }
+        }
         _scannedFiles["text"] = text;
     }
 
@@ -166,6 +183,24 @@ public static class DashboardPillar
             string ext = Path.GetExtension(f).ToLowerInvariant();
             if (System.Array.IndexOf(extensions, ext) < 0) continue;
             out_.Add(new FileEntry { Name = Path.GetFileName(f), Status = FileStatus.OnDisk });
+        }
+    }
+
+    /// <summary>
+    /// Scans a Text/ root directory for .yml files, storing paths relative to that
+    /// root (e.g. "UI/EN.yml", "Enemies/ZH.yml").  Skips files already present in
+    /// <paramref name="out_"/> so root entries take priority over pack duplicates.
+    /// </summary>
+    private static void ScanTextDir(string textRoot, List<FileEntry> out_)
+    {
+        if (!Directory.Exists(textRoot)) return;
+        foreach (string f in Directory.GetFiles(textRoot, "*.yml", SearchOption.AllDirectories))
+        {
+            string rel = f.Substring(textRoot.Length)
+                          .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                          .Replace('\\', '/');
+            if (out_.All(e => e.Name != rel))
+                out_.Add(new FileEntry { Name = rel, Status = FileStatus.OnDisk });
         }
     }
 }

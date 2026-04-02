@@ -87,8 +87,13 @@ public static class TextLog
     /// Renders all entries matching <paramref name="filter"/> (sheet, key, or text).
     /// No fade/bump — intended for the search pane where order is alphabetical not temporal.
     /// Pass null or empty to show all entries.
+    /// If <paramref name="out_seen"/> is provided, every rendered entry's composite key
+    /// ("sheet|key") is added to it — useful for deduplication against a second source.
+    /// If <paramref name="suppressEmpty"/> is true the "No matches" / "No entries yet"
+    /// label is omitted, letting the caller render a combined empty state.
     /// </summary>
-    public static void DrawFilteredEntries(string filter, Action<string, string, string> onEntryClick)
+    public static void DrawFilteredEntries(string filter, Action<string, string, string> onEntryClick,
+        HashSet<string> out_seen = null, bool suppressEmpty = false)
     {
         bool hasFilter = !string.IsNullOrEmpty(filter);
         GUILayout.BeginVertical();
@@ -107,9 +112,10 @@ public static class TextLog
 
             if (GUILayout.Button($"{entry.SheetName}.{entry.KeyName}: {preview}", GUIHelper.LabelStyle))
                 onEntryClick?.Invoke(entry.SheetName, entry.KeyName, entry.Text);
+            out_seen?.Add($"{entry.SheetName}|{entry.KeyName}");
             any = true;
         }
-        if (!any)
+        if (!any && !suppressEmpty)
         {
             UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
             GUILayout.Label(hasFilter ? "No matches." : "No entries yet.", GUIHelper.LabelStyle);

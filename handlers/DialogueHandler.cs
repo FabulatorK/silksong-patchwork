@@ -13,6 +13,9 @@ public class DialogueHandler
     public static string TextDumpPath { get { return Path.Combine(Plugin.BasePath, "TextDumps"); } }
     public static string TextLoadPath { get { return Path.Combine(Plugin.BasePath, "Text"); } }
 
+    /// <summary>Current language code string (e.g. "EN"). Convenience wrapper for GUI code.</summary>
+    public static string CurrentLangCode => Language.CurrentLanguage().ToString();
+
     public static Dictionary<string, Dictionary<string, Dictionary<string, string>>> TextCache = [];
 
     // Tracks which user-override keys were actually requested by the game.
@@ -82,6 +85,34 @@ public class DialogueHandler
         {
             Plugin.Logger.LogInfo($"Invalidating text cache for sheet: {sheet}, lang: {lang}");
             TextCache[lang].Remove(sheet);
+        }
+    }
+
+    /// <summary>
+    /// Searches all currently cached override entries (current language) for
+    /// <paramref name="filter"/> in sheet name, key, or value.
+    /// Returns an empty sequence when the filter is null/empty or the cache is empty.
+    /// Skips entries already present in <paramref name="skipKeys"/> ("sheet|key" strings)
+    /// so the caller can deduplicate against TextLog results.
+    /// </summary>
+    public static IEnumerable<(string Sheet, string Key, string Value)> SearchCache(
+        string filter, HashSet<string> skipKeys = null)
+    {
+        if (string.IsNullOrEmpty(filter)) yield break;
+        if (!TextCache.TryGetValue(CurrentLangCode, out var langCache)) yield break;
+        foreach (var sheetKvp in langCache)
+        {
+            string sheet = sheetKvp.Key;
+            bool sheetMatch = sheet.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+            foreach (var kvp in sheetKvp.Value)
+            {
+                if (skipKeys != null && skipKeys.Contains($"{sheet}|{kvp.Key}")) continue;
+                if (!sheetMatch &&
+                    kvp.Key.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    kvp.Value.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                yield return (sheet, kvp.Key, kvp.Value);
+            }
         }
     }
 
