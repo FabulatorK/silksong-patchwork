@@ -111,25 +111,59 @@ public static partial class T2DLoader
             if (!names.Contains(sprite.name)) names.Add(sprite.name);
         }
 
-        SeedFromScene();  // no-op after first call; catches pre-patch sprites
+        SeedFromScene();
         foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
         foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
 
-        var result = new List<T2DSceneEntry>(texById.Count);
+        // Enrich sprite lists from all Sprite assets in memory — tracked renderers only
+        // expose sprites currently assigned to live objects, so many frames of an animation
+        // atlas are invisible until their renderer fires. FindObjectsOfTypeAll<Sprite> covers
+        // inactive objects, unspawned prefabs, and every animation frame in the atlas.
+        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
+            if (sprite?.texture == null) continue;
+            int id = sprite.texture.GetInstanceID();
+            if (!spritesByTexId.TryGetValue(id, out var names)) continue;
+            if (!names.Contains(sprite.name)) names.Add(sprite.name);
+        }
+
+        // Deduplicate by clean name: the game can hold multiple Texture2D instances for the
+        // same logical atlas (e.g. Inventory loaded once per renderer). Merge them so the
+        // browser shows one entry per atlas, not one per renderer instance.
+        var byCleanName = new Dictionary<string, (Texture tex, string rawName, List<string> sprites, bool isT2D)>(
+            System.StringComparer.OrdinalIgnoreCase);
+
         foreach (var kvp in texById)
         {
-            var tex       = kvp.Value;
-            bool isT2D    = T2DUtil.IsT2DTexture(tex.name);
+            var    tex    = kvp.Value;
+            bool   isT2D  = T2DUtil.IsT2DTexture(tex.name);
             string clean  = isT2D ? T2DUtil.CleanTextureName(tex.name) : tex.name;
-            bool hasSheet = SpritesheetOverrides.ContainsKey(tex.name)
+            var    names  = spritesByTexId[kvp.Key];
+
+            if (byCleanName.TryGetValue(clean, out var existing))
+            {
+                foreach (var s in names)
+                    if (!existing.sprites.Contains(s)) existing.sprites.Add(s);
+            }
+            else
+            {
+                byCleanName[clean] = (tex, tex.name, names, isT2D);
+            }
+        }
+
+        var result = new List<T2DSceneEntry>(byCleanName.Count);
+        foreach (var kvp in byCleanName)
+        {
+            var (tex, rawName, sprites, isT2D) = kvp.Value;
+            string clean  = kvp.Key;
+            bool hasSheet = SpritesheetOverrides.ContainsKey(rawName)
                          || SpritesheetOverrides.ContainsKey(clean);
             string prefix = clean + "/";
             int loaded    = 0;
             foreach (var k in _loadedSprites.Keys)
                 if (k.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase)) loaded++;
 
-            result.Add(new T2DSceneEntry(clean, tex.name, tex, isT2D,
-                spritesByTexId[kvp.Key], hasSheet, loaded));
+            result.Add(new T2DSceneEntry(clean, rawName, tex, isT2D, sprites, hasSheet, loaded));
         }
 
         result.Sort((a, b) =>
