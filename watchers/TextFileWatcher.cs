@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Patchwork.Watchers;
 
-public class TextFileWatcher
+public class TextFileWatcher : System.IDisposable
 {
     public FileSystemWatcher TextWatcher;
     public List<FileSystemWatcher> PackWatchers = new();
@@ -53,6 +53,14 @@ public class TextFileWatcher
                 PackWatchers.Add(CreateWatcher(textDir));
         }
         Plugin.Logger.LogInfo($"[TextFileWatcher] Rebuilt pack watchers: {PackWatchers.Count} dir(s)");
+    }
+
+    public void Dispose()
+    {
+        TextWatcher.EnableRaisingEvents = false;
+        TextWatcher.Dispose();
+        foreach (var w in PackWatchers) { w.EnableRaisingEvents = false; w.Dispose(); }
+        PackWatchers.Clear();
     }
 
     private void OnTextChanged(object sender, FileSystemEventArgs e)

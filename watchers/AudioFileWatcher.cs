@@ -3,7 +3,7 @@ using Patchwork.Handlers;
 
 namespace Patchwork.Watchers;
 
-public class AudioFileWatcher
+public class AudioFileWatcher : System.IDisposable
 {
     public FileSystemWatcher AudioWatcher;
 
@@ -21,6 +21,12 @@ public class AudioFileWatcher
         AudioWatcher.Deleted += OnAudioChanged;
         AudioWatcher.Renamed += OnAudioChanged;
         AudioWatcher.EnableRaisingEvents = true;
+    }
+
+    public void Dispose()
+    {
+        AudioWatcher.EnableRaisingEvents = false;
+        AudioWatcher.Dispose();
     }
 
     private void OnAudioChanged(object sender, FileSystemEventArgs e)

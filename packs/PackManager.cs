@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Patchwork.Handlers;
 using Patchwork.Util;
 using Patchwork.Watchers;
@@ -108,32 +109,32 @@ public static class PackManager
 
         try
         {
-            string json    = File.ReadAllText(manifestPath);
-            string name    = ParseJsonString(json, "name");
-            string author  = ParseJsonString(json, "author");
-            string version = ParseJsonString(json, "version");
-            string desc    = ParseJsonString(json, "description");
-            return new PackInfo(path, name ?? Path.GetFileName(path), isLocal, author, version, desc);
+            string json             = File.ReadAllText(manifestPath);
+            var (name, author, ver, desc) = ReadManifestFields(json);
+            if (name == null)
+                Plugin.Logger.LogWarning($"[PackManager] pack.json at '{manifestPath}' has no 'name' field — using folder name");
+            return new PackInfo(path, name ?? Path.GetFileName(path), isLocal, author, ver, desc);
         }
-        catch
+        catch (JsonException ex)
         {
+            Plugin.Logger.LogWarning($"[PackManager] Malformed JSON in '{manifestPath}': {ex.Message} — using folder name");
+            return new PackInfo(path, Path.GetFileName(path), isLocal);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Logger.LogWarning($"[PackManager] Failed to read '{manifestPath}': {ex.Message} — using folder name");
             return new PackInfo(path, Path.GetFileName(path), isLocal);
         }
     }
 
-    /// <summary>Minimal JSON string-value extractor — no external library needed.</summary>
-    private static string ParseJsonString(string json, string key)
+    private static (string name, string author, string version, string desc) ReadManifestFields(string json)
     {
-        string searchKey = $"\"{key}\"";
-        int ki = json.IndexOf(searchKey, StringComparison.OrdinalIgnoreCase);
-        if (ki < 0) return null;
-        int colon = json.IndexOf(':', ki + searchKey.Length);
-        if (colon < 0) return null;
-        int q1 = json.IndexOf('"', colon + 1);
-        if (q1 < 0) return null;
-        int q2 = json.IndexOf('"', q1 + 1);
-        if (q2 < 0) return null;
-        return json.Substring(q1 + 1, q2 - q1 - 1);
+        using var doc  = JsonDocument.Parse(json);
+        var root       = doc.RootElement;
+        static string GetStr(JsonElement el, string key)
+            => el.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String
+               ? p.GetString() : null;
+        return (GetStr(root, "name"), GetStr(root, "author"), GetStr(root, "version"), GetStr(root, "description"));
     }
 
     // ================================================================

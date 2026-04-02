@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
@@ -28,6 +29,12 @@ public static class AudioHandler
     // Set to true while Reload() is writing vanilla clips back to AudioSources.
     // Blocks ClipSetterPatch from immediately re-applying a replacement and undoing the revert.
     private static bool _reverting;
+
+    // Tracks sounds currently being loaded by a coroutine — prevents duplicate launches.
+    private static readonly HashSet<string> _loadingInProgress =
+        new(StringComparer.OrdinalIgnoreCase);
+    // Incremented at the start of each Reload() so stale in-flight coroutines discard their result.
+    private static int _reloadGeneration;
 
     /// <summary>True when at least one audio replacement file exists across all active packs.</summary>
     public static bool HasAudioReplacements => _indexBuilt && _soundIndex.Count > 0;
@@ -98,8 +105,11 @@ public static class AudioHandler
             return;
         }
 
-        // Clear cache so clips are re-read from disk on this reload pass.
+        // Clear cache so clips are re-fetched on this reload pass.
+        // Invalidate any in-flight coroutines from a previous reload.
         LoadedClips.Clear();
+        _loadingInProgress.Clear();
+        _reloadGeneration++;
 
         foreach (var source in Resources.FindObjectsOfTypeAll<AudioSource>())
         {
@@ -108,18 +118,14 @@ public static class AudioHandler
             if (source.clip != null)
             {
                 string clipName = source.clip.name.Replace("PATCHWORK_", "");
-                AudioClip replacement = LoadAudioClip(clipName);
-                if (replacement != null)
+                if (_soundIndex.ContainsKey(clipName))
                 {
-                    // Save the original clip before we overwrite source.clip. Adding to LoadedClips
-                    // first would cause the ClipSetterPatch guard (LoadedClips.ContainsKey) to block
-                    // the Harmony postfix, so _originalClips would never receive this entry and the
-                    // clip could not be restored when the pack is disabled.
+                    // Save the vanilla clip now (synchronous) so the async completion
+                    // sweep can restore it when a pack is disabled.
                     int id = source.GetInstanceID();
-                    if (source.clip != null && !source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
+                    if (!source.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
                         _originalClips[id] = source.clip;
-                    LoadedClips[clipName] = replacement;
-                    source.clip = replacement;
+                    EnqueueLoad(clipName);
                 }
                 else if (source.clip.name.StartsWith("PATCHWORK_"))
                 {
@@ -220,12 +226,8 @@ public static class AudioHandler
             return;
         }
 
-        AudioClip loadedClip = LoadAudioClip(clipName);
-        if (loadedClip != null)
-        {
-            LoadedClips[clipName] = loadedClip;
-            source.clip = loadedClip;
-        }
+        // Not loaded yet — enqueue background load; vanilla plays this trigger.
+        EnqueueLoad(clipName);
     }
 
     public static void LoadAudio(ref AudioClip clip)
@@ -240,12 +242,8 @@ public static class AudioHandler
             return;
         }
 
-        AudioClip loadedClip = LoadAudioClip(clipName);
-        if (loadedClip != null)
-        {
-            LoadedClips[clipName] = loadedClip;
-            clip = loadedClip;
-        }
+        // Not loaded yet — enqueue background load; vanilla plays this trigger.
+        EnqueueLoad(clipName);
     }
 
     public static void InvalidateCache(string soundName)
@@ -255,29 +253,59 @@ public static class AudioHandler
 
     public static int CachedClipCount => LoadedClips.Count;
 
+    /// <summary>
+    /// Returns the cached clip for <paramref name="soundName"/>, or null if not yet loaded.
+    /// Use <see cref="EnqueueLoad"/> to start a background load; the clip will be available
+    /// on the next call once the coroutine completes.
+    /// </summary>
     public static AudioClip LoadAudioClip(string soundName)
     {
+        LoadedClips.TryGetValue(soundName, out var clip);
+        return clip;
+    }
+
+    private static void EnqueueLoad(string soundName)
+    {
+        if (LoadedClips.ContainsKey(soundName) || _loadingInProgress.Contains(soundName)) return;
         string path = GetSoundPath(soundName);
-        if (string.IsNullOrEmpty(path))
-            return null;
+        if (path == null) return;
+        _loadingInProgress.Add(soundName);
+        Plugin.Instance.StartCoroutine(LoadAudioClipAsync(soundName, path, _reloadGeneration));
+    }
 
-        if (LoadedClips.TryGetValue(soundName, out var cachedClip))
-            return cachedClip;
-
+    private static IEnumerator LoadAudioClipAsync(string soundName, string path, int gen)
+    {
         string url = "file:///" + Uri.EscapeUriString(path.Replace("\\", "/"));
         var request = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.UNKNOWN);
-        var operation = request.SendWebRequest();
-        while (!operation.isDone) { }
+        yield return request.SendWebRequest();   // non-blocking: returns control each frame
+
+        _loadingInProgress.Remove(soundName);
+
+        // Discard result if a newer Reload() has already superseded this load.
+        if (_reloadGeneration != gen) yield break;
+
         if (request.result != UnityWebRequest.Result.Success)
         {
-            Plugin.Logger.LogError($"[Patchwork] Failed to load audio clip from {path}: {request.error}");
-            return null;
+            Plugin.Logger.LogError($"[Audio] Failed to load '{path}': {request.error}");
+            yield break;
         }
 
-        AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
+        var clip = DownloadHandlerAudioClip.GetContent(request);
         clip.name = "PATCHWORK_" + soundName;
         LoadedClips[soundName] = clip;
-        return clip;
+
+        // Sweep live AudioSources and apply the clip immediately on the completion frame.
+        // Unity coroutines resume on the main thread so no concurrency concern here.
+        foreach (var src in Resources.FindObjectsOfTypeAll<AudioSource>())
+        {
+            if (src == null || src.clip == null) continue;
+            string cn = src.clip.name.Replace("PATCHWORK_", "");
+            if (!cn.Equals(soundName, StringComparison.OrdinalIgnoreCase)) continue;
+            int id = src.GetInstanceID();
+            if (!src.clip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
+                _originalClips[id] = src.clip;
+            src.clip = clip;
+        }
     }
 
     static string GetSoundPath(string soundName)

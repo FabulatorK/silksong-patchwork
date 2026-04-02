@@ -6,7 +6,7 @@ namespace Patchwork.Handlers;
 /// <summary>
 /// Watches the sprite load directory for changes and invalidates cache entries accordingly.
 /// </summary>
-public class SpriteFileWatcher
+public class SpriteFileWatcher : System.IDisposable
 {
     public FileSystemWatcher SpriteWatcher;
     public FileSystemWatcher AtlasWatcher;
@@ -37,6 +37,14 @@ public class SpriteFileWatcher
         AtlasWatcher.Deleted += OnAtlasChanged;
         AtlasWatcher.Renamed += OnAtlasChanged;
         AtlasWatcher.EnableRaisingEvents = true;
+    }
+
+    public void Dispose()
+    {
+        SpriteWatcher.EnableRaisingEvents = false;
+        SpriteWatcher.Dispose();
+        AtlasWatcher.EnableRaisingEvents = false;
+        AtlasWatcher.Dispose();
     }
 
     private void OnSpriteChanged(object sender, FileSystemEventArgs e)
