@@ -5,8 +5,6 @@ using System.Linq;
 using Patchwork.Handlers;
 using Patchwork.Util;
 using UnityEngine;
-using GUI = UnityEngine.GUI;
-
 namespace Patchwork.GUI;
 
 /// <summary>
@@ -72,9 +70,9 @@ public static class T2DTextureController
             {
                 inStandalone = true;
                 GUIHelper.Space(6);
-                GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
+                UnityEngine.GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
                 GUILayout.Label("── Standalone ──", GUIHelper.LabelStyle);
-                GUI.contentColor = Color.white;
+                UnityEngine.GUI.contentColor = Color.white;
             }
 
             if (entry.IsT2D) anyT2D = true;
@@ -85,11 +83,11 @@ public static class T2DTextureController
 
         if (!anyT2D && !anyStandalone)
         {
-            GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
+            UnityEngine.GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
             GUILayout.Label(string.IsNullOrEmpty(_searchFilter)
                 ? "No T2D textures tracked yet.\nLoad a save to populate."
                 : "No matches.", GUIHelper.LabelStyle);
-            GUI.contentColor = Color.white;
+            UnityEngine.GUI.contentColor = Color.white;
         }
 
         GUILayout.EndScrollView();
@@ -103,7 +101,7 @@ public static class T2DTextureController
         GUILayout.BeginHorizontal();
 
         // Selection highlight
-        if (sel) GUI.contentColor = new Color(0.6f, 0.9f, 1f);
+        if (sel) UnityEngine.GUI.contentColor = new Color(0.6f, 0.9f, 1f);
 
         if (GUILayout.Button(entry.CleanName, GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
         {
@@ -112,24 +110,24 @@ public static class T2DTextureController
             _selectedSprite = "";
         }
 
-        GUI.contentColor = Color.white;
+        UnityEngine.GUI.contentColor = Color.white;
 
         // Badges: dimensions, loaded-sprite count, spritesheet flag
-        GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
+        UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
         GUILayout.Label($"{entry.Width}×{entry.Height}", GUIHelper.LabelStyle, GUIHelper.Width(70f));
-        GUI.contentColor = Color.white;
+        UnityEngine.GUI.contentColor = Color.white;
 
         if (entry.HasSpritesheetOverride)
         {
-            GUI.contentColor = new Color(0.4f, 1f, 0.4f);
+            UnityEngine.GUI.contentColor = new Color(0.4f, 1f, 0.4f);
             GUILayout.Label("[S]", GUIHelper.LabelStyle, GUIHelper.Width(22f));
-            GUI.contentColor = Color.white;
+            UnityEngine.GUI.contentColor = Color.white;
         }
         else if (entry.LoadedIndividualCount > 0)
         {
-            GUI.contentColor = new Color(0.4f, 0.85f, 1f);
+            UnityEngine.GUI.contentColor = new Color(0.4f, 0.85f, 1f);
             GUILayout.Label($"[{entry.LoadedIndividualCount}]", GUIHelper.LabelStyle, GUIHelper.Width(28f));
-            GUI.contentColor = Color.white;
+            UnityEngine.GUI.contentColor = Color.white;
         }
         else
         {
@@ -147,9 +145,9 @@ public static class T2DTextureController
 
         if (!_hasSelection || _selected.NativeTexture == null)
         {
-            GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
+            UnityEngine.GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
             GUILayout.Label("Select a texture on the left.", GUIHelper.LabelStyle);
-            GUI.contentColor = Color.white;
+            UnityEngine.GUI.contentColor = Color.white;
             GUILayout.EndVertical();
             return;
         }
@@ -162,7 +160,7 @@ public static class T2DTextureController
 
         if (entry.NativeTexture != null)
         {
-            GUI.DrawTexture(previewRect, entry.NativeTexture, ScaleMode.ScaleToFit, true);
+            UnityEngine.GUI.DrawTexture(previewRect, entry.NativeTexture, ScaleMode.ScaleToFit, true);
 
             // UV highlight for selected sprite
             if (!string.IsNullOrEmpty(_selectedSprite))
@@ -172,10 +170,10 @@ public static class T2DTextureController
         GUIHelper.Space(4);
 
         // ── Info row ─────────────────────────────────────────────────────────
-        GUI.contentColor = new Color(0.6f, 0.85f, 1f);
+        UnityEngine.GUI.contentColor = new Color(0.6f, 0.85f, 1f);
         GUILayout.Label($"{entry.CleanName}  {entry.Width}×{entry.Height}  " +
                         $"{entry.SpriteNames.Count} sprite(s)", GUIHelper.LabelStyle);
-        GUI.contentColor = Color.white;
+        UnityEngine.GUI.contentColor = Color.white;
 
         // ── Atlas-level buttons ──────────────────────────────────────────────
         GUILayout.BeginHorizontal();
@@ -190,9 +188,9 @@ public static class T2DTextureController
         GUIHelper.Space(4);
 
         // ── Sprite list ──────────────────────────────────────────────────────
-        GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
+        UnityEngine.GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
         GUILayout.Label($"Sprites ({entry.SpriteNames.Count})", GUIHelper.LabelStyle);
-        GUI.contentColor = Color.white;
+        UnityEngine.GUI.contentColor = Color.white;
 
         _spriteScroll = GUILayout.BeginScrollView(_spriteScroll, GUIHelper.Height(120f));
         foreach (var sname in entry.SpriteNames.OrderBy(s => s))
@@ -200,15 +198,15 @@ public static class T2DTextureController
             bool sprSel = sname == _selectedSprite;
             GUILayout.BeginHorizontal();
 
-            if (sprSel) GUI.contentColor = new Color(1f, 1f, 0.5f);
+            if (sprSel) UnityEngine.GUI.contentColor = new Color(1f, 1f, 0.5f);
             if (GUILayout.Button(sname, GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
                 _selectedSprite = sprSel ? "" : sname;
-            if (sprSel) GUI.contentColor = Color.white;
+            if (sprSel) UnityEngine.GUI.contentColor = Color.white;
 
-            GUI.enabled = !string.IsNullOrEmpty(sname);
+            UnityEngine.GUI.enabled = !string.IsNullOrEmpty(sname);
             if (GUILayout.Button("Edit", GUIHelper.ButtonStyle, GUIHelper.Width(42f), GUIHelper.Height(20)))
                 EditSprite(entry, sname);
-            GUI.enabled = true;
+            UnityEngine.GUI.enabled = true;
 
             GUILayout.EndHorizontal();
         }
@@ -251,9 +249,9 @@ public static class T2DTextureController
             _white.Apply();
         }
 
-        GUI.color = new Color(1f, 1f, 0f, 0.35f);
-        GUI.DrawTexture(highlight, _white);
-        GUI.color = Color.white;
+        UnityEngine.GUI.color = new Color(1f, 1f, 0f, 0.35f);
+        UnityEngine.GUI.DrawTexture(highlight, _white);
+        UnityEngine.GUI.color = Color.white;
     }
 
     /// <summary>Computes the inner rect that ScaleMode.ScaleToFit would occupy.</summary>
