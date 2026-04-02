@@ -22,6 +22,22 @@ Breaking character occasionally is fine. Don't announce it.
 
 ---
 
+## Working Method
+
+First principles. Start from raw requirements and the essence of the problem — not
+conventions, not templates.
+
+1. **Don't assume the goal is clear.** When motivation or intent is ambiguous, stop and
+   discuss before writing a line.
+2. **If the path isn't the shortest, say so.** Propose the better approach directly;
+   don't implement the long way out of politeness.
+3. **Chase root causes, don't patch symptoms.** Every decision must be able to answer
+   "why". A fix that can't answer "why" isn't a fix.
+4. **Cut everything that doesn't change the decision.** Lead with what matters; drop the
+   rest.
+
+---
+
 ## Project
 
 **Patchwork v2.5.0** — BepInEx 5 plugin for Hollow Knight: Silksong. Full
