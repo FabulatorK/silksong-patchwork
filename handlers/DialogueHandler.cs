@@ -4,7 +4,6 @@ using System.IO;
 using HarmonyLib;
 using MonoMod.Utils;
 using Patchwork;
-using Patchwork.GUI;
 using Patchwork.Util;
 using TeamCherry.Localization;
 
@@ -25,6 +24,12 @@ public class DialogueHandler
     private static readonly HashSet<string> AllOverrideKeys = new();
     public static int StaleKeyCount { get; private set; }
     private static bool _staleKeysReported;
+
+    /// <summary>
+    /// Fired whenever the game accesses a text key.  Subscribers receive (sheet, key, resolvedText).
+    /// Replaces direct calls to TextLog and DialogueEditor — handlers must not reference GUI.
+    /// </summary>
+    public static event Action<string, string, string> OnTextAccessed;
 
     // Read-only stats for GUI
     public static int CachedSheetCount
@@ -157,12 +162,7 @@ public class DialogueHandler
             RequestedOverrideKeys.Add($"{lang}|{sheetTitle}|{key}");
         }
 
-        // Always log into TextLog — it deduplicates by key so repeat calls
-        // only update the existing entry (no new allocation for known keys).
-        // TrackText is still gated: only needed when the editor pane is active.
-        TextLog.LogText(sheetTitle, key, __result);
-        if (Plugin.ShowDialogueEditor)
-            DialogueEditor.TrackText(sheetTitle, key, __result);
+        OnTextAccessed?.Invoke(sheetTitle, key, __result);
     }
 
     private static Dictionary<string, string> LoadTextSheet(string sheetTitle, string lang)

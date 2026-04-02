@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
-using Patchwork.GUI;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -33,6 +32,11 @@ public static class AudioHandler
     /// <summary>True when at least one audio replacement file exists across all active packs.</summary>
     public static bool HasAudioReplacements => _indexBuilt && _soundIndex.Count > 0;
 
+    /// <summary>Fired on the main thread whenever an AudioClip is about to play (vanilla or replaced).</summary>
+    public static event Action<AudioClip> OnAudioPlayed;
+    /// <summary>Fired during Reload() for every live AudioSource — lets GUI inventory the loaded clip set.</summary>
+    public static event Action<AudioSource> OnAudioSourceLoaded;
+
     public static void ApplyPatches(Harmony harmony)
     {
         harmony.Patch(
@@ -55,7 +59,7 @@ public static class AudioHandler
     {
         if (source.clip != null)
         {
-            AudioLog.LogAudio(source.clip);
+            OnAudioPlayed?.Invoke(source.clip);
             LoadAudio(source);
         }
     }
@@ -64,7 +68,7 @@ public static class AudioHandler
     {
         if (clip != null)
         {
-            AudioLog.LogAudio(clip);
+            OnAudioPlayed?.Invoke(clip);
             LoadAudio(ref clip);
         }
     }
@@ -73,7 +77,7 @@ public static class AudioHandler
     {
         if (value != null)
         {
-            AudioLog.LogAudio(value);
+            OnAudioPlayed?.Invoke(value);
             if (!_reverting &&
                 (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", ""))))
                 LoadAudio(__instance);
@@ -171,7 +175,7 @@ public static class AudioHandler
                 }
             }
 
-            AudioList.LogAudio(source);
+            OnAudioSourceLoaded?.Invoke(source);
         }
     }
 

@@ -10,44 +10,6 @@ public static class AudioLog
 {
     private static readonly List<AudioPlayEntry> AudioPlayEntries = new();
 
-    // Base dimensions at 1080p - will be scaled automatically
-    private const float WindowWidth = 300f;
-    private const float WindowHeight = 400f;
-    private const float RightMargin = 10f;
-    private const float TopMargin = 10f;
-
-    private static Rect windowRect;
-    private static bool initialized = false;
-
-    public static void DrawAudioLog()
-    {
-        // Initialize or recalculate on resolution change
-        if (!initialized || windowRect.width < 1)
-        {
-            windowRect = GUIHelper.ScaledRectFromRight(RightMargin, TopMargin, WindowWidth, WindowHeight);
-            initialized = true;
-        }
-
-        GUIHelper.ApplyScaledSkin();
-        windowRect = GUILayout.Window(
-            6969,
-            windowRect,
-            AudioLogWindow,
-            "Patchwork Audio Log",
-            GUIHelper.WindowStyle,
-            GUIHelper.WindowLayout(WindowWidth, WindowHeight)
-        );
-    }
-
-    private static void AudioLogWindow(int windowID)
-    {
-        GUIHelper.Space(16);
-        int maxVisible    = Mathf.Clamp(Plugin.Config.AudioLogMaxVisible, 5, 50);
-        double fadeDuration = Plugin.Config.LogAudioDuration;
-        DrawEntries(maxVisible, fadeDuration, Plugin.Config.HideModdedAudioInLog);
-        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
-    }
-
     /// <summary>
     /// Renders log entries into the current GUILayout context (no window chrome).
     /// Called by AudioPillar inside the Dev Hub window.

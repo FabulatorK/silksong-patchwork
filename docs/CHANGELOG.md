@@ -1,4 +1,10 @@
 ### Unreleased
+* Removed legacy standalone window shim methods (`DevProfiler.Draw`, `DrawAnimationController`, `DrawAudioLog`, `DrawAudioList`, `DrawTextLog`) and dead `Plugin.ShowDialogueEditor` field — all content is served exclusively through the Dev Hub pillars
+* Decoupled handlers from GUI: `AudioHandler` and `DialogueHandler` now fire static events (`OnAudioPlayed`, `OnAudioSourceLoaded`, `OnTextAccessed`); `Plugin.Awake` wires the GUI subscribers, satisfying Architecture Principle 4
+* Dashboard text file list now shows `Sheet/LANG.yml` paths (relative to their Text/ root) with loaded-status badges
+* TextPillar search now covers both in-session TextLog keys and all loaded YAML cache overrides; cache-only hits are blue-tinted
+* TextPillar editor gains a direct Sheet / Key / Open row for editing any key without triggering it in-game first
+* Fixed text hot-reload: Patchwork root `Text/` is now highest priority (matches sprite/audio pipeline); pack `Text/` watchers are rebuilt when active packs change
 * Fixed T2D revert sweep breaking individual sprite priority — revert sweep now sets `_enforcing` and explicitly prefers `_loadedSprites` over vanilla, preventing the Harmony setter chain from corrupting priority during pack reload
 * Fixed T2D revert block being skipped when base-path T2D files kept `HasT2DReplacements` true with no active pack
 * Fixed T2D spritesheet and audio revert cascade failures on pack disable

@@ -12,41 +12,6 @@ public static class TextLog
 
     private static readonly int MaxPreviewLength = 50;
 
-    private static Rect windowRect;
-
-    private static bool initialized = false;
-
-    private static Vector2 scrollPosition = Vector2.zero;
-
-
-    public static void DrawTextLog()
-    {
-        if (!initialized || windowRect.width < 1)
-        {
-            windowRect = GUIHelper.ScaledRect(10, 10, 700, 400);
-            initialized = true;
-        }
-        GUIHelper.ApplyScaledSkin();
-        windowRect = GUILayout.Window(6971, windowRect, TextLogWindow, "Patchwork Text Log", GUIHelper.WindowStyle, GUIHelper.WindowLayout(700, 400));
-    }
-
-    private static void TextLogWindow(int windowID)
-    {
-        GUIHelper.Space(16);
-        int maxVisible    = Mathf.Clamp(Plugin.Config.TextLogMaxVisible, 5, 50);
-        double fadeDuration = Plugin.Config.TextLogDuration;
-
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-        DrawEntries(maxVisible, fadeDuration, (sheet, key, text) =>
-        {
-            DialogueEditor.SelectEntry(sheet, key, text);
-            Plugin.ShowDialogueEditor = true;
-        });
-        GUILayout.EndScrollView();
-
-        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
-    }
-
     /// <summary>Total number of tracked text entries.</summary>
     public static int EntryCount => TextLogEntries.Count;
 

@@ -12,16 +12,8 @@ namespace Patchwork.GUI;
 public static class DevProfiler
 {
     private const int FrameSampleCount = 120;
-    private const float WindowWidth = 340f;
-    private const float WindowHeight = 500f;
-    private const float RightMargin = 10f;
-    private const float TopMargin = 420f;
     private const float GraphHeight = 50f;
     private const float GraphBarWidth = 2f;
-
-    private static Rect windowRect;
-    private static bool initialized;
-    private static Vector2 scrollPosition;
 
     // Frame time ring buffer
     private static readonly float[] FrameTimes = new float[FrameSampleCount];
@@ -95,24 +87,6 @@ public static class DevProfiler
         }
     }
 
-    public static void Draw()
-    {
-        if (!initialized || windowRect.width < 1)
-        {
-            windowRect = GUIHelper.ScaledRectFromRight(RightMargin, TopMargin, WindowWidth, WindowHeight);
-            initialized = true;
-        }
-
-        windowRect = GUILayout.Window(
-            6975,
-            windowRect,
-            DrawWindow,
-            "Patchwork Dev Profiler",
-            GUIHelper.WindowStyle,
-            GUIHelper.WindowLayout(WindowWidth, WindowHeight)
-        );
-    }
-
     /// <summary>
     /// Renders the profiler content without a window chrome.
     /// Called by PerformancePillar inside the Dev Hub window.
@@ -121,15 +95,6 @@ public static class DevProfiler
     public static void DrawPillarContent()
     {
         DrawContent();
-    }
-
-    private static void DrawWindow(int windowID)
-    {
-        GUIHelper.Space(16);
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-        DrawContent();
-        GUILayout.EndScrollView();
-        UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
     private static void DrawContent()

@@ -13,13 +13,6 @@ using UnityEngine;
 public static class AnimationController
 {
     private static Vector2 scrollPosition = Vector2.zero;
-    private static Rect windowRect;
-    private static bool initialized = false;
-    // Constants at top of class (base sizes at 1080p)
-    private const float WindowWidthRatio = 0.33f;   // 1/3 of screen width
-    private const float WindowHeightRatio = 0.33f;  // 1/3 of screen height
-    private const float RightMargin = 10f;
-    private const float TopMargin = 10f;
 
     private const float MinWidth = 300f;
     private const float MinHeight = 200f;
@@ -39,7 +32,6 @@ public static class AnimationController
     private static string _animationSearchText = "";
     private static Vector2 _animationDropdownScroll = Vector2.zero;
     private const int MaxVisibleAnimations = 10;
-    private const float MinWindowWidth = 350f;
     private const float MaxWindowWidth = 600f;
     private const int MaxPathLength = 55;
 
@@ -230,33 +222,6 @@ public static class AnimationController
     #endregion
 
     #region GUI
-    public static void DrawAnimationController()
-    {
-        if (!initialized || windowRect.width < 1)
-        {
-            float width = Mathf.Max(Screen.width * WindowWidthRatio, GUIHelper.Scaled(MinWidth));
-            float height = Mathf.Max(Screen.height * WindowHeightRatio, GUIHelper.Scaled(MinHeight));
-            windowRect = new Rect(
-                Screen.width - width - GUIHelper.Scaled(RightMargin),
-                GUIHelper.Scaled(TopMargin),
-                width,
-                height
-            );
-            initialized = true;
-        }
-
-        GUIHelper.ApplyScaledSkin();
-        windowRect = GUILayout.Window(
-            6972,
-            windowRect,
-            AnimationControllerWindow,
-            "Patchwork Animation Controller",
-            GUIHelper.WindowStyle,
-            GUILayout.MinWidth(GUIHelper.Scaled(MinWindowWidth)),
-            GUILayout.MaxWidth(GUIHelper.Scaled(MaxWindowWidth))
-        );
-    }
-
     /// <summary>
     /// Renders the animator list content without window chrome or scroll view.
     /// Called by GraphicsPillar — the caller (GraphicsPillar) wraps this in a scroll view.
@@ -264,15 +229,6 @@ public static class AnimationController
     public static void DrawPillarContent()
     {
         DrawAnimatorEntries();
-    }
-
-    private static void DrawAnimatorList()
-    {
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-        GUILayout.BeginVertical();
-        DrawAnimatorEntries();
-        GUILayout.EndVertical();
-        GUILayout.EndScrollView();
     }
 
     private static void DrawAnimatorEntries()
@@ -457,11 +413,5 @@ public static class AnimationController
         }
     }
 
-    private static void AnimationControllerWindow(int windowID)
-    {
-        GUIHelper.Space(16);
-        DrawAnimatorList();
-        GUI.DragWindow(GUIHelper.DragRect);
-    }
     #endregion
 }

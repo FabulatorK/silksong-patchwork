@@ -74,6 +74,13 @@ item is implemented or a new plan is recorded.
 | Pack Manager "Dev Tools →" footer | `gui/PackManagerWindow.cs` | Blue button in footer opens Dev Hub at Graphics tab |
 | Keybind consolidation | `PatchworkConfig.cs`, `Plugin.cs` | Alpha1=PackManager; Alpha2–5 open DevHub at Graphics/Audio/Text/Performance; legacy shims kept one release |
 
+### Technical debt resolved
+
+| Item | Files changed | Notes |
+|------|---------------|-------|
+| Legacy standalone window shim removal | `gui/DevProfiler.cs`, `gui/AnimationController.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs`, `gui/TextLog.cs`, `Plugin.cs` | Removed `Draw()`/`DrawAnimationController()`/`DrawAudioLog()`/`DrawAudioList()`/`DrawTextLog()` and their window-only fields; pillar APIs unchanged |
+| Data layer independence | `handlers/AudioHandler.cs`, `handlers/DialogueHandler.cs`, `Plugin.cs` | Replaced direct GUI calls with `OnAudioPlayed`, `OnAudioSourceLoaded`, `OnTextAccessed` events; subscribers wired in `Plugin.Awake()` |
+
 ### Documentation
 
 | Document | File | Status |
@@ -127,27 +134,24 @@ finished packs.
 
 ## Technical Debt
 
-### Legacy GUI shim cleanup  *(one release after GUI/UX redesign)*
+### ~~Legacy GUI shim cleanup~~  *(resolved)*
 
-The GUI/UX redesign kept two standalone windows as shims for one release cycle to
-avoid hard breakage for users with custom keybinds.  Remove these after the next
-release:
+All standalone window shim methods and their window-only fields have been removed:
+`DevProfiler.Draw()`, `AnimationController.DrawAnimationController()`,
+`AudioLog.DrawAudioLog()`, `AudioList.DrawAudioList()`, `TextLog.DrawTextLog()`,
+`Plugin.ShowDialogueEditor`.  Each file retains only its pillar-facing API
+(`DrawPillarContent`, `DrawEntries`, `GetClipNames`, `LogAudio`, etc.).
 
-| Item | File(s) | What to remove |
-|------|---------|----------------|
-| DevProfiler standalone window | `gui/DevProfiler.cs`, `Plugin.cs`, `PatchworkConfig.cs` | `DevProfiler.Draw()`, `Plugin.ShowDevProfiler`, `ShowDevProfilerKey` config entry |
-| AnimationController standalone window | `gui/AnimationController.cs`, `Plugin.cs`, `PatchworkConfig.cs` | `DrawAnimationController()`, `Plugin.ShowAnimationController`, `ShowAnimationControllerKey` config entry |
-| Old Alpha1–7 keybind config entries | `PatchworkConfig.cs` | `ShowAudioLog`, `ShowAudioList`, `ShowAnimationController`, `ShowTextLog`, `ShowSkinStatus`, `ShowDialogueEditor` keys (all point to removed/merged windows) |
+### ~~Data layer independence violation~~  *(resolved)*
 
-### Data layer independence violation
+`AudioHandler` and `DialogueHandler` no longer import or call GUI classes directly.
+Both now fire static events; `Plugin.Awake()` wires the GUI subscribers:
 
-`AudioHandler` calls `AudioLog.LogAudio()` and `AudioList.LogAudio()`.
-`DialogueHandler` calls `TextLog.LogText()` and `DialogueEditor.TrackText()`.
-
-This violates Architecture Principle 4 (handlers must not reference GUI).  The pragmatic
-fix during the GUI redesign was to keep the data-holding files as handler targets and
-only extract their rendering.  Proper fix: replace direct calls with events/delegates
-so handlers have zero GUI imports.
+| Event | Subscribers wired in Plugin.Awake() |
+|-------|-------------------------------------|
+| `AudioHandler.OnAudioPlayed` | `AudioLog.LogAudio` |
+| `AudioHandler.OnAudioSourceLoaded` | `AudioList.LogAudio` |
+| `DialogueHandler.OnTextAccessed` | `TextLog.LogText`; `DialogueEditor.TrackText` (gated on `ShowDevHub`) |
 
 ---
 

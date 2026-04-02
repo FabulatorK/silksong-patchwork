@@ -30,8 +30,6 @@ public class Plugin : BaseUnityPlugin
     /// Forwards to PackManager — all handlers iterate this.</summary>
     public static IEnumerable<string> PluginPackPaths => PackManager.ActivePackPaths;
 
-    // ── Legacy standalone shims (one release only, then removed) ─────────────
-    public static bool ShowDialogueEditor = false;  // set by TextLogWindow (dead path); kept to avoid compile error
     public static bool ShowPackManager = false;
 
     // ── New unified UI ────────────────────────────────────────────────────────
@@ -134,7 +132,13 @@ public class Plugin : BaseUnityPlugin
         SpriteLoader.ApplyPatches(harmony);
         VideoHandler.ApplyPatches(harmony);
         GUIHelper.InitInputBlocking();
-        
+
+        // ── Wire handler → GUI events (keeps handlers free of GUI references) ──
+        DialogueHandler.OnTextAccessed += (sheet, key, text) => TextLog.LogText(sheet, key, text);
+        DialogueHandler.OnTextAccessed += (sheet, key, text) => { if (ShowDevHub) DialogueEditor.TrackText(sheet, key, text); };
+        AudioHandler.OnAudioPlayed    += clip   => AudioLog.LogAudio(clip);
+        AudioHandler.OnAudioSourceLoaded += src => AudioList.LogAudio(src);
+
         RawKeyboardLeakBlocker.ApplyPatches(harmony);
 
         StartCoroutine(AwakeDelayed(harmony));
