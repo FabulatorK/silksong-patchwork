@@ -17,8 +17,7 @@ public static class T2DTextureController
 {
     // ── State ────────────────────────────────────────────────────────────────
     private static List<T2DSceneEntry> _entries = new();
-    private static float               _lastRefresh = -999f;
-    private const  float               RefreshInterval = 2f;
+    private static bool                _needsRefresh = true;
 
     private static T2DSceneEntry _selected;
     private static bool          _hasSelection;
@@ -35,7 +34,8 @@ public static class T2DTextureController
 
     public static void DrawPillarContent()
     {
-        MaybeRefresh();
+        if (_needsRefresh)
+            Refresh();
 
         GUILayout.BeginHorizontal();
         DrawListPane();
@@ -49,9 +49,13 @@ public static class T2DTextureController
     {
         GUILayout.BeginVertical(GUILayout.Width(GUIHelper.Scaled(220f)));
 
-        // Search field
+        // Search + Refresh row
+        GUILayout.BeginHorizontal();
         _searchFilter = GUIHelper.TextField("T2DTex.Search", _searchFilter,
             GUILayout.ExpandWidth(true), GUIHelper.Height(22));
+        if (GUILayout.Button("↺", GUIHelper.ButtonStyle, GUIHelper.Width(26f), GUIHelper.Height(22)))
+            _needsRefresh = true;
+        GUILayout.EndHorizontal();
 
         _listScroll = GUILayout.BeginScrollView(_listScroll);
 
@@ -400,11 +404,10 @@ public static class T2DTextureController
 
     // ── Refresh ──────────────────────────────────────────────────────────────
 
-    private static void MaybeRefresh()
+    private static void Refresh()
     {
-        if (Time.realtimeSinceStartup - _lastRefresh < RefreshInterval) return;
-        _lastRefresh = Time.realtimeSinceStartup;
-        _entries     = T2DLoader.GetSceneTextureEntries();
+        _needsRefresh = false;
+        _entries      = T2DLoader.GetSceneTextureEntries();
 
         // If selected entry is stale, clear it
         if (_hasSelection && !_entries.Any(e => e.RawName == _selected.RawName))
@@ -413,4 +416,7 @@ public static class T2DTextureController
             _selectedSprite = "";
         }
     }
+
+    /// <summary>Called by external systems (e.g. scene load) to schedule a refresh.</summary>
+    public static void RequestRefresh() => _needsRefresh = true;
 }

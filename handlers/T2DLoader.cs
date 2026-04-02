@@ -68,11 +68,19 @@ public static partial class T2DLoader
     public static void TrackRenderer(SpriteRenderer sr) { if (sr != null) _knownRenderers.Add(sr); }
     public static void TrackImage(UnityEngine.UI.Image img) { if (img != null) _knownImages.Add(img); }
 
+    // Cached Sprite[] from the scene seed sweep — used for sprite-list enrichment and
+    // FindSceneSprite fallback. Avoids repeated FindObjectsOfTypeAll<Sprite> calls.
+    private static Sprite[] _seededSprites = System.Array.Empty<Sprite>();
+
+    // FindSceneSprite result cache — keyed by "cleanTexName/spriteName".
+    // Cleared when the scene seed resets (scene unload).
+    private static readonly Dictionary<string, Sprite> _spriteHighlightCache =
+        new(System.StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
-    /// Seeds _knownRenderers/_knownImages from the live scene on first browser open.
-    /// Catches sprites that were assigned before Harmony patches fired (e.g. during
-    /// scene initialisation before BepInEx loaded).  Safe to call repeatedly — the
-    /// HashSets deduplicate and the flag prevents re-scanning.
+    /// Seeds _knownRenderers/_knownImages and caches all Sprite objects in the scene.
+    /// Runs once per scene on first browser open; catches sprites assigned before
+    /// Harmony patches fired.
     /// </summary>
     private static bool _sceneSeedDone;
     public static void SeedFromScene()
@@ -83,9 +91,19 @@ public static partial class T2DLoader
             if (sr != null && sr.sprite?.texture != null) _knownRenderers.Add(sr);
         foreach (var img in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>())
             if (img != null && img.sprite?.texture != null) _knownImages.Add(img);
+        // Cache all Sprite assets in one sweep — reused for enrichment and UV highlight lookup.
+        _seededSprites = Resources.FindObjectsOfTypeAll<Sprite>();
     }
 
-    public static void ResetSceneSeed() => _sceneSeedDone = false;
+    public static void ResetSceneSeed()
+    {
+        _sceneSeedDone = false;
+        _seededSprites = System.Array.Empty<Sprite>();
+        _spriteHighlightCache.Clear();
+        // Prune destroyed renderers/images so the sets don't grow unboundedly across scenes.
+        _knownRenderers.RemoveWhere(_srNull);
+        _knownImages.RemoveWhere(_imgNull);
+    }
 
     // ================================================================
     //  Scene texture snapshot for the T2D browser GUI
@@ -115,11 +133,12 @@ public static partial class T2DLoader
         foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
         foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
 
-        // Enrich sprite lists from all Sprite assets in memory — tracked renderers only
-        // expose sprites currently assigned to live objects, so many frames of an animation
-        // atlas are invisible until their renderer fires. FindObjectsOfTypeAll<Sprite> covers
-        // inactive objects, unspawned prefabs, and every animation frame in the atlas.
-        foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+        // Enrich sprite lists from the seed cache — tracked renderers only expose sprites
+        // currently assigned to live objects, so many frames of an animation atlas are
+        // invisible until their renderer fires. _seededSprites (populated once by
+        // SeedFromScene) covers inactive objects, unspawned prefabs, and every animation
+        // frame in the atlas without a per-refresh FindObjectsOfTypeAll<Sprite> call.
+        foreach (var sprite in _seededSprites)
         {
             if (sprite?.texture == null) continue;
             int id = sprite.texture.GetInstanceID();
@@ -180,20 +199,35 @@ public static partial class T2DLoader
     /// </summary>
     public static Sprite FindSceneSprite(string cleanTexName, string spriteName)
     {
+        string cacheKey = cleanTexName + "/" + spriteName;
+        if (_spriteHighlightCache.TryGetValue(cacheKey, out var cached))
+            return cached;
+
+        // Search live renderers first (fastest path for currently-visible sprites)
         foreach (var sr in _knownRenderers)
         {
             var s = sr?.sprite;
             if (s == null) continue;
             if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
-                return s;
+            { _spriteHighlightCache[cacheKey] = s; return s; }
         }
         foreach (var img in _knownImages)
         {
             var s = img?.sprite;
             if (s == null) continue;
             if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture?.name ?? "") == cleanTexName)
-                return s;
+            { _spriteHighlightCache[cacheKey] = s; return s; }
         }
+
+        // Fall back to the seed cache — covers enriched sprites not on any live renderer
+        // (animation frames, inactive prefabs, etc.)
+        foreach (var s in _seededSprites)
+        {
+            if (s == null || s.texture == null) continue;
+            if (s.name == spriteName && T2DUtil.CleanTextureName(s.texture.name) == cleanTexName)
+            { _spriteHighlightCache[cacheKey] = s; return s; }
+        }
+
         return null;
     }
 
