@@ -1,6 +1,6 @@
 # Patchwork — CLAUDE.md
 
-AI assistant reference for the Patchwork codebase. Read this before modifying any file.
+AI assistant reference. Read before modifying any file.
 
 ---
 
@@ -22,347 +22,251 @@ Breaking character occasionally is fine. Don't announce it.
 
 ---
 
-## Project Overview
+## Project
 
-**Patchwork v2.5.0** is a BepInEx 5 plugin for Hollow Knight: Silksong that provides a
-full asset-replacement framework: sprites (tk2d + Texture2D), audio, video, and text.
-It also ships a developer toolset (animation inspector, audio/text logs, profiler).
+**Patchwork v2.5.0** — BepInEx 5 plugin for Hollow Knight: Silksong. Full
+asset-replacement framework (tk2d sprites, Texture2D, audio, video, text) plus a
+developer toolset (animation inspector, audio/text logs, profiler).
 
-- **Target runtime**: `netstandard2.1`, Unity 6000.0.50, BepInEx 5.x
-- **Game engine toolkit**: 2D Toolkit (tk2d) for most in-game sprites
-- **Distribution**: Thunderstore (`manifest.json`)
-
----
-
-## Repository Layout
-
-```
-Patchwork.csproj          project file (single output: Patchwork.dll)
-Plugin.cs                 BepInEx entry point — lifecycle, Update, OnGUI
-PatchworkConfig.cs        all ConfigEntry<T> bindings (keybinds, toggles, tuning)
-
-handlers/
-  SpriteLoader.cs         tk2d atlas patching via composite RenderTextures
-  SpriteDumper.cs         extract individual sprite PNGs from tk2d collections
-  T2DLoader.cs            Texture2D sprite replacement (in-place + individual)
-  T2DHandler.cs           Harmony postfixes routing to T2DLoader
-  T2DSpritesheets.cs      partial of T2DLoader: in-place PNG swap + vanilla backup
-  T2DDumper.cs            dump T2D atlases and sprite frames to disk
-  SceneTraverser.cs       batch scene loader used for full-game dump
-  AudioHandler.cs         audio clip replacement and hot-reload
-  VideoHandler.cs         cinematic video URL override
-  DialogueHandler.cs      YAML-based text/localisation override
-
-gui/
-  GUIHelper.cs            IMGUI scaling (1080p base), styles, input blocking
-  StatusOverlay.cs        always-on HUD badge (packs / conflicts / sprites / clips)
-  DevHub.cs               tabbed developer window (6 pillars, Alpha2–7 keybinds)
-  PackManagerWindow.cs    pack list editor, profiles, conflict view, condition editor
-  AnimationController.cs  frame inspector for sprite editing
-  AudioLog.cs / AudioList.cs  real-time audio activity + pre-loaded clip list
-  TextLog.cs / DialogueEditor.cs  text key log + override editor
-  DevProfiler.cs          GC stats and frame timing
-  pillars/                one file per Dev Hub tab (Dashboard, Graphics, Text,
-                          Audio, Video, Performance)
-
-packs/
-  PackManager.cs          discover, order, enable/disable, hot-reload packs
-  PackInfo.cs             single pack metadata + DNF condition evaluator
-  PackCondition.cs        condition types (Scene, Crest, Nail, PlayerData, PackActive)
-  PackStats.cs            per-pack asset file counts (cached)
-
-util/
-  TexUtil.cs              PNG load/save, RenderTexture readback, RotateMaterial shader
-  T2DUtil.cs              T2D texture detection, name cleaning, sprite key building
-  SpriteUtil.cs           sprite rect extraction + flip mode handling
-  ConflictTracker.cs      record/query asset override conflicts
-  PlayerDataCatalog.cs    reflection search over PlayerData fields/properties
-  GcUtil.cs               heap pre-warming, manual GC triggers
-  FileCache.cs            PNG file read cache
-  PackRamCache.cs         pin pack assets into RAM
-  RawKeyboardLeakBlocker.cs  prevent game input while Patchwork UI has keyboard focus
-  IOUtil.cs               path helpers
-  StringUtil.cs           trimming, sanitization
-  IsExternalInit.cs       C# 11 record/init compatibility shim
-
-watchers/
-  SpriteFileWatcher.cs    watch Sprites/ and Spritesheets/ for hot-reload
-  AudioFileWatcher.cs     watch Sounds/
-  TextFileWatcher.cs      watch Text/
-
-docs/                     design notes, changelog, feature checklist (non-code)
-assetbundle/              patchwork.assetbundle — contains Rotate.shader
-```
+- Runtime: `netstandard2.1`, Unity 6000.0.50, BepInEx 5.x
+- Sprite toolkit: 2D Toolkit (tk2d)
+- Distribution: Thunderstore (`manifest.json`)
+- Build: `dotnet build Patchwork.csproj -c Release` → `bin/Release/netstandard2.1/Patchwork.dll`
 
 ---
 
-## Namespaces
+## Layout
 
-| Namespace | Location |
-|---|---|
-| `Patchwork` | root (Plugin.cs) |
-| `Patchwork.Handlers` | handlers/ |
-| `Patchwork.GUI` | gui/ |
-| `Patchwork.GUI.Pillars` | gui/pillars/ |
-| `Patchwork.Packs` | packs/ |
-| `Patchwork.Util` | util/ |
-| `Patchwork.Watchers` | watchers/ |
+```
+Plugin.cs / PatchworkConfig.cs   entry point + all ConfigEntry<T> bindings
+
+handlers/   SpriteLoader.cs      tk2d atlas patching (composite RenderTextures)
+            SpriteDumper.cs      extract sprite PNGs from tk2d collections
+            T2DLoader.cs         Texture2D replacement (in-place + individual)
+            T2DHandler.cs        Harmony postfixes → T2DLoader
+            T2DSpritesheets.cs   partial of T2DLoader: in-place PNG swap + vanilla backup
+            T2DDumper.cs         dump T2D atlases/frames to disk
+            SceneTraverser.cs    batch scene loader for full-game dump
+            AudioHandler.cs      audio clip replacement + hot-reload
+            VideoHandler.cs      cinematic video URL override
+            DialogueHandler.cs   YAML text/localisation override
+
+gui/        GUIHelper.cs         IMGUI scaling (1080p base), styles, input blocking
+            StatusOverlay.cs     HUD badge (packs / conflicts / sprites / clips)
+            DevHub.cs            tabbed dev window (6 pillars, Alpha2–7 keybinds)
+            PackManagerWindow.cs pack list, profiles, conflict view, condition editor
+            AnimationController.cs  frame inspector
+            AudioLog.cs / AudioList.cs / TextLog.cs / DialogueEditor.cs / DevProfiler.cs
+            pillars/             Dashboard, Graphics, Text, Audio, Video, Performance
+
+packs/      PackManager.cs       discover, order, enable/disable, hot-reload
+            PackInfo.cs          metadata + DNF condition evaluator
+            PackCondition.cs     condition types (Scene, Crest, Nail, PlayerData, PackActive)
+            PackStats.cs         per-pack asset file counts (cached)
+
+util/       TexUtil.cs / T2DUtil.cs / SpriteUtil.cs / ConflictTracker.cs
+            PlayerDataCatalog.cs / GcUtil.cs / FileCache.cs / PackRamCache.cs
+            RawKeyboardLeakBlocker.cs / IOUtil.cs / StringUtil.cs / IsExternalInit.cs
+
+watchers/   SpriteFileWatcher.cs / AudioFileWatcher.cs / TextFileWatcher.cs
+
+docs/       design notes, changelogs, feature checklists, tech sheets
+assetbundle/  patchwork.assetbundle (Rotate.shader)
+```
+
+**Namespaces**: `Patchwork` · `Patchwork.Handlers` · `Patchwork.GUI` ·
+`Patchwork.GUI.Pillars` · `Patchwork.Packs` · `Patchwork.Util` · `Patchwork.Watchers`
 
 ---
 
 ## Core Architecture
 
-### tk2d Sprite Replacement (`SpriteLoader.cs`)
+### tk2d Sprites (`SpriteLoader.cs`)
 
-The game uses 2D Toolkit: each `tk2dSpriteCollectionData` owns one or more `Material`s
-whose `mainTexture` is a packed atlas. Patchwork composites replacement sprites directly
-onto `RenderTexture` copies of those atlases.
+Each `tk2dSpriteCollectionData` owns `Material`s whose `mainTexture` is a packed atlas.
+Patchwork composites replacements directly onto `RenderTexture` copies.
 
-**Key data structures** (all static, never freed):
+**Static state (never freed)**:
 ```
-_originalTextures[collection][material]    RenderTexture — vanilla backup, baked once
-LoadedAtlasesTextures[collection][material] RenderTexture — custom atlas (mat.mainTexture)
-LoadedAtlases[collection]                  HashSet<string> — materials processed this cycle
-LoadedSprites[collection][material]        HashSet<string> — sprites drawn this cycle
-_spriteFileIndex / _sheetFileIndex         case-insensitive path → (fullPath, packName)
+_originalTextures[coll][mat]       RenderTexture — vanilla backup, baked once
+LoadedAtlasesTextures[coll][mat]   RenderTexture — custom atlas (= mat.mainTexture)
+LoadedAtlases[coll]                HashSet<string> — materials processed this cycle
+LoadedSprites[coll][mat]           HashSet<string> — sprites drawn this cycle
+_spriteFileIndex / _sheetFileIndex case-insensitive path → (fullPath, packName)
 ```
 
-**Lifecycle per `Reload()`**:
-1. `RebuildFileIndex()` — re-scan all pack dirs
-2. Clear `LoadedAtlases` and `LoadedSprites` (not `LoadedAtlasesTextures`)
-3. `FindObjectsOfTypeAll<tk2dSpriteCollectionData>()` → `LoadCollection` each
+**`Reload()` cycle**: rebuild file index → clear `LoadedAtlases`/`LoadedSprites` (not
+`LoadedAtlasesTextures`) → `FindObjectsOfTypeAll<tk2dSpriteCollectionData>` → `LoadCollection` each.
 
 **`LoadCollection` per material**:
-1. If `mat.mainTexture` is not yet an RT → blit into new vanilla backup RT (once ever)
-2. If backup RT missing → skip (will retry when `Init()` fires)
-3. If material not yet processed this cycle → find custom spritesheet, blit into atlas RT
-   (reuse existing RT in-place; only reallocate on dimension change)
-4. Draw individual custom sprites on top using `Graphics.DrawTextureImpl`
-5. `Destroy(spriteTex)` immediately after draw (prevents GPU texture leak)
+1. First encounter (non-RT texture): blit vanilla → persistent backup RT
+2. Backup missing → skip (retry on next `Init()`)
+3. First pass this cycle: find custom spritesheet → blit into atlas RT (reuse in-place)
+4. Draw individual sprites with `Graphics.DrawTextureImpl`
+5. `Destroy(spriteTex)` immediately after draw
 
-**Critical invariant**: `LoadedAtlasesTextures` is **never cleared**. RTs are reused
-in-place so `mat.mainTexture` always points to a live object, regardless of which
-collections `FindObjectsOfTypeAll` happens to return.
+**Invariants**:
+- `LoadedAtlasesTextures` is **never cleared** — RTs reused in-place, `mat.mainTexture` always valid
+- `_originalTextures` stores **`RenderTexture`**, not raw `Texture` — survives `AssetBundle.Unload(true)`
 
-**Critical invariant**: `_originalTextures` stores **`RenderTexture`**, not raw `Texture`.
-Runtime RTs survive `AssetBundle.Unload(true)`; raw Texture references become fake-null
-after bundle unload, causing silent transparent blits.
-
-### Texture2D Replacement (`T2DLoader.cs` + `T2DSpritesheets.cs`)
-
-Two modes:
+### Texture2D Sprites (`T2DLoader.cs` + `T2DSpritesheets.cs`)
 
 | Mode | Trigger | Mechanism |
 |---|---|---|
-| Spritesheet override | replacement PNG matches texture name | `tex.LoadImage()` in-place |
-| Individual sprite | replacement PNG matches sprite name | new `Sprite` object, set on renderers |
+| Spritesheet | replacement PNG matches clean texture name | `tex.LoadImage()` in-place |
+| Individual | replacement PNG matches sprite name | new `Sprite`, set on renderers |
 
-T2D textures are identified by format suffix in name (`-BC7-`, `DXT5|BC3-`). The
-"clean name" strips the suffix and hash, e.g.:
-`sactx-0-2048x2048-BC7-Hornet-abc123` → `Hornet`
-
-Vanilla texture bytes are captured before the first swap (blit → RT → ReadPixels →
-EncodeToPNG) and stored in `_originalTextureData[texName]`. Pack disable calls
-`tex.LoadImage(vanillaBytes)` to restore.
-
-Harmony patches (`T2DHandler.cs`) intercept `SpriteRenderer.sprite`, `Image.sprite`,
-and `Material.mainTexture` setters to apply replacements inline.
+Clean name: strip format suffix + hash (`sactx-0-2048x2048-BC7-Hornet-abc123` → `Hornet`).
+Sprite key: `cleanTexName/spriteName` (prevents cross-atlas collisions).
+Vanilla bytes captured before first swap → `_originalTextureData[texName]` → `LoadImage()` on revert.
+Harmony patches intercept `SpriteRenderer.sprite`, `Image.sprite`, `Material.mainTexture` setters.
 
 ### Audio (`AudioHandler.cs`)
 
-Patches `AudioSource.PlayHelper` and `PlayOneShotHelper`. On first play of a clip,
-checks `_soundIndex` for a replacement file. Loads via `UnityWebRequest` (sync wait).
-`_originalClips` captures vanilla clip before first override for revert on disable.
+Patches `AudioSource.PlayHelper` / `PlayOneShotHelper`. Loads replacements via
+`UnityWebRequest` (sync) on first play. `_originalClips` holds vanilla for revert.
 
 ### Video (`VideoHandler.cs`)
 
-Patches `EmbeddedCinematicVideoPlayer` constructor and `CinematicPlayer.StartVideo`.
-Sets `videoPlayer.url = "file:///" + localPath`. Supported formats: `.mp4 .webm .ogv
-.mov .avi .m4v .mpg .mpeg .wmv`. `VideoFileMap` rebuilt on startup and pack change.
+Patches `EmbeddedCinematicVideoPlayer` + `CinematicPlayer.StartVideo`. Sets
+`videoPlayer.url = "file:///" + path`. Formats: `.mp4 .webm .ogv .mov .avi .m4v
+.mpg .mpeg .wmv`. `VideoFileMap` rebuilt on startup and pack change.
 
 ### Text (`DialogueHandler.cs`)
 
-Patches `Language.Get(key, sheet)`. Override files at
-`Text/[Sheet]/[LANG].yml` (simple `KEY: "value"` YAML). Stale key detection warns when
-an override key is never requested during a session.
+Patches `Language.Get(key, sheet)`. YAML at `Text/[Sheet]/[LANG].yml`. Load order:
+root `Patchwork/Text/` first, then active packs in priority order (later overwrites
+earlier). See `docs/text-replacement.md` for full details and known watcher bug.
 
 ---
 
 ## Pack System
 
-### Discovery
+**Discovery**: Thunderstore (`BepInEx/plugins/*/Patchwork/`) + local (`Patchwork/Packs/*/`).
+Patchwork's own folder is excluded from pack discovery.
 
-Two sources, both scanned at startup and on Rescan:
-- **Thunderstore packs**: `BepInEx/plugins/*/Patchwork/` (parent dir name = pack name)
-- **Local packs**: `Patchwork/Packs/*/`
-
-### State Files (next to `Patchwork.dll`)
+**State files** (next to `Patchwork.dll`):
 
 | File | Content |
 |---|---|
-| `packs.txt` | `+\|/abs/path` or `-\|/abs/path` per line |
-| `packs-conditions.txt` | tab-delimited: `path\tcondition\|condition\|...` |
+| `packs.txt` | `+\|/path` or `-\|/path` per line |
+| `packs-conditions.txt` | `path\ttrigger\tcond\|cond...` |
 | `packs-stats.txt` | cached asset file counts |
-| `Profiles/[Name].txt` | saved pack configurations |
+| `Profiles/[Name].txt` | saved configurations |
 
-### Conditions (`PackCondition.cs`)
+**Conditions** (DNF — OR of AND groups):
 
-Conditions use Disjunctive Normal Form (OR of AND groups). Types:
-
-| Type | Meaning |
+| Type | Match |
 |---|---|
-| `Scene` | exact scene name |
-| `SceneContains` | scene name substring |
-| `PackActive` | another pack is enabled |
-| `CrestEquipped` | player crest ID (base name or variant) |
-| `NailUpgrade` | nail level with operators (`>=`, `<=`, `>`, `<`, or exact name) |
+| `Scene` / `SceneContains` | exact / substring scene name |
+| `PackActive` | another pack enabled |
+| `CrestEquipped` | player crest ID |
+| `NailUpgrade` | nail level (`>=` `<=` `>` `<` or exact name) |
 | `PlayerData` | any `PlayerData` field/property via reflection |
 
-Serialisation: `type|negate|join|value` (pipe-delimited, one per condition).
-
-### Pack Changes
-
-`PackManager.Apply(staged)` → `TriggerFullReload()` → calls each handler's `Reload()`.
-Hot-reload conditions polled every ~2 s in `Plugin.Update()`.
+Serialisation: `type|negate|join|value`. `PackManager.Apply(staged)` →
+`TriggerFullReload()` → all handlers' `Reload()`.
 
 ---
 
 ## GUI
 
-### Scaling
-
-All sizes and positions use `GUIHelper.Scaled(n)` or `GUIHelper.ScaledRect(...)`.
-Base resolution is 1080p height. Scale clamped 0.75×–2.5×. Styles (`GUIHelper.Window`,
-`GUIHelper.Button`, etc.) are recalculated whenever font size changes.
-
-### Input Blocking
-
-`GUIHelper` tracks focused IMGUI control name. When a text field has focus, all
-`InputSystem` action maps are disabled via reflection so game hotkeys don't fire
-during typing. Restored on blur or plugin destroy.
-`RawKeyboardLeakBlocker` handles the raw keyboard path.
-
-### Status Overlay
-
-Bottom-left HUD badge. Click opens Pack Manager.
-Persisted across sessions via `PatchworkConfig._ShowStatusOverlay` (`ConfigEntry<bool>`).
-Access via `Plugin.ShowStatusOverlay` property (get/set auto-saves to disk).
-
-### Pack Manager
-
-Staged editing model: user edits are applied to `_staged` list; nothing changes until
-"Apply" is clicked. "Discard" reverts `_staged` to current live state.
+- **Scaling**: `GUIHelper.Scaled(n)` / `ScaledRect(...)`. Base 1080p, clamped 0.75×–2.5×.
+- **Input blocking**: text field focus → all `InputSystem` action maps disabled via reflection. `RawKeyboardLeakBlocker` handles the raw keyboard path.
+- **Status overlay**: bottom-left HUD badge, click opens Pack Manager. Persisted via `ConfigEntry<bool>` → `Plugin.ShowStatusOverlay` property.
+- **Pack Manager**: staged edits in `_staged`; nothing applies until "Apply" clicked.
 
 ---
 
 ## Hot Reload
 
-File watchers run on background threads and set boolean flags (`ReloadSprites`,
-`ReloadAudio`, `ReloadText`, `ReloadVideos`). `Plugin.Update()` checks these flags each
-frame and calls the appropriate handler `Reload()` on the main thread.
+File watchers (background threads) set boolean flags. `Plugin.Update()` checks each
+frame and dispatches to handler `Reload()` on main thread.
+
+```
+SpriteFileWatcher.ReloadSprites    → SpriteLoader.Reload()
+SpriteFileWatcher.ReloadT2DSprites → T2DLoader.ReloadSpritesInScene()
+AudioFileWatcher.ReloadAudio       → AudioHandler.Reload()
+TextFileWatcher.ReloadText         → DialogueHandler.Reload()
+VideoHandler.ReloadVideos          → VideoHandler.Reload()
+```
+
+**Known issue**: `TextFileWatcher.PackWatchers` is built once at startup. Packs enabled
+after startup have no watcher on their `Text/` dirs. Fix in `docs/text-replacement.md`.
 
 ---
 
 ## Memory Rules
 
-These are non-negotiable. Violating them causes hard-to-reproduce VRAM leaks or
-transparent/missing textures after long sessions.
+Non-negotiable. Violations cause VRAM leaks or missing textures after long sessions.
 
-1. **Never store a raw `Texture` reference long-term.** `AssetBundle.Unload(true)` can
-   destroy the native object, leaving a fake-null C# reference. Always blit into a
-   runtime-created `RenderTexture` for any backup that must outlive the frame.
-
-2. **Always `Destroy(tex)` after blitting a temporary `Texture2D`.** `LoadFromPNG`
-   creates a `Texture2D` with `DontUnloadUnusedAsset`. If not destroyed, every
-   `Reload()` permanently leaks one GPU texture per sprite.
-
-3. **`DontUnloadUnusedAsset` only blocks `Resources.UnloadUnusedAssets()`.** It does
-   NOT protect against `AssetBundle.Unload(true)`. Use runtime RTs for long-lived data.
-
-4. **`Object.Destroy` is safe to call immediately after submitting draw commands.**
-   The GPU has finished reading by end-of-frame.
-
-5. **Instance ID sets (`ReplacedTextureIds`, `SkippedTextureIds`) must be cleared on
-   scene unload.** Unity recycles instance IDs; stale entries cause missed replacements.
-
-6. **`LoadedAtlasesTextures` is never cleared.** Reuse RTs in-place. Destroying an RT
-   that `mat.mainTexture` points to produces a one-frame transparent flash that can
-   persist on scene-scoped collections not present in the next `FindObjectsOfTypeAll`.
+1. **Never store a raw `Texture` long-term.** `AssetBundle.Unload(true)` destroys the
+   native object → fake-null C# ref → silent transparent blits. Use `RenderTexture`.
+2. **`Destroy(tex)` after every temporary `Texture2D` blit.** `DontUnloadUnusedAsset`
+   prevents GC eviction but not accumulation — every `Reload()` leaks one per sprite.
+3. **`DontUnloadUnusedAsset` ≠ `AssetBundle.Unload(true)` protection.** Only blocks
+   `Resources.UnloadUnusedAssets()`.
+4. **`Object.Destroy` is safe immediately after draw commands.** GPU finishes by end-of-frame.
+5. **Clear instance ID sets on scene unload.** Unity recycles IDs; stale entries cause
+   missed replacements.
+6. **`LoadedAtlasesTextures` is never cleared.** Reuse RTs in-place.
 
 ---
 
-## Harmony Patching Conventions
+## Harmony Conventions
 
-- Apply patches in handler `ApplyPatches(Harmony harmony)` called from `Plugin.Awake()`
-- Prefix = intercept before game code (can skip original with `return false`)
-- Postfix = run after game code (mutate `__result` or trigger side-effects)
-- Never use `__instance` fields that may be null; null-check defensively
-- Deferred patches (requiring game state) go in a startup coroutine in `Plugin.cs`
+- Patches applied in `ApplyPatches(Harmony)` from `Plugin.Awake()`
+- Prefix: intercept before game code (skip original with `return false`)
+- Postfix: run after game code (mutate `__result`, trigger side-effects)
+- Null-check `__instance` defensively
+- Deferred patches (need game state) go in `AwakeDelayed` coroutine
 
 ---
 
-## Asset File Layout (inside a pack)
+## Asset Layout (inside a pack)
 
 ```
 PackRoot/
-  Sprites/[CollectionName]/[MaterialName]/[SpriteName].png   individual tk2d sprites
-  Spritesheets/[CollectionName]/[MaterialName].png           full atlas override
-  Sounds/[ClipName].ogg  (or .wav, .mp3, .aiff)             audio replacement
-  Videos/[CinematicName].mp4  (or .webm, .ogv, etc.)        video replacement
-  Text/[Sheet]/[LANG].yml                                    text overrides
+  Sprites/[CollectionName]/[MaterialName]/[SpriteName].png
+  Spritesheets/[CollectionName]/[MaterialName].png
+  Sounds/[ClipName].ogg  (.wav .mp3 .aiff)
+  Videos/[CinematicName].mp4  (.webm .ogv .mov .avi .m4v .mpg .mpeg .wmv)
+  Text/[Sheet]/[LANG].yml
 ```
 
-File index keys are **normalised to forward slashes and case-insensitive**.
+File index keys: normalised to forward slashes, case-insensitive.
 
 ---
 
 ## Key Conventions
 
-- **Sprite key format** (T2D): `cleanTexName/spriteName` — prevents collisions across
-  atlas variants that share sprite names.
-- **Material name abbreviation**: `mat.name.Split(' ')[0]` used for file lookup keys
-  (Unity appends ` (Instance)` etc.).
-- **Conflict tracking**: call `ConflictTracker.Record(type, key, winnerPack, loserPack)`
-  whenever a later pack would override a key already claimed by a higher-priority pack.
-- **Logging prefix convention**: `[ClassName] message` — e.g., `[SpriteLoader] Reload complete`.
-- **No `FindObjectsOfType` on hot paths** (expensive). Cache results or use tracked sets.
-- **No `Resources.Load` for user assets** — all user content is loaded from explicit
-  file paths, never from the Unity asset database.
+- **Material name**: `mat.name.Split(' ')[0]` for lookup keys (Unity appends ` (Instance)`)
+- **Conflict tracking**: `ConflictTracker.Record(type, key, winner, loser)` on every override collision
+- **Log prefix**: `[ClassName] message`
+- **No `FindObjectsOfType` on hot paths** — cache results
+- **No `Resources.Load` for user assets** — always explicit file paths
 
 ---
 
-## Build
-
-```bash
-dotnet build Patchwork.csproj -c Release
-```
-
-Output: `bin/Release/netstandard2.1/Patchwork.dll`
-No CI config in this repo. Deploy by copying DLL + `patchwork.assetbundle` +
-`manifest.json` into `BepInEx/plugins/Patchwork/`.
-
----
-
-## Recent Work (last significant commits)
+## Recent Commits
 
 | Commit | Change |
 |---|---|
-| `ace4d28` | `_originalTextures` → backup RenderTextures (survive `AssetBundle.Unload`) |
-| `bf2f59d` | Destroy sprite Texture2D after blit (fix GPU leak → hard-restart failure) |
-| `771d4f5` | `ShowStatusOverlay` backed by `ConfigEntry<bool>` (persist across sessions) |
+| `ace4d28` | `_originalTextures` → backup RTs (survive `AssetBundle.Unload`) |
+| `bf2f59d` | Destroy sprite Texture2D after blit (fix GPU leak / hard-restart failure) |
+| `771d4f5` | `ShowStatusOverlay` → `ConfigEntry<bool>` (persist HUD toggle) |
 | `cd6117f` | `VideoHandler.Reload()` + eager video scan on startup and pack change |
-| `c0d2407` | T2D individual sprite revert: protect vanilla sprite with `DontUnloadUnusedAsset` |
+| `c0d2407` | T2D vanilla sprite `DontUnloadUnusedAsset` (fix revert failure) |
 | `6a6f28a` | tk2d atlas RT reuse in-place (fix all-objects transparency on toggle) |
 
 ---
 
-## Open / In-Progress Design Areas
+## Open Design Areas
 
-- **Conditional sprite system**: pre-bake N variant RTs per material; activate via
-  pointer swap (`mat.mainTexture = variantRT`). Zero GPU cost at condition-switch time.
-  Candidate map: `conditionKey → collection → material → spriteName → byte[]` with
-  lazy compositing on condition change.
-- **Apply/Revert as pointer swaps**: separate baking from activation so pack ON/OFF
-  becomes `mat.mainTexture = customRT` / `mat.mainTexture = vanillaRT` instead of a
-  full blit cycle. `_originalTextures` (vanilla RT) and `LoadedAtlasesTextures` (custom
-  RT) are already both in memory — just need the control-flow split.
+- **Conditional sprite system**: pre-bake N variant RTs per material; condition switch =
+  pointer swap (`mat.mainTexture = variantRT`), zero GPU cost. Candidate map:
+  `conditionKey → collection → material → spriteName → byte[]`, composited lazily on change.
+  Multiple active conditions composited additively; priority resolves per-sprite conflicts.
+- **Apply/Revert as pointer swaps**: `_originalTextures` (vanilla RT) and
+  `LoadedAtlasesTextures` (custom RT) are both in memory — pack ON/OFF should be a
+  pointer swap, not a blit cycle. Needs `Bake()` / `SetActive(bool)` split in `SpriteLoader`.
