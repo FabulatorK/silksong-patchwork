@@ -21,6 +21,7 @@ public static class PackManagerWindow
     private static Rect    _windowRect;
     private static bool    _initialized;
     private static Vector2 _scroll;
+    private static Vector2 _profilesScroll;
     private static string  _profileNameInput = "";
 
     // Staged list — null means no pending changes, non-null means user has unsaved edits.
@@ -130,6 +131,14 @@ public static class PackManagerWindow
 
             GUIHelper.Space(6);
             DrawPinButton();
+            GUIHelper.Space(4);
+
+            // Close button — consistent with DevHub
+            Color prevClose = UnityEngine.GUI.backgroundColor;
+            UnityEngine.GUI.backgroundColor = new Color(0.45f, 0.18f, 0.18f);
+            if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(26), GUIHelper.Height(22)))
+                Plugin.ShowPackManager = false;
+            UnityEngine.GUI.backgroundColor = prevClose;
         }
         GUILayout.EndHorizontal();
     }
@@ -286,10 +295,8 @@ public static class PackManagerWindow
             }
 
             // ── Inline condition editor ───────────────────────────
-            var livePackForEditor = PackManager.AllPacks.FirstOrDefault(p =>
-                string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
-            if (livePackForEditor != null && _conditionsOpen.Contains(pack.Path))
-                DrawConditionEditor(livePackForEditor);
+            if (livePack != null && _conditionsOpen.Contains(pack.Path))
+                DrawConditionEditor(livePack);
         }
         GUILayout.EndVertical();
 
@@ -742,6 +749,10 @@ public static class PackManagerWindow
         var names = PackManager.GetProfileNames();
         if (names.Length > 0)
         {
+            _profilesScroll = GUILayout.BeginScrollView(
+                _profilesScroll, false, false,
+                UnityEngine.GUI.skin.horizontalScrollbar, GUIStyle.none,
+                GUIHelper.Height(28));
             GUILayout.BeginHorizontal();
             foreach (var name in names)
             {
@@ -754,6 +765,7 @@ public static class PackManagerWindow
                     PackManager.DeleteProfile(name);
             }
             GUILayout.EndHorizontal();
+            GUILayout.EndScrollView();
         }
         else
         {
