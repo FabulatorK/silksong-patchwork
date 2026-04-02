@@ -183,6 +183,14 @@ public static class AudioHandler
 
             OnAudioSourceLoaded?.Invoke(source);
         }
+
+        // Eagerly preload every replacement clip in the index, even those not currently
+        // assigned to any live AudioSource. Coroutines start in the background; by the time
+        // the player triggers the action (silk spear cast, etc.), the clip is already cached
+        // in LoadedClips and LoadAudio() will apply it instantly instead of queuing a load
+        // that forces vanilla to play first.
+        foreach (var clipName in _soundIndex.Keys)
+            EnqueueLoad(clipName);
     }
 
     private static void RebuildSoundIndex()
