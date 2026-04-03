@@ -54,6 +54,19 @@ public static partial class T2DLoader
     /// <summary>True while a harmony setter or enforcement sweep is in progress.</summary>
     public static bool IsHandlingOrEnforcing => _handling || _enforcing;
 
+    /// <summary>
+    /// Set by GraphicsPillar when the T2D or T2D-Log sub-tab is visible.
+    /// Gates all trigger-logging work; a single bool check in the hot setter path.
+    /// Reset to false at the top of Plugin.OnGUI so it goes dark when DevHub closes.
+    /// </summary>
+    public static bool IsT2DLogActive;
+
+    /// <summary>
+    /// Fired (main thread, only when <see cref="IsT2DLogActive"/>) on every sprite or
+    /// T2D-texture setter invocation.  Args: (cleanTexName, spriteName-or-empty).
+    /// </summary>
+    public static event System.Action<string, string> OnT2DTrigger;
+
     // Read-only stats for GUI
     public static int SpritesheetOverrideCount => SpritesheetOverrides.Count;
     public static int LoadedT2DSpriteCount => _loadedSprites.Count;

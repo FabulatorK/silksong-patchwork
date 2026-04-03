@@ -24,6 +24,10 @@ public static class T2DHandler
 
         T2DLoader.TrackRenderer(__instance);  // always track for T2D browser
 
+        if (T2DLoader.IsT2DLogActive && value.texture != null)
+            T2DLoader.OnT2DTrigger?.Invoke(
+                T2DUtil.CleanTextureName(value.texture.name), value.name);
+
         if (!T2DLoader.HasT2DReplacements)
             return;
 
@@ -42,6 +46,10 @@ public static class T2DHandler
 
         T2DLoader.TrackImage(__instance);  // always track for T2D browser
 
+        if (T2DLoader.IsT2DLogActive && value.texture != null)
+            T2DLoader.OnT2DTrigger?.Invoke(
+                T2DUtil.CleanTextureName(value.texture.name), value.name);
+
         if (!T2DLoader.HasT2DReplacements)
             return;
 
@@ -52,15 +60,18 @@ public static class T2DHandler
     [HarmonyPatch(typeof(Material), nameof(Material.mainTexture), MethodType.Setter)]
     public static void SetMaterialTexturePostfix(Texture value)
     {
-        if (!T2DLoader.HasT2DReplacements)
-            return;
+        if (!(value is Texture2D tex)) return;
 
-        if (value is Texture2D tex)
-        {
-            T2DLoader.TrySwapTexture(tex);
+        // Log T2D-named texture assignments for the discovery log.
+        // Filtered to T2D textures only — plain UI/FX materials produce too much noise.
+        if (T2DLoader.IsT2DLogActive && T2DUtil.IsT2DTexture(tex.name))
+            T2DLoader.OnT2DTrigger?.Invoke(T2DUtil.CleanTextureName(tex.name), "");
 
-            if (Plugin.Config.DumpSprites && T2DUtil.IsT2DTexture(tex.name))
-                T2DDumper.DumpAtlasTexture(tex);
-        }
+        if (!T2DLoader.HasT2DReplacements) return;
+
+        T2DLoader.TrySwapTexture(tex);
+
+        if (Plugin.Config.DumpSprites && T2DUtil.IsT2DTexture(tex.name))
+            T2DDumper.DumpAtlasTexture(tex);
     }
 }

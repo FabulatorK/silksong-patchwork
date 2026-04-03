@@ -142,6 +142,7 @@ public class Plugin : BaseUnityPlugin
         DialogueHandler.OnTextAccessed += (sheet, key, text) => { if (ShowDevHub) DialogueEditor.TrackText(sheet, key, text); };
         AudioHandler.OnAudioPlayed    += clip   => AudioLog.LogAudio(clip);
         AudioHandler.OnAudioSourceLoaded += src => AudioList.LogAudio(src);
+        T2DLoader.OnT2DTrigger        += (tex, sprite) => T2DLog.LogTrigger(tex, sprite);
 
         RawKeyboardLeakBlocker.ApplyPatches(harmony);
 
@@ -215,6 +216,9 @@ public class Plugin : BaseUnityPlugin
     private void OnGUI()
     {
         GUIHelper.BeginOnGUI();
+
+        // Reset T2D log gate each pass — GraphicsPillar re-enables it if the T2D tab is visible.
+        T2DLoader.IsT2DLogActive = false;
 
         // ── New unified UI ────────────────────────────────────────────────────
         if (ShowStatusOverlay)

@@ -27,15 +27,47 @@ public static class T2DTextureController
     private static Vector2 _listScroll;
     private static Vector2 _spriteScroll;
 
+    // Pending selection queued by SelectEntry() — applied on the next draw pass once
+    // _entries is up to date.
+    private static string _pendingSelectTex    = null;
+    private static string _pendingSelectSprite = null;
+
     // Small reusable 1×1 white texture for highlight overlays
     private static Texture2D _white;
 
     // ── Public entry point ───────────────────────────────────────────────────
 
+    /// <summary>
+    /// Queues a selection by clean texture name and optional sprite name.
+    /// Applied on the next draw pass; triggers a refresh so the entry list is current.
+    /// Called from GraphicsPillar's T2D Log when the user clicks an entry.
+    /// </summary>
+    public static void SelectEntry(string cleanTexName, string spriteName)
+    {
+        _pendingSelectTex    = cleanTexName;
+        _pendingSelectSprite = spriteName ?? "";
+        _needsRefresh        = true;
+    }
+
     public static void DrawPillarContent()
     {
         if (_needsRefresh)
             Refresh();
+
+        // Apply any pending selection queued by SelectEntry() / T2D Log clicks.
+        if (_pendingSelectTex != null)
+        {
+            var match = _entries.Find(e =>
+                string.Equals(e.CleanName, _pendingSelectTex, System.StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                _selected       = match;
+                _hasSelection   = true;
+                _selectedSprite = _pendingSelectSprite;
+            }
+            _pendingSelectTex    = null;
+            _pendingSelectSprite = null;
+        }
 
         GUILayout.BeginHorizontal();
         DrawListPane();
