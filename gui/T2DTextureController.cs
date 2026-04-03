@@ -190,19 +190,40 @@ public static class T2DTextureController
 
         var entry = _selected;
 
-        // ── Atlas preview ────────────────────────────────────────────────────
-        float previewH = GUIHelper.Scaled(180f);
-        Rect previewRect = GUILayoutUtility.GetRect(0f, float.MaxValue, previewH, previewH);
+        // ── Preview row: atlas (always) + sprite crop (when sprite selected) ───
+        float previewH   = GUIHelper.Scaled(180f);
+        float spriteColW = GUIHelper.Scaled(150f);
+        bool  hasSprSel  = !string.IsNullOrEmpty(_selectedSprite);
 
+        GUILayout.BeginHorizontal();
+
+        // Left — full atlas with UV highlight
+        GUILayout.BeginVertical(GUILayout.ExpandWidth(true));
+        Rect atlasRect = GUILayoutUtility.GetRect(0f, float.MaxValue, previewH, previewH);
         if (entry.NativeTexture != null)
         {
-            UnityEngine.GUI.DrawTexture(previewRect, entry.NativeTexture, ScaleMode.ScaleToFit, true);
+            UnityEngine.GUI.DrawTexture(atlasRect, entry.NativeTexture, ScaleMode.ScaleToFit, true);
+            if (hasSprSel)
+                DrawSpriteHighlight(atlasRect, entry, _selectedSprite);
+        }
+        UnityEngine.GUI.contentColor = new Color(0.5f, 0.5f, 0.5f);
+        GUILayout.Label("Atlas", GUIHelper.LabelStyle);
+        UnityEngine.GUI.contentColor = Color.white;
+        GUILayout.EndVertical();
 
-            // UV highlight for selected sprite
-            if (!string.IsNullOrEmpty(_selectedSprite))
-                DrawSpriteHighlight(previewRect, entry, _selectedSprite);
+        // Right — cropped sprite preview (only when a sprite is selected)
+        if (hasSprSel)
+        {
+            GUILayout.BeginVertical(GUIHelper.Width(spriteColW));
+            Rect spriteRect = GUILayoutUtility.GetRect(spriteColW, spriteColW, previewH, previewH);
+            DrawSpritePreview(spriteRect, entry, _selectedSprite);
+            UnityEngine.GUI.contentColor = new Color(0.5f, 0.5f, 0.5f);
+            GUILayout.Label("Sprite", GUIHelper.LabelStyle);
+            UnityEngine.GUI.contentColor = Color.white;
+            GUILayout.EndVertical();
         }
 
+        GUILayout.EndHorizontal();
         GUIHelper.Space(4);
 
         // ── Info row ─────────────────────────────────────────────────────────
@@ -288,6 +309,36 @@ public static class T2DTextureController
         UnityEngine.GUI.color = new Color(1f, 1f, 0f, 0.35f);
         UnityEngine.GUI.DrawTexture(highlight, _white);
         UnityEngine.GUI.color = Color.white;
+    }
+
+    /// <summary>
+    /// Draws a cropped view of <paramref name="spriteName"/> inside <paramref name="rect"/>.
+    /// Uses GUI.DrawTextureWithTexCoords so only the sprite's region of the atlas is rendered,
+    /// scaled to fill the rect while preserving aspect ratio.
+    /// </summary>
+    private static void DrawSpritePreview(Rect rect, T2DSceneEntry entry, string spriteName)
+    {
+        Sprite s = T2DLoader.FindSceneSprite(entry.CleanName, spriteName);
+        if (s == null || s.texture == null)
+        {
+            UnityEngine.GUI.contentColor = new Color(0.45f, 0.45f, 0.45f);
+            UnityEngine.GUI.DrawTexture(rect, Texture2D.blackTexture, ScaleMode.StretchToFill);
+            UnityEngine.GUI.contentColor = Color.white;
+            return;
+        }
+
+        float tw = s.texture.width;
+        float th = s.texture.height;
+        if (tw <= 0 || th <= 0) return;
+
+        // textureRect is in pixel coords with Y=0 at bottom (Unity convention).
+        // DrawTextureWithTexCoords also uses that convention, so no Y-flip needed.
+        Rect tr = s.textureRect;
+        Rect uvRect = new Rect(tr.x / tw, tr.y / th, tr.width / tw, tr.height / th);
+
+        // Scale the draw rect to preserve sprite aspect ratio (letterbox within the column)
+        Rect fitted = ScaleToFitRect(rect, (int)tr.width, (int)tr.height);
+        UnityEngine.GUI.DrawTextureWithTexCoords(fitted, s.texture, uvRect, true);
     }
 
     /// <summary>Computes the inner rect that ScaleMode.ScaleToFit would occupy.</summary>

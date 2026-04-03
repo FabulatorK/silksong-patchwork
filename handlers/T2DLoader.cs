@@ -178,8 +178,14 @@ public static partial class T2DLoader
 
             if (byCleanName.TryGetValue(clean, out var existing))
             {
+                // Always merge sprite names into the existing list (it's a reference, mutations persist).
                 foreach (var s in names)
                     if (!existing.sprites.Contains(s)) existing.sprites.Add(s);
+                // Prefer the LARGEST texture — multiple Texture2D instances can share a clean name
+                // (e.g. Inventory: one per-renderer copy and one full atlas). The full atlas has the
+                // most pixels; keeping it ensures the browser preview shows the atlas, not a crop.
+                if (tex.width * tex.height > existing.tex.width * existing.tex.height)
+                    byCleanName[clean] = (tex, tex.name, existing.sprites, existing.isT2D);
             }
             else
             {
