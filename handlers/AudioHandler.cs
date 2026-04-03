@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -60,6 +61,41 @@ public static class AudioHandler
             AccessTools.PropertySetter(typeof(AudioSource), nameof(AudioSource.clip)),
             postfix: new HarmonyMethod(typeof(AudioHandler), nameof(ClipSetterPatch))
         );
+
+        // ── Needolin-specific patches ─────────────────────────────────────────
+        // The Needolin loop uses OverrideNeedolinLoop.StartSyncedAudio(AudioSource, AudioClip)
+        // instead of the standard AudioSource.Play() family.  Our PlayHelperPatch never fires
+        // for it, so the synced system starts with the vanilla clip and schedules its next cycle
+        // based on that clip's length — causing the ~10s cut-and-restart when the replacement
+        // has a different length.  A prefix lets us swap synchronously before the scheduler sees it.
+        var needolinLoopType = AccessTools.TypeByName("OverrideNeedolinLoop");
+        if (needolinLoopType != null)
+        {
+            var startSyncedAudio = AccessTools.Method(needolinLoopType, "StartSyncedAudio",
+                [typeof(AudioSource), typeof(AudioClip)]);
+            if (startSyncedAudio != null)
+                harmony.Patch(startSyncedAudio,
+                    prefix: new HarmonyMethod(typeof(AudioHandler), nameof(StartSyncedAudioPatch)));
+            else
+                Plugin.Logger.LogWarning("[Audio] OverrideNeedolinLoop.StartSyncedAudio(AudioSource, AudioClip) not found — Needolin loop replacement disabled");
+        }
+        else
+        {
+            Plugin.Logger.LogWarning("[Audio] OverrideNeedolinLoop type not found — Needolin loop replacement disabled");
+        }
+
+        // PlayMaker SetAudioClip.OnEnter covers the up/down Needolin variants
+        // (needolin_bell_beast_v2, needolin_alt_melodies_deep) and any other PM audio
+        // assignment.  ClipSetterPatch already fires downstream, but it's async; a prefix
+        // here makes the swap synchronous when the clip is already in LoadedClips.
+        var setAudioClipType = AccessTools.TypeByName("HutongGames.PlayMaker.Actions.SetAudioClip");
+        if (setAudioClipType != null)
+        {
+            var onEnter = AccessTools.Method(setAudioClipType, "OnEnter");
+            if (onEnter != null)
+                harmony.Patch(onEnter,
+                    prefix: new HarmonyMethod(typeof(AudioHandler), nameof(SetAudioClipOnEnterPatch)));
+        }
     }
 
     public static void PlayHelperPatch(AudioSource source, ulong delay)
@@ -88,6 +124,70 @@ public static class AudioHandler
             if (!_reverting &&
                 (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", ""))))
                 LoadAudio(__instance);
+        }
+    }
+
+    /// <summary>
+    /// Prefix for OverrideNeedolinLoop.StartSyncedAudio(AudioSource, AudioClip).
+    /// The synced loop passes the clip into a scheduler that reads its length to time
+    /// the next cycle — swapping after the fact (async) produces the wrong cycle length,
+    /// causing the cut-and-restart at ~10 s.  Swapping here (before the scheduler sees
+    /// the clip) fixes both the replacement and the loop timing in one step.
+    /// </summary>
+    public static void StartSyncedAudioPatch(AudioSource targetSource, ref AudioClip defaultClip)
+    {
+        if (defaultClip == null || string.IsNullOrEmpty(defaultClip.name)) return;
+        string clipName = defaultClip.name.Replace("PATCHWORK_", "");
+        if (!_soundIndex.ContainsKey(clipName)) return;
+
+        int id = targetSource != null ? targetSource.GetInstanceID() : -1;
+        if (id >= 0 && !defaultClip.name.StartsWith("PATCHWORK_") && !_originalClips.ContainsKey(id))
+            _originalClips[id] = defaultClip;
+
+        if (LoadedClips.TryGetValue(clipName, out var loaded))
+            defaultClip = loaded;
+        else
+            EnqueueLoad(clipName);
+        // If not yet loaded, vanilla plays this cycle; on the next StartSyncedAudio call
+        // the replacement will be in LoadedClips (eager preload runs at pack Apply time).
+    }
+
+    /// <summary>
+    /// Prefix for HutongGames.PlayMaker.Actions.SetAudioClip.OnEnter.
+    /// Covers the Needolin up/down variants and any other PlayMaker audio assignment.
+    /// ClipSetterPatch fires downstream regardless; this gives a synchronous fast-path
+    /// when the replacement is already cached, eliminating the one-trigger delay.
+    /// </summary>
+    public static void SetAudioClipOnEnterPatch(object __instance)
+    {
+        try
+        {
+            // Access audioClip field via reflection — avoids a hard compile-time reference
+            // to the PlayMaker assembly (which may not be present in all build configs).
+            var field = __instance.GetType().GetField("audioClip",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            if (field == null) return;
+
+            var fsmObj = field.GetValue(__instance);
+            if (fsmObj == null) return;
+
+            var valProp = fsmObj.GetType().GetProperty("Value");
+            if (valProp == null) return;
+
+            var clip = valProp.GetValue(fsmObj) as AudioClip;
+            if (clip == null || string.IsNullOrEmpty(clip.name)) return;
+
+            string clipName = clip.name;
+            if (!_soundIndex.ContainsKey(clipName)) return;
+
+            if (LoadedClips.TryGetValue(clipName, out var loaded))
+                valProp.SetValue(fsmObj, loaded);
+            else
+                EnqueueLoad(clipName);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Logger.LogWarning($"[Audio] SetAudioClipOnEnterPatch: {ex.Message}");
         }
     }
 
