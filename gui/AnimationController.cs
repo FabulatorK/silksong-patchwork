@@ -12,7 +12,7 @@ using UnityEngine;
 [HarmonyPatch]
 public static class AnimationController
 {
-    private static Vector2 scrollPosition = Vector2.zero;
+    private static Vector2 _listScroll = Vector2.zero;
 
     private const float MinWidth = 300f;
     private const float MinHeight = 200f;
@@ -223,12 +223,21 @@ public static class AnimationController
 
     #region GUI
     /// <summary>
-    /// Renders the animator list content without window chrome or scroll view.
-    /// Called by GraphicsPillar — the caller (GraphicsPillar) wraps this in a scroll view.
+    /// Two-section layout: scrollable animator list (top) + standalone frame preview (bottom).
+    /// GraphicsPillar must NOT wrap this in an additional scroll view.
     /// </summary>
     public static void DrawPillarContent()
     {
+        // ── Scrollable object list ────────────────────────────────────────────
+        _listScroll = GUILayout.BeginScrollView(_listScroll, GUILayout.ExpandHeight(true));
         DrawAnimatorEntries();
+        GUILayout.EndScrollView();
+
+        // ── Standalone frame preview ──────────────────────────────────────────
+        // Rendered outside the scroll so it stays anchored at the bottom regardless
+        // of how far the list is scrolled. Updates live with the current frame.
+        GUIHelper.Space(4);
+        DrawStandalonePreview();
     }
 
     private static void DrawAnimatorEntries()
@@ -243,27 +252,29 @@ public static class AnimationController
 
             if (animator.CurrentFrame < 0 || animator.CurrentFrame >= animator.CurrentClip.frames.Length)
                 continue;
+
             int currentSpriteId = animator.CurrentClip.frames[animator.CurrentFrame].spriteId;
             tk2dSpriteCollectionData spriteCollection = animator.CurrentClip.frames[animator.CurrentFrame].spriteCollection;
             if (spriteCollection == null || currentSpriteId < 0 || currentSpriteId >= spriteCollection.spriteDefinitions.Length)
                 continue;
             tk2dSpriteDefinition currentFrameDef = spriteCollection.spriteDefinitions[currentSpriteId];
 
-            if (SelectedAnimator == name)
-                GUI.contentColor = Color.green;
-            else
-                GUI.contentColor = Color.white;
-
+            // ── Object name button ────────────────────────────────────────────
+            GUI.contentColor = SelectedAnimator == name ? Color.green : Color.white;
             if (GUILayout.Button(name, GUIHelper.ButtonStyle))
                 SelectAnimator(animator);
+            GUI.contentColor = Color.white;
 
-            string fullPath = $"{spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}";
-            string displayPath = fullPath.Length > MaxPathLength
-                ? "..." + fullPath.Substring(fullPath.Length - MaxPathLength + 3)
-                : fullPath;
+            // ── Current sprite path: collection / spriteName (no material tier) ──
+            // The material/atlas changes per-frame when sprites span multiple atlases;
+            // displaying it here would imply the whole animation lives on one atlas.
+            // The standalone preview below shows the per-frame atlas name accurately.
+            string spritePath = $"{spriteCollection.name}/{currentFrameDef.name}";
+            if (spritePath.Length > MaxPathLength)
+                spritePath = "..." + spritePath.Substring(spritePath.Length - MaxPathLength + 3);
+            GUILayout.Label(spritePath, GUIHelper.LabelStyle);
 
-            GUILayout.Label(displayPath, GUIHelper.LabelStyle);
-
+            // ── Clip row ──────────────────────────────────────────────────────
             GUILayout.BeginHorizontal();
             GUIHelper.Space(48);
 
@@ -328,7 +339,6 @@ public static class AnimationController
                 GUILayout.Label("[PAUSED]", GUIHelper.LabelStyle);
                 GUI.contentColor = temp;
             }
-
             if (Frozen && SelectedAnimator == name)
             {
                 Color temp = GUI.contentColor;
@@ -338,74 +348,6 @@ public static class AnimationController
             }
             GUILayout.Label($"[Frame {animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]", GUIHelper.LabelStyle);
             GUILayout.EndHorizontal();
-
-            if (SelectedAnimator == name)
-            {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Edit Current Sprite", GUIHelper.ButtonStyle))
-                {
-                    string openPath = Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
-                    if (File.Exists(openPath))
-                        Process.Start(openPath);
-                    else
-                    {
-                        SpriteDumper.DumpSingleSprite(currentFrameDef, spriteCollection);
-                        string dumpedPath = Path.Combine(SpriteDumper.DumpPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0], currentFrameDef.name + ".png");
-                        if (!File.Exists(dumpedPath))
-                            Plugin.Logger.LogError($"Failed to dump sprite for editing: {spriteCollection.name}/{currentFrameDef.material.name.Split(' ')[0]}/{currentFrameDef.name}");
-                        else
-                        {
-                            IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, spriteCollection.name, currentFrameDef.material.name.Split(' ')[0]));
-                            File.Copy(dumpedPath, openPath, true);
-                            Process.Start(openPath);
-                        }
-                    }
-                }
-
-                if (GUILayout.Button("Edit All Animation Sprites", GUIHelper.ButtonStyle))
-                {
-                    var clip = animator.CurrentClip;
-                    int dumped = 0;
-                    for (int f = 0; f < clip.frames.Length; f++)
-                    {
-                        var frame = clip.frames[f];
-                        var frameCollection = frame.spriteCollection;
-                        if (frameCollection == null || frame.spriteId < 0 || frame.spriteId >= frameCollection.spriteDefinitions.Length)
-                            continue;
-                        var frameDef = frameCollection.spriteDefinitions[frame.spriteId];
-                        if (string.IsNullOrEmpty(frameDef.name))
-                            continue;
-                        string matname = frameDef.material.name.Split(' ')[0];
-                        string loadPath = Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname, frameDef.name + ".png");
-                        if (File.Exists(loadPath)) { dumped++; continue; }
-                        SpriteDumper.DumpSingleSprite(frameDef, frameCollection);
-                        string dumpPath2 = Path.Combine(SpriteDumper.DumpPath, frameCollection.name, matname, frameDef.name + ".png");
-                        if (!File.Exists(dumpPath2)) { Plugin.Logger.LogError($"Failed to dump sprite: {frameCollection.name}/{matname}/{frameDef.name}"); continue; }
-                        IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, frameCollection.name, matname));
-                        File.Copy(dumpPath2, loadPath, true);
-                        dumped++;
-                    }
-                    Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from animation '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
-
-                    for (int f2 = 0; f2 < clip.frames.Length; f2++)
-                    {
-                        var openFrame = clip.frames[f2];
-                        var openCollection = openFrame.spriteCollection;
-                        if (openCollection == null || openFrame.spriteId < 0 || openFrame.spriteId >= openCollection.spriteDefinitions.Length)
-                            continue;
-                        var openDef = openCollection.spriteDefinitions[openFrame.spriteId];
-                        if (string.IsNullOrEmpty(openDef.name)) continue;
-                        string openMatname = openDef.material.name.Split(' ')[0];
-                        string openPath2 = Path.Combine(SpriteLoader.LoadPath, openCollection.name, openMatname, openDef.name + ".png");
-                        if (File.Exists(openPath2))
-                            Process.Start(openPath2);
-                    }
-                }
-                GUILayout.EndHorizontal();
-
-                // ── Atlas preview with current-frame highlight ────────────
-                DrawFramePreview(currentFrameDef);
-            }
         }
 
         if (Animators.Count == 0)
@@ -416,52 +358,142 @@ public static class AnimationController
         }
     }
 
+    // ── Standalone preview ────────────────────────────────────────────────────
+
     private static Texture2D _previewWhite;
 
-    private static void DrawFramePreview(tk2dSpriteDefinition frameDef)
+    /// <summary>
+    /// Atlas preview + edit buttons for the currently selected animator's current frame.
+    /// Rendered below the scrollable list — always visible, independent of scroll position.
+    /// Shows the per-frame material/atlas name so cross-atlas animations are represented
+    /// accurately frame by frame.
+    /// </summary>
+    private static void DrawStandalonePreview()
     {
-        var mat = frameDef.materialInst ?? frameDef.material;
+        if (SelectedAnimator == null || !Animators.TryGetValue(SelectedAnimator, out var animator))
+        {
+            GUI.contentColor = new Color(0.5f, 0.5f, 0.5f);
+            GUILayout.Label("Select an object above to preview.", GUIHelper.LabelStyle);
+            GUI.contentColor = Color.white;
+            return;
+        }
+
+        if (animator == null || animator.CurrentClip == null) return;
+        if (animator.CurrentFrame < 0 || animator.CurrentFrame >= animator.CurrentClip.frames.Length) return;
+
+        var frame  = animator.CurrentClip.frames[animator.CurrentFrame];
+        var coll   = frame.spriteCollection;
+        if (coll == null || frame.spriteId < 0 || frame.spriteId >= coll.spriteDefinitions.Length) return;
+        var frameDef = coll.spriteDefinitions[frame.spriteId];
+        var mat      = frameDef.materialInst ?? frameDef.material;
         if (mat?.mainTexture == null) return;
 
-        float previewH = GUIHelper.Scaled(110f);
+        // ── Info row: collection · atlas · sprite · frame ────────────────────
+        string atlasName = mat.name.Split(' ')[0];
+        GUI.contentColor = new Color(0.6f, 0.85f, 1f);
+        GUILayout.Label(
+            $"{coll.name}  ·  {atlasName}  ·  {frameDef.name}" +
+            $"  [{animator.CurrentFrame + 1}/{animator.CurrentClip.frames.Length}]",
+            GUIHelper.LabelStyle);
+        GUI.contentColor = Color.white;
+
+        // ── Atlas texture with UV highlight ───────────────────────────────────
+        float previewH = GUIHelper.Scaled(150f);
         Rect atlasRect = GUILayoutUtility.GetRect(0f, float.MaxValue, previewH, previewH);
         GUI.DrawTexture(atlasRect, mat.mainTexture, ScaleMode.ScaleToFit, true);
 
-        // Highlight the current frame's region on the atlas
         var uvs = frameDef.uvs;
-        if (uvs == null || uvs.Length < 4) return;
-
-        float minU = uvs.Min(v => v.x), maxU = uvs.Max(v => v.x);
-        float minV = uvs.Min(v => v.y), maxV = uvs.Max(v => v.y);
-
-        // Compute letterboxed rect that ScaleToFit actually occupies
-        Texture tex = mat.mainTexture;
-        float scaleW = atlasRect.width  / tex.width;
-        float scaleH = atlasRect.height / tex.height;
-        float scale  = Mathf.Min(scaleW, scaleH);
-        float fw = tex.width  * scale;
-        float fh = tex.height * scale;
-        Rect fitted = new Rect(
-            atlasRect.x + (atlasRect.width  - fw) * 0.5f,
-            atlasRect.y + (atlasRect.height - fh) * 0.5f,
-            fw, fh);
-
-        // UV → IMGUI pixel rect (flip V: Unity is bottom-left, IMGUI is top-left)
-        float hx = fitted.x + minU * fitted.width;
-        float hy = fitted.y + (1f - maxV) * fitted.height;
-        float hw = (maxU - minU) * fitted.width;
-        float hh = (maxV - minV) * fitted.height;
-
-        if (_previewWhite == null)
+        if (uvs != null && uvs.Length >= 4)
         {
-            _previewWhite = new Texture2D(1, 1);
-            _previewWhite.SetPixel(0, 0, Color.white);
-            _previewWhite.Apply();
+            float minU = uvs.Min(v => v.x), maxU = uvs.Max(v => v.x);
+            float minV = uvs.Min(v => v.y), maxV = uvs.Max(v => v.y);
+
+            Texture tex  = mat.mainTexture;
+            float scaleW = atlasRect.width  / tex.width;
+            float scaleH = atlasRect.height / tex.height;
+            float scale  = Mathf.Min(scaleW, scaleH);
+            float fw = tex.width  * scale;
+            float fh = tex.height * scale;
+            Rect fitted = new Rect(
+                atlasRect.x + (atlasRect.width  - fw) * 0.5f,
+                atlasRect.y + (atlasRect.height - fh) * 0.5f,
+                fw, fh);
+
+            float hx = fitted.x + minU * fitted.width;
+            float hy = fitted.y + (1f - maxV) * fitted.height;
+            float hw = (maxU - minU) * fitted.width;
+            float hh = (maxV - minV) * fitted.height;
+
+            if (_previewWhite == null)
+            {
+                _previewWhite = new Texture2D(1, 1);
+                _previewWhite.SetPixel(0, 0, Color.white);
+                _previewWhite.Apply();
+            }
+
+            GUI.color = new Color(1f, 1f, 0f, 0.4f);
+            GUI.DrawTexture(new Rect(hx, hy, hw, hh), _previewWhite);
+            GUI.color = Color.white;
         }
 
-        GUI.color = new Color(1f, 1f, 0f, 0.4f);
-        GUI.DrawTexture(new Rect(hx, hy, hw, hh), _previewWhite);
-        GUI.color = Color.white;
+        // ── Edit buttons ──────────────────────────────────────────────────────
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Edit Current Sprite", GUIHelper.ButtonStyle))
+        {
+            string matName  = frameDef.material.name.Split(' ')[0];
+            string openPath = Path.Combine(SpriteLoader.LoadPath, coll.name, matName, frameDef.name + ".png");
+            if (File.Exists(openPath))
+                Process.Start(openPath);
+            else
+            {
+                SpriteDumper.DumpSingleSprite(frameDef, coll);
+                string dumpedPath = Path.Combine(SpriteDumper.DumpPath, coll.name, matName, frameDef.name + ".png");
+                if (!File.Exists(dumpedPath))
+                    Plugin.Logger.LogError($"Failed to dump sprite for editing: {coll.name}/{matName}/{frameDef.name}");
+                else
+                {
+                    IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, coll.name, matName));
+                    File.Copy(dumpedPath, openPath, true);
+                    Process.Start(openPath);
+                }
+            }
+        }
+
+        if (GUILayout.Button("Edit All Animation Sprites", GUIHelper.ButtonStyle))
+        {
+            var clip  = animator.CurrentClip;
+            int dumped = 0;
+            for (int f = 0; f < clip.frames.Length; f++)
+            {
+                var fr   = clip.frames[f];
+                var fc   = fr.spriteCollection;
+                if (fc == null || fr.spriteId < 0 || fr.spriteId >= fc.spriteDefinitions.Length) continue;
+                var fd   = fc.spriteDefinitions[fr.spriteId];
+                if (string.IsNullOrEmpty(fd.name)) continue;
+                string mn    = fd.material.name.Split(' ')[0];
+                string lpath = Path.Combine(SpriteLoader.LoadPath, fc.name, mn, fd.name + ".png");
+                if (File.Exists(lpath)) { dumped++; continue; }
+                SpriteDumper.DumpSingleSprite(fd, fc);
+                string dpath = Path.Combine(SpriteDumper.DumpPath, fc.name, mn, fd.name + ".png");
+                if (!File.Exists(dpath)) { Plugin.Logger.LogError($"Failed to dump: {fc.name}/{mn}/{fd.name}"); continue; }
+                IOUtil.EnsureDirectoryExists(Path.Combine(SpriteLoader.LoadPath, fc.name, mn));
+                File.Copy(dpath, lpath, true);
+                dumped++;
+            }
+            Plugin.Logger.LogInfo($"[AnimCtrl] Copied {dumped} sprites from '{clip.name}' ({clip.frames.Length} frames) to {SpriteLoader.LoadPath}");
+            for (int f2 = 0; f2 < clip.frames.Length; f2++)
+            {
+                var fr2 = clip.frames[f2];
+                var fc2 = fr2.spriteCollection;
+                if (fc2 == null || fr2.spriteId < 0 || fr2.spriteId >= fc2.spriteDefinitions.Length) continue;
+                var fd2 = fc2.spriteDefinitions[fr2.spriteId];
+                if (string.IsNullOrEmpty(fd2.name)) continue;
+                string mn2    = fd2.material.name.Split(' ')[0];
+                string opath2 = Path.Combine(SpriteLoader.LoadPath, fc2.name, mn2, fd2.name + ".png");
+                if (File.Exists(opath2)) Process.Start(opath2);
+            }
+        }
+        GUILayout.EndHorizontal();
     }
 
     #endregion

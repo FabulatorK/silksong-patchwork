@@ -11,8 +11,7 @@ namespace Patchwork.GUI.Pillars;
 /// </summary>
 public static class GraphicsPillar
 {
-    private static int    _tab = 0;
-    private static Vector2 _animScroll;
+    private static int     _tab = 0;
     private static Vector2 _logScroll;
 
     private const int TabAnimation = 0;
@@ -38,9 +37,7 @@ public static class GraphicsPillar
 
         if (_tab == TabAnimation)
         {
-            _animScroll = GUILayout.BeginScrollView(_animScroll);
             AnimationController.DrawPillarContent();
-            GUILayout.EndScrollView();
         }
         else if (_tab == TabT2D)
         {
