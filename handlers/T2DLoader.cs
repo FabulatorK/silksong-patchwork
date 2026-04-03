@@ -67,6 +67,10 @@ public static partial class T2DLoader
     /// </summary>
     public static event System.Action<string, string> OnT2DTrigger;
 
+    /// <summary>Raises OnT2DTrigger. Call only when IsT2DLogActive is true.</summary>
+    public static void RaiseT2DTrigger(string cleanTexName, string spriteName)
+        => OnT2DTrigger?.Invoke(cleanTexName, spriteName);
+
     // Read-only stats for GUI
     public static int SpritesheetOverrideCount => SpritesheetOverrides.Count;
     public static int LoadedT2DSpriteCount => _loadedSprites.Count;

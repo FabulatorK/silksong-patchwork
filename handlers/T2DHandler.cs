@@ -25,7 +25,7 @@ public static class T2DHandler
         T2DLoader.TrackRenderer(__instance);  // always track for T2D browser
 
         if (T2DLoader.IsT2DLogActive && value.texture != null)
-            T2DLoader.OnT2DTrigger?.Invoke(
+            T2DLoader.RaiseT2DTrigger(
                 T2DUtil.CleanTextureName(value.texture.name), value.name);
 
         if (!T2DLoader.HasT2DReplacements)
@@ -47,7 +47,7 @@ public static class T2DHandler
         T2DLoader.TrackImage(__instance);  // always track for T2D browser
 
         if (T2DLoader.IsT2DLogActive && value.texture != null)
-            T2DLoader.OnT2DTrigger?.Invoke(
+            T2DLoader.RaiseT2DTrigger(
                 T2DUtil.CleanTextureName(value.texture.name), value.name);
 
         if (!T2DLoader.HasT2DReplacements)
@@ -65,7 +65,7 @@ public static class T2DHandler
         // Log T2D-named texture assignments for the discovery log.
         // Filtered to T2D textures only — plain UI/FX materials produce too much noise.
         if (T2DLoader.IsT2DLogActive && T2DUtil.IsT2DTexture(tex.name))
-            T2DLoader.OnT2DTrigger?.Invoke(T2DUtil.CleanTextureName(tex.name), "");
+            T2DLoader.RaiseT2DTrigger(T2DUtil.CleanTextureName(tex.name), "");
 
         if (!T2DLoader.HasT2DReplacements) return;
 
