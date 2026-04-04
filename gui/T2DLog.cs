@@ -52,6 +52,16 @@ public static class T2DLog
         GUILayout.EndVertical();
     }
 
+    // Minimum seconds between re-bumping a known entry to the top of the log.
+    // Prevents animated sprites (which fire the setter every frame) from permanently
+    // owning the top of the log and drowning out newly-triggered entries.
+    // First-seen entries always appear immediately regardless of this value.
+    private const double ReBumpCooldownSeconds = 2.0;
+
+    /// <summary>
+    /// Returns true if this is a sprite the log has never seen before — used by
+    /// T2DTextureController to know when to add the sprite to the browser's entry list.
+    /// </summary>
     public static void LogTrigger(string cleanTexName, string spriteName)
     {
         if (string.IsNullOrEmpty(cleanTexName)) return;
@@ -59,6 +69,10 @@ public static class T2DLog
         string key = cleanTexName + "/" + (spriteName ?? "");
         if (_lookup.TryGetValue(key, out var existing))
         {
+            // Within cooldown: suppress the re-bump entirely.
+            if ((DateTime.Now - existing.LogTime).TotalSeconds < ReBumpCooldownSeconds)
+                return;
+
             _entries.Remove(existing);
             existing.LogTime    = DateTime.Now;
             existing.BumpedTime = null;
@@ -75,6 +89,11 @@ public static class T2DLog
             };
             _entries.Insert(0, entry);
             _lookup[key] = entry;
+
+            // New sprite discovered — add it live to the browser's atlas entry so the
+            // sprite list grows as the creator plays the game, without needing a refresh.
+            if (!string.IsNullOrEmpty(spriteName))
+                T2DTextureController.AddDiscoveredSprite(cleanTexName, spriteName);
         }
     }
 

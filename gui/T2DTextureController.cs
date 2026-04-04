@@ -24,6 +24,7 @@ public static class T2DTextureController
     private static string        _selectedSprite = "";
 
     private static string  _searchFilter = "";
+    private static string  _spriteFilter = "";
     private static Vector2 _listScroll;
     private static Vector2 _spriteScroll;
 
@@ -144,6 +145,7 @@ public static class T2DTextureController
             _selected       = entry;
             _hasSelection   = true;
             _selectedSprite = "";
+            _spriteFilter   = "";
         }
 
         UnityEngine.GUI.contentColor = Color.white;
@@ -245,12 +247,26 @@ public static class T2DTextureController
         GUIHelper.Space(4);
 
         // ── Sprite list ──────────────────────────────────────────────────────
+        GUILayout.BeginHorizontal();
         UnityEngine.GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
-        GUILayout.Label($"Sprites ({entry.SpriteNames.Count})", GUIHelper.LabelStyle);
+        GUILayout.Label($"Sprites ({entry.SpriteNames.Count})", GUIHelper.LabelStyle,
+            GUILayout.ExpandWidth(false));
         UnityEngine.GUI.contentColor = Color.white;
+        _spriteFilter = GUIHelper.TextField("T2DTex.SpriteFilter", _spriteFilter,
+            GUILayout.ExpandWidth(true), GUIHelper.Height(20));
+        if (!string.IsNullOrEmpty(_spriteFilter) &&
+            GUILayout.Button("x", GUIHelper.ButtonStyle, GUIHelper.Width(22f), GUIHelper.Height(20)))
+            _spriteFilter = "";
+        GUILayout.EndHorizontal();
+
+        var filteredSprites = string.IsNullOrEmpty(_spriteFilter)
+            ? entry.SpriteNames.OrderBy(s => s)
+            : entry.SpriteNames
+                .Where(s => s.IndexOf(_spriteFilter, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(s => s);
 
         _spriteScroll = GUILayout.BeginScrollView(_spriteScroll, GUIHelper.Height(120f));
-        foreach (var sname in entry.SpriteNames.OrderBy(s => s))
+        foreach (var sname in filteredSprites)
         {
             bool sprSel = sname == _selectedSprite;
             GUILayout.BeginHorizontal();
@@ -502,4 +518,23 @@ public static class T2DTextureController
 
     /// <summary>Called by external systems (e.g. scene load) to schedule a refresh.</summary>
     public static void RequestRefresh() => _needsRefresh = true;
+
+    /// <summary>
+    /// Adds a sprite name to the live entry for the given atlas, if not already present.
+    /// Called by T2DLog when a trigger fires for a first-seen sprite — populates animation
+    /// frames and other lazily-loaded sprites that weren't in memory when the scene was seeded.
+    /// No-op if the entries list is empty or the atlas isn't tracked yet.
+    /// </summary>
+    public static void AddDiscoveredSprite(string cleanTexName, string spriteName)
+    {
+        if (string.IsNullOrEmpty(cleanTexName) || string.IsNullOrEmpty(spriteName)) return;
+        foreach (var entry in _entries)
+        {
+            if (!string.Equals(entry.CleanName, cleanTexName, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!entry.SpriteNames.Contains(spriteName))
+                entry.SpriteNames.Add(spriteName);
+            return;
+        }
+    }
 }
