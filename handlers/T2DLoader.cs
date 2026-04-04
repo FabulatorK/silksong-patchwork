@@ -150,19 +150,6 @@ public static partial class T2DLoader
         foreach (var sr in _knownRenderers) { if (sr != null) Accumulate(sr.sprite); }
         foreach (var img in _knownImages)   { if (img != null) Accumulate(img.sprite); }
 
-        // Enrich sprite lists from the seed cache — tracked renderers only expose sprites
-        // currently assigned to live objects, so many frames of an animation atlas are
-        // invisible until their renderer fires. _seededSprites (populated once by
-        // SeedFromScene) covers inactive objects, unspawned prefabs, and every animation
-        // frame in the atlas without a per-refresh FindObjectsOfTypeAll<Sprite> call.
-        foreach (var sprite in _seededSprites)
-        {
-            if (sprite?.texture == null) continue;
-            int id = sprite.texture.GetInstanceID();
-            if (!spritesByTexId.TryGetValue(id, out var names)) continue;
-            if (!names.Contains(sprite.name)) names.Add(sprite.name);
-        }
-
         // Deduplicate by clean name: the game can hold multiple Texture2D instances for the
         // same logical atlas (e.g. Inventory loaded once per renderer). Merge them so the
         // browser shows one entry per atlas, not one per renderer instance.
@@ -190,6 +177,43 @@ public static partial class T2DLoader
             else
             {
                 byCleanName[clean] = (tex, tex.name, names, isT2D);
+            }
+        }
+
+        // ── Enrichment pass 1: Unity Sprite assets (clean-name keyed) ────────
+        // Done AFTER byCleanName is built so we match by atlas identity, not by
+        // texture instance ID. Sprites that reference a different Texture2D instance
+        // of the same logical atlas (common when the game loads one copy per renderer)
+        // are correctly attributed here instead of being silently skipped.
+        foreach (var sprite in _seededSprites)
+        {
+            if (sprite?.texture == null) continue;
+            bool   sIsT2D = T2DUtil.IsT2DTexture(sprite.texture.name);
+            string sClean = sIsT2D ? T2DUtil.CleanTextureName(sprite.texture.name) : sprite.texture.name;
+            if (!byCleanName.TryGetValue(sClean, out var entry)) continue;
+            if (!entry.sprites.Contains(sprite.name)) entry.sprites.Add(sprite.name);
+            // Opportunistically upgrade to the larger texture instance.
+            if (sprite.texture.width * sprite.texture.height > entry.tex.width * entry.tex.height)
+                byCleanName[sClean] = (sprite.texture, sprite.texture.name, entry.sprites, entry.isT2D);
+        }
+
+        // ── Enrichment pass 2: tk2d SpriteCollectionData ─────────────────────
+        // tk2d stores sprite names in SpriteDefinition arrays, not as Unity Sprite
+        // objects — FindObjectsOfTypeAll<Sprite> is completely blind to them. If a
+        // tk2d atlas texture appears in the browser (e.g. via a material setter or a
+        // Unity SpriteRenderer that shares the same texture), this pass fills in all
+        // the frame names from the collection definition.
+        foreach (var coll in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
+        {
+            if (coll?.spriteDefinitions == null) continue;
+            foreach (var def in coll.spriteDefinitions)
+            {
+                if (def?.material?.mainTexture == null || string.IsNullOrEmpty(def.name)) continue;
+                string texName = def.material.mainTexture.name;
+                bool   dIsT2D  = T2DUtil.IsT2DTexture(texName);
+                string dClean  = dIsT2D ? T2DUtil.CleanTextureName(texName) : texName;
+                if (!byCleanName.TryGetValue(dClean, out var entry)) continue;
+                if (!entry.sprites.Contains(def.name)) entry.sprites.Add(def.name);
             }
         }
 
