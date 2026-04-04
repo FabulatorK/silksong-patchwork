@@ -583,29 +583,11 @@ public static partial class T2DLoader
             return;
         _lastUninitCheckTime = now;
 
-        // Pass A — spritesheet packs ─────────────────────────────────────────────
-        // Sweep all live Texture2D objects and apply any overrides that haven't
-        // been processed yet. Catches textures created by AssetBundle loads or
-        // prefab Instantiate that bypass the Harmony sprite setter (e.g. Animator
-        // driving sprite changes through a native code path). Without this pass,
-        // newly-spawned effect renderers sharing a fresh Texture2D instance can
-        // show vanilla pixels indefinitely alongside already-swapped renderers.
-        // Note: CheckSprite (Pass B) returns early when _loadedSprites has no
-        // entry for the sprite, so spritesheet-only packs are handled here only.
-        if (SpritesheetOverrides.Count > 0)
-        {
-            foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
-            {
-                if (tex == null) continue;
-                int id = tex.GetInstanceID();
-                if (!ReplacedTextureIds.Contains(id) && !SkippedTextureIds.Contains(id))
-                    TrySwapTexture(tex);
-            }
-        }
-
-        // Pass B — individual sprite packs ───────────────────────────────────────
         // Re-trigger the managed setter for any renderer whose sprite name changed
-        // without going through our Harmony patch.
+        // without going through our Harmony patch (e.g. Animator-driven changes via
+        // native code, or freshly Instantiated objects where Unity copies sprite state
+        // via native serialisation and bypasses the managed property setter).
+        // OnSpriteSet → TrySwapTexture covers both spritesheets and individual sprites.
         int triggered = 0;
         foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
