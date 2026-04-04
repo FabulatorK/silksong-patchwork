@@ -570,24 +570,41 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 1f;   // seconds; independent of frame rate
+    private const  float UninitCheckInterval  = 0.5f;  // seconds; independent of frame rate
 
     public static void CheckForUninitializedSprites()
     {
-        // Needs to run for both spritesheet and individual-sprite packs.
-        // Animators drive sprite changes through native code that bypasses the managed
-        // Harmony setter patch; this sweep catches those renderers via FindObjectsByType
-        // and re-triggers the setter via managed code so HandleLoad can process them.
         if (!HasT2DReplacements)
             return;
 
-        // Wall-clock cooldown: FindObjectsByType is expensive (8-13ms).
-        // Using a frame counter is FPS-dependent — at 300fps a 60-frame interval fires 5×/s.
         float now = UnityEngine.Time.unscaledTime;
         if (now - _lastUninitCheckTime < UninitCheckInterval)
             return;
         _lastUninitCheckTime = now;
 
+        // Pass A — spritesheet packs ─────────────────────────────────────────────
+        // Sweep all live Texture2D objects and apply any overrides that haven't
+        // been processed yet. Catches textures created by AssetBundle loads or
+        // prefab Instantiate that bypass the Harmony sprite setter (e.g. Animator
+        // driving sprite changes through a native code path). Without this pass,
+        // newly-spawned effect renderers sharing a fresh Texture2D instance can
+        // show vanilla pixels indefinitely alongside already-swapped renderers.
+        // Note: CheckSprite (Pass B) returns early when _loadedSprites has no
+        // entry for the sprite, so spritesheet-only packs are handled here only.
+        if (SpritesheetOverrides.Count > 0)
+        {
+            foreach (var tex in Resources.FindObjectsOfTypeAll<Texture2D>())
+            {
+                if (tex == null) continue;
+                int id = tex.GetInstanceID();
+                if (!ReplacedTextureIds.Contains(id) && !SkippedTextureIds.Contains(id))
+                    TrySwapTexture(tex);
+            }
+        }
+
+        // Pass B — individual sprite packs ───────────────────────────────────────
+        // Re-trigger the managed setter for any renderer whose sprite name changed
+        // without going through our Harmony patch.
         int triggered = 0;
         foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
@@ -610,7 +627,6 @@ public static partial class T2DLoader
                 triggered++;
             }
         }
-
     }
 
     public static void EnforceT2DReplacements()
