@@ -171,16 +171,12 @@ public class Plugin : BaseUnityPlugin
 
     private static int _conditionPollFrames = 0;
     private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
-    private static int _enforceFrame = 0;
-    private const  int EnforceInterval = 2;  // enforce every 2nd LateUpdate → 30 sweeps/s at 60fps
 
     private void Update()
     {
         DevProfiler.RecordFrame();
         DevProfiler.BeginUpdateTiming();
 
-        // CheckForUninitializedSprites uses a wall-clock cooldown internally (3s);
-        // calling it every frame is safe — it will self-gate.
         DevProfiler.StartOp();
         T2DLoader.CheckForUninitializedSprites();
         DevProfiler.RecordUninitMs(DevProfiler.StopOp("UninitCheck"));
@@ -202,8 +198,6 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
-        if (++_enforceFrame < EnforceInterval) return;
-        _enforceFrame = 0;
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
         DevProfiler.RecordEnforceMs(DevProfiler.StopOp("EnforceT2D"));
