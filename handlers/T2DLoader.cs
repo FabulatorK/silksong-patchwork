@@ -583,10 +583,12 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 0.5f; // 500ms wall-clock — matches the original UninitInterval=30
-                                                       // design intent (30 frames ÷ 60fps = 0.5s), now FPS-independent.
-                                                       // At 300fps the old frame counter fired at 0.1s — 5× more often
-                                                       // than intended. 0.5s is the correct cadence.
+    private const  float UninitCheckInterval  = 0.2f; // 200ms wall-clock — 5 checks/sec.
+                                                       // Balances latency vs cost: Instantiate-spawned
+                                                       // projectiles (Thread Storm etc.) show vanilla for
+                                                       // at most ~200ms before the sweep catches them.
+                                                       // EnforceT2DReplacements is now near-free (iterates
+                                                       // only replaced renderers), freeing budget here.
 
     public static void CheckForUninitializedSprites()
     {
