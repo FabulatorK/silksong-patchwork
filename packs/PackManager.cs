@@ -521,6 +521,14 @@ public static class PackManager
         // Rebuild text pack watchers so newly-enabled packs have their Text/ dirs watched.
         Plugin.TextFileWatcher?.RebuildPackWatchers();
 
+        // The pack set has changed — every cached PNG byte[] from the old active packs is
+        // now stale. Clearing here is safe: FileCache uses timestamp-based fingerprinting,
+        // so files will be re-read from disk correctly on the next Reload() sweep.
+        // This is the primary defence against managed-heap bloat: without this clear,
+        // byte[] arrays for every PNG in every pack that was ever loaded accumulate
+        // permanently and are never GC-eligible.
+        Util.FileCache.Clear();
+
         SpriteFileWatcher.ReloadSprites    = true;
         SpriteFileWatcher.ReloadT2DSprites = true;
         AudioFileWatcher.ReloadAudio       = true;
