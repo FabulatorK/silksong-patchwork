@@ -172,7 +172,9 @@ public class Plugin : BaseUnityPlugin
     private static int _conditionPollFrames = 0;
     private const  int ConditionPollInterval = 120; // ~2 s at 60 fps
     private static int _uninitFrames = 0;
-    private const  int UninitInterval = 30;  // ~0.5 s at 60 fps — catches Object.Instantiate clones mid-scene
+    private const  int UninitInterval = 60;  // ~1 s at 60 fps — catches Object.Instantiate clones mid-scene
+    private static int _enforceFrame = 0;
+    private const  int EnforceInterval = 2;  // enforce every 2nd LateUpdate → 30 sweeps/s at 60fps
 
     private void Update()
     {
@@ -182,7 +184,9 @@ public class Plugin : BaseUnityPlugin
         if (++_uninitFrames >= UninitInterval)
         {
             _uninitFrames = 0;
+            DevProfiler.StartOp();
             T2DLoader.CheckForUninitializedSprites();
+            DevProfiler.RecordUninitMs(DevProfiler.StopOp("UninitCheck"));
         }
 
         if (++_conditionPollFrames >= ConditionPollInterval)
@@ -202,7 +206,11 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
+        if (++_enforceFrame < EnforceInterval) return;
+        _enforceFrame = 0;
+        DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
+        DevProfiler.RecordEnforceMs(DevProfiler.StopOp("EnforceT2D"));
     }
 
     private void OnDestroy()

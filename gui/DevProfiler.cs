@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using Patchwork.Handlers;
 using Patchwork.Packs;
+using Patchwork.Util;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -36,9 +37,32 @@ public static class DevProfiler
     private static readonly Stopwatch UpdateTimer = new();
     private static float lastUpdateMs;
 
+    // Per-operation timing (shared Stopwatch — main thread only)
+    private static readonly Stopwatch OpTimer = new();
+
+    // Spike log — ring buffer of operations that exceeded the spike threshold
+    private const int SpikeLogCapacity = 20;
+    private const float SpikeThresholdMs = 5f;   // anything ≥ 5ms gets logged
+    private static readonly string[] _spikeLabels    = new string[SpikeLogCapacity];
+    private static readonly float[]  _spikeDurations = new float[SpikeLogCapacity];
+    private static readonly float[]  _spikeTimes     = new float[SpikeLogCapacity];
+    private static int  _spikeHead;
+    private static int  _spikeCount;
+    private static Vector2 _spikeScroll;
+
+    // Per-op stats (rolling max over last FrameSampleCount frames)
+    private static float _maxEnforceMs;
+    private static float _maxUninitMs;
+    private static float _lastEnforceMs;
+    private static float _lastUninitMs;
+
     // Graph texture (reused)
     private static Texture2D graphTex;
     private static Texture2D barTex;
+    // Separate bar texture for reload-frame highlights
+    private static Texture2D reloadBarTex;
+    // Ring buffer: true on frames where a reload fired
+    private static readonly bool[] ReloadFrames = new bool[FrameSampleCount];
 
     public static void Initialize()
     {
@@ -73,6 +97,7 @@ public static class DevProfiler
     {
         float dt = Time.unscaledDeltaTime;
         FrameTimes[frameIndex] = dt;
+        ReloadFrames[frameIndex] = false;   // cleared each frame; set by MarkReloadFrame()
         frameIndex = (frameIndex + 1) % FrameSampleCount;
         if (sampleCount < FrameSampleCount) sampleCount++;
 
@@ -85,6 +110,54 @@ public static class DevProfiler
             if (fps > maxFps) maxFps = fps;
             if (frameTimeMs > worstFrameTimeMs) worstFrameTimeMs = frameTimeMs;
         }
+    }
+
+    /// <summary>
+    /// Starts the shared per-operation stopwatch.  Must be paired with a
+    /// <see cref="StopOp"/> call.  Main thread only.
+    /// </summary>
+    public static void StartOp() => OpTimer.Restart();
+
+    /// <summary>
+    /// Stops the per-op timer, records a spike if the elapsed time exceeds
+    /// <see cref="SpikeThresholdMs"/>, and returns the elapsed ms.
+    /// </summary>
+    public static float StopOp(string label)
+    {
+        OpTimer.Stop();
+        float ms = (float)OpTimer.Elapsed.TotalMilliseconds;
+        if (ms >= SpikeThresholdMs && !string.IsNullOrEmpty(label))
+            RecordSpike(label, ms);
+        return ms;
+    }
+
+    /// <summary>
+    /// Unconditionally records a spike entry (use for reloads that are always notable).
+    /// </summary>
+    public static void RecordSpike(string label, float durationMs)
+    {
+        _spikeLabels[_spikeHead]    = label;
+        _spikeDurations[_spikeHead] = durationMs;
+        _spikeTimes[_spikeHead]     = Time.realtimeSinceStartup;
+        _spikeHead = (_spikeHead + 1) % SpikeLogCapacity;
+        if (_spikeCount < SpikeLogCapacity) _spikeCount++;
+        // Mark the current frame bar orange in the frame graph
+        int lastIdx = ((frameIndex - 1) % FrameSampleCount + FrameSampleCount) % FrameSampleCount;
+        ReloadFrames[lastIdx] = true;
+    }
+
+    /// <summary>Records the last enforcement sweep duration for display.</summary>
+    public static void RecordEnforceMs(float ms)
+    {
+        _lastEnforceMs = ms;
+        if (ms > _maxEnforceMs) _maxEnforceMs = ms;
+    }
+
+    /// <summary>Records the last uninit-check sweep duration for display.</summary>
+    public static void RecordUninitMs(float ms)
+    {
+        _lastUninitMs = ms;
+        if (ms > _maxUninitMs) _maxUninitMs = ms;
     }
 
     /// <summary>
@@ -113,10 +186,44 @@ public static class DevProfiler
             minFps = float.MaxValue;
             maxFps = 0;
             worstFrameTimeMs = 0;
+            _maxEnforceMs = 0;
+            _maxUninitMs  = 0;
         }
+
+        Label($"Enforce T2D: {_lastEnforceMs:F2}ms  (max {_maxEnforceMs:F2}ms)");
+        Label($"Uninit check: {_lastUninitMs:F2}ms  (max {_maxUninitMs:F2}ms)");
 
         GUIHelper.Space(4);
         DrawFrameGraph();
+
+        // --- Spike Log ---
+        GUIHelper.Space(8);
+        SectionHeader("Spike Log");
+        if (_spikeCount == 0)
+        {
+            Label("No spikes recorded (threshold: 5ms).");
+        }
+        else
+        {
+            if (GUILayout.Button("Clear", GUIHelper.ButtonStyle, GUIHelper.Height(20)))
+            {
+                _spikeCount = 0;
+                _spikeHead  = 0;
+            }
+            float now = Time.realtimeSinceStartup;
+            float logH = GUIHelper.Scaled(120f);
+            _spikeScroll = GUILayout.BeginScrollView(_spikeScroll, GUIHelper.Height(logH));
+            // Iterate newest-first
+            for (int i = 0; i < _spikeCount; i++)
+            {
+                int idx = ((_spikeHead - 1 - i) % SpikeLogCapacity + SpikeLogCapacity) % SpikeLogCapacity;
+                float ms  = _spikeDurations[idx];
+                float age = now - _spikeTimes[idx];
+                Color c   = ms >= 33.3f ? Color.red : ms >= 16.7f ? Color.yellow : new Color(1f, 0.65f, 0.2f);
+                ColorLabel($"{age:F1}s ago  {_spikeLabels[idx]}  {ms:F1}ms", c);
+            }
+            GUILayout.EndScrollView();
+        }
 
         // --- Memory ---
         GUIHelper.Space(8);
@@ -137,6 +244,7 @@ public static class DevProfiler
         SectionHeader("Patchwork Assets");
         Label($"Audio clips cached: {AudioHandler.CachedClipCount}");
         Label($"Text sheets cached: {DialogueHandler.CachedSheetCount} ({DialogueHandler.CachedKeyCount} keys)");
+        Label($"FileCache entries: {FileCache.Count}  (cleared on pack change)");
         if (DialogueHandler.StaleKeyCount > 0)
             ColorLabel($"  \u26A0 {DialogueHandler.StaleKeyCount} stale text key(s)", Color.yellow);
         Label($"Plugin packs: {PackManager.AllPacks.Count(p => p.IsEnabled)} active / {PackManager.AllPacks.Count} total");
@@ -187,6 +295,12 @@ public static class DevProfiler
             barTex.SetPixel(0, 0, Color.white);
             barTex.Apply();
         }
+        if (reloadBarTex == null)
+        {
+            reloadBarTex = new Texture2D(1, 1);
+            reloadBarTex.SetPixel(0, 0, Color.white);
+            reloadBarTex.Apply();
+        }
 
         if (sampleCount < 2) return;
 
@@ -205,7 +319,8 @@ public static class DevProfiler
             float barH = normalized * graphRect.height;
 
             Color barColor;
-            if (ms <= targetMs) barColor = Color.green;
+            if (ReloadFrames[idx]) barColor = new Color(1f, 0.55f, 0f); // orange = reload
+            else if (ms <= targetMs) barColor = Color.green;
             else if (ms <= 33.33f) barColor = Color.yellow;
             else barColor = Color.red;
 
