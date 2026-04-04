@@ -570,7 +570,8 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 2f;  // fallback only — OnEnable patch is the primary path
+    private const  float UninitCheckInterval  = 0.2f; // 200ms wall-clock — matches original frame-based rate
+                                                       // at 60fps, independent of actual frame rate
 
     public static void CheckForUninitializedSprites()
     {
