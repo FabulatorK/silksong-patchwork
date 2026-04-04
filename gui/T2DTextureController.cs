@@ -518,23 +518,4 @@ public static class T2DTextureController
 
     /// <summary>Called by external systems (e.g. scene load) to schedule a refresh.</summary>
     public static void RequestRefresh() => _needsRefresh = true;
-
-    /// <summary>
-    /// Adds a sprite name to the live entry for the given atlas, if not already present.
-    /// Called by T2DLog when a trigger fires for a first-seen sprite — populates animation
-    /// frames and other lazily-loaded sprites that weren't in memory when the scene was seeded.
-    /// No-op if the entries list is empty or the atlas isn't tracked yet.
-    /// </summary>
-    public static void AddDiscoveredSprite(string cleanTexName, string spriteName)
-    {
-        if (string.IsNullOrEmpty(cleanTexName) || string.IsNullOrEmpty(spriteName)) return;
-        foreach (var entry in _entries)
-        {
-            if (!string.Equals(entry.CleanName, cleanTexName, System.StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (!entry.SpriteNames.Contains(spriteName))
-                entry.SpriteNames.Add(spriteName);
-            return;
-        }
-    }
 }

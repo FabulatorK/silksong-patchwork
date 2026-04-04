@@ -89,11 +89,6 @@ public static class T2DLog
             };
             _entries.Insert(0, entry);
             _lookup[key] = entry;
-
-            // New sprite discovered — add it live to the browser's atlas entry so the
-            // sprite list grows as the creator plays the game, without needing a refresh.
-            if (!string.IsNullOrEmpty(spriteName))
-                T2DTextureController.AddDiscoveredSprite(cleanTexName, spriteName);
         }
     }
 
