@@ -570,16 +570,18 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 3f;   // seconds; independent of frame rate
+    private const  float UninitCheckInterval  = 1f;   // seconds; independent of frame rate
 
     public static void CheckForUninitializedSprites()
     {
-        // Only needed when individual sprite replacements exist; spritesheets are handled
-        // in-place by TrySwapTexture and don't require a full renderer scan.
-        if (_loadedSprites.Count == 0)
+        // Needs to run for both spritesheet and individual-sprite packs.
+        // Animators drive sprite changes through native code that bypasses the managed
+        // Harmony setter patch; this sweep catches those renderers via FindObjectsByType
+        // and re-triggers the setter via managed code so HandleLoad can process them.
+        if (!HasT2DReplacements)
             return;
 
-        // Wall-clock cooldown: the check does Object.FindObjectsByType which is expensive.
+        // Wall-clock cooldown: FindObjectsByType is expensive (8-13ms).
         // Using a frame counter is FPS-dependent — at 300fps a 60-frame interval fires 5×/s.
         float now = UnityEngine.Time.unscaledTime;
         if (now - _lastUninitCheckTime < UninitCheckInterval)
