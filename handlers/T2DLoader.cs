@@ -570,8 +570,10 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 0.1f; // 100ms wall-clock — matches original UninitInterval=30
-                                                       // at the game's ~300fps (30/300 = 0.1s), now FPS-independent
+    private const  float UninitCheckInterval  = 0.5f; // 500ms wall-clock — matches the original UninitInterval=30
+                                                       // design intent (30 frames ÷ 60fps = 0.5s), now FPS-independent.
+                                                       // At 300fps the old frame counter fired at 0.1s — 5× more often
+                                                       // than intended. 0.5s is the correct cadence.
 
     public static void CheckForUninitializedSprites()
     {
@@ -588,8 +590,9 @@ public static partial class T2DLoader
         // native code, or freshly Instantiated objects where Unity copies sprite state
         // via native serialisation and bypasses the managed property setter).
         // OnSpriteSet → TrySwapTexture covers both spritesheets and individual sprites.
+        // FindObjectsInactive.Exclude: inactive renderers are invisible — no point checking them.
         int triggered = 0;
-        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             if (sr == null || sr.sprite == null) continue;
             CheckSprite(sr.GetInstanceID(), sr.sprite, out bool changed, out _);
@@ -600,7 +603,7 @@ public static partial class T2DLoader
             }
         }
 
-        foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        foreach (var img in Object.FindObjectsByType<Image>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             if (img == null || img.sprite == null) continue;
             CheckSprite(img.GetInstanceID(), img.sprite, out bool changed, out _);
