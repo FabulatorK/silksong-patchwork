@@ -119,9 +119,12 @@ public class Plugin : BaseUnityPlugin
 
         SceneManager.sceneLoaded += (scene, mode) => PackManager.OnSceneLoaded(scene.name);
 
-        // Discovery sweep for Instantiate-cloned renderers that bypass the Harmony sprite-setter
-        // postfix. Runs once at scene load to catch clones already present, and periodically
-        // from Update() to catch clones spawned mid-scene.
+        // Reset the burst window timer first, then run the scene-entry check.
+        // Burst window: uninit sweep runs at 50ms intervals for the first 2s after each
+        // scene load, catching Instantiate-spawned objects (Thread Storm projectiles, pool
+        // objects activated in Start()) well within a single animation frame.
+        // After 2s the sweep settles to the steady-state 200ms cadence.
+        SceneManager.sceneLoaded += (scene, mode) => T2DLoader.OnSceneLoaded();
         SceneManager.sceneLoaded += (scene, mode) => T2DLoader.CheckForUninitializedSprites();
 
         SceneManager.sceneUnloaded += _ => T2DLoader.PruneStaleOriginals();

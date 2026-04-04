@@ -583,12 +583,14 @@ public static partial class T2DLoader
 
     // Wall-clock timestamp of the last uninit sweep — avoids FPS-dependent call rates.
     private static float _lastUninitCheckTime = float.MinValue;
-    private const  float UninitCheckInterval  = 0.2f; // 200ms wall-clock — 5 checks/sec.
-                                                       // Balances latency vs cost: Instantiate-spawned
-                                                       // projectiles (Thread Storm etc.) show vanilla for
-                                                       // at most ~200ms before the sweep catches them.
-                                                       // EnforceT2DReplacements is now near-free (iterates
-                                                       // only replaced renderers), freeing budget here.
+    private const  float UninitCheckInterval      = 0.2f; // steady-state: 5 checks/sec
+    private const  float UninitCheckIntervalBurst = 0.05f; // burst: 20 checks/sec for first 2s after scene load
+    private const  float UninitBurstWindow        = 2.0f;  // seconds after scene load to use burst rate
+    // Set on scene load; used to determine whether burst rate applies.
+    private static float _sceneLoadTime = float.MinValue;
+
+    /// <summary>Called on sceneLoaded — resets the burst window timer.</summary>
+    public static void OnSceneLoaded() => _sceneLoadTime = Time.unscaledTime;
 
     public static void CheckForUninitializedSprites()
     {
@@ -596,7 +598,10 @@ public static partial class T2DLoader
             return;
 
         float now = UnityEngine.Time.unscaledTime;
-        if (now - _lastUninitCheckTime < UninitCheckInterval)
+        float interval = (now - _sceneLoadTime < UninitBurstWindow)
+            ? UninitCheckIntervalBurst
+            : UninitCheckInterval;
+        if (now - _lastUninitCheckTime < interval)
             return;
         _lastUninitCheckTime = now;
 
