@@ -6,13 +6,15 @@ namespace Patchwork.GUI;
 
 /// <summary>
 /// Live log of T2D sprite and texture setter triggers.
-/// Mirrors the AudioLog / TextLog pattern — bump-to-front list, fade-out for old entries.
+/// One entry per atlas (cleanTexName) — shows the most recently triggered sprite name.
+/// Deduplicating at atlas level prevents animated backgrounds (e.g. Black_Thread_BG
+/// with 30 frames) from flooding the log with per-frame entries.
 /// Populated via T2DLoader.OnT2DTrigger, which fires only when IsT2DLogActive is true.
 /// Displayed by GraphicsPillar in the T2D Log sub-tab.
 /// </summary>
 public static class T2DLog
 {
-    private static readonly List<T2DLogEntry>            _entries = new();
+    private static readonly List<T2DLogEntry>               _entries = new();
     private static readonly Dictionary<string, T2DLogEntry> _lookup  =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -34,12 +36,12 @@ public static class T2DLog
             float opacity = i < maxVisible ? 1f : entry.GetFadeOpacity(fadeDuration);
             UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
 
-            string label = string.IsNullOrEmpty(entry.SpriteName)
+            string label = string.IsNullOrEmpty(entry.LastSpriteName)
                 ? entry.CleanTexName
-                : $"{entry.CleanTexName} / {entry.SpriteName}";
+                : $"{entry.CleanTexName} / {entry.LastSpriteName}";
 
             if (GUILayout.Button(label, GUIHelper.LabelStyle))
-                onEntryClick?.Invoke(entry.CleanTexName, entry.SpriteName);
+                onEntryClick?.Invoke(entry.CleanTexName, entry.LastSpriteName);
         }
 
         if (_entries.Count == 0)
@@ -52,24 +54,23 @@ public static class T2DLog
         GUILayout.EndVertical();
     }
 
-    // Minimum seconds between re-bumping a known entry to the top of the log.
-    // Prevents animated sprites (which fire the setter every frame) from permanently
-    // owning the top of the log and drowning out newly-triggered entries.
-    // First-seen entries always appear immediately regardless of this value.
+    // Minimum seconds between re-bumping an atlas entry to the top of the log.
+    // Sprite name updates (e.g. animation cycling) within this window are applied
+    // silently without re-ordering the list.
     private const double ReBumpCooldownSeconds = 2.0;
 
-    /// <summary>
-    /// Returns true if this is a sprite the log has never seen before — used by
-    /// T2DTextureController to know when to add the sprite to the browser's entry list.
-    /// </summary>
     public static void LogTrigger(string cleanTexName, string spriteName)
     {
         if (string.IsNullOrEmpty(cleanTexName)) return;
 
-        string key = cleanTexName + "/" + (spriteName ?? "");
-        if (_lookup.TryGetValue(key, out var existing))
+        // Key is atlas only — all sprites from the same atlas share one log entry.
+        if (_lookup.TryGetValue(cleanTexName, out var existing))
         {
-            // Within cooldown: suppress the re-bump entirely.
+            // Always update the displayed sprite name so the entry stays current.
+            if (!string.IsNullOrEmpty(spriteName))
+                existing.LastSpriteName = spriteName;
+
+            // Only re-order to the top after the cooldown has elapsed.
             if ((DateTime.Now - existing.LogTime).TotalSeconds < ReBumpCooldownSeconds)
                 return;
 
@@ -82,13 +83,13 @@ public static class T2DLog
         {
             var entry = new T2DLogEntry
             {
-                CleanTexName = cleanTexName,
-                SpriteName   = spriteName ?? "",
-                LogTime      = DateTime.Now,
-                BumpedTime   = null
+                CleanTexName    = cleanTexName,
+                LastSpriteName  = spriteName ?? "",
+                LogTime         = DateTime.Now,
+                BumpedTime      = null
             };
             _entries.Insert(0, entry);
-            _lookup[key] = entry;
+            _lookup[cleanTexName] = entry;
         }
     }
 
@@ -113,7 +114,7 @@ public static class T2DLog
     internal class T2DLogEntry
     {
         public string    CleanTexName;
-        public string    SpriteName;
+        public string    LastSpriteName;  // most recently triggered sprite on this atlas
         public DateTime  LogTime;
         public DateTime? BumpedTime;
 
