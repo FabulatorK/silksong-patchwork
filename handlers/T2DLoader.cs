@@ -40,6 +40,13 @@ public static partial class T2DLoader
     private static readonly HashSet<SpriteRenderer> _knownRenderers = new();
     private static readonly HashSet<Image> _knownImages = new();
 
+    // Only renderers/images where a T2D replacement has actually been applied.
+    // Much smaller than _knownRenderers (which grows with every sprite setter in the game).
+    // EnforceT2DReplacements iterates this set — avoids scanning all game renderers every frame.
+    private static readonly HashSet<SpriteRenderer> _replacedSrs  = new();
+    private static readonly HashSet<Image>          _replacedImgs = new();
+    private static int _enforcePruneCounter;
+
     // Cached null-check predicates to avoid per-frame closure allocations in RemoveWhere
     private static readonly System.Predicate<SpriteRenderer> _srNull = sr => sr == null;
     private static readonly System.Predicate<Image> _imgNull = img => img == null;
@@ -559,9 +566,15 @@ public static partial class T2DLoader
     private static void TrackContainer(object container)
     {
         if (container is SpriteRenderer sr)
+        {
             _knownRenderers.Add(sr);
+            _replacedSrs.Add(sr);   // marks this renderer as having an active T2D replacement
+        }
         else if (container is Image img)
+        {
             _knownImages.Add(img);
+            _replacedImgs.Add(img);
+        }
     }
 
     // ================================================================
@@ -616,33 +629,44 @@ public static partial class T2DLoader
 
     public static void EnforceT2DReplacements()
     {
-        if (!HasT2DReplacements)
+        if (!HasT2DReplacements || (_replacedSrs.Count == 0 && _replacedImgs.Count == 0))
             return;
 
         _enforcing = true;
         try
         {
-            foreach (var sr in _knownRenderers)
+            // Only iterate renderers where a T2D replacement has actually been applied.
+            // _replacedSrs is populated by TrackContainer (called from HandleLoad when
+            // replacement != null), so it never contains unreplaced renderers.
+            // This avoids the O(all game renderers) scan that made the old loop expensive.
+            foreach (var sr in _replacedSrs)
             {
                 if (sr == null || sr.sprite == null) continue;
                 if (TryGetReplacement(sr.sprite, out var replacement) && sr.sprite != replacement)
                     sr.sprite = replacement;
             }
 
-            foreach (var img in _knownImages)
+            foreach (var img in _replacedImgs)
             {
                 if (img == null || img.sprite == null) continue;
                 if (TryGetReplacement(img.sprite, out var replacement) && img.sprite != replacement)
                     img.sprite = replacement;
             }
-
-            // Clean up destroyed references
-            _knownRenderers.RemoveWhere(_srNull);
-            _knownImages.RemoveWhere(_imgNull);
         }
         finally
         {
             _enforcing = false;
+        }
+
+        // Prune destroyed references every 300 calls (~3.5s at 87fps).
+        // No longer done every frame — that was O(N) over all game renderers each LateUpdate.
+        if (++_enforcePruneCounter >= 300)
+        {
+            _enforcePruneCounter = 0;
+            _replacedSrs.RemoveWhere(_srNull);
+            _replacedImgs.RemoveWhere(_imgNull);
+            _knownRenderers.RemoveWhere(_srNull);
+            _knownImages.RemoveWhere(_imgNull);
         }
     }
 
@@ -715,6 +739,11 @@ public static partial class T2DLoader
             }
             foreach (var k in deadKeys) _trackedSpriteNames.Remove(k);
         }
+
+        // Scene textures are destroyed — IDs from the old scene may be reused next scene.
+        // Replacement-tracking sets must be rebuilt from scratch via ApplyReplacementsInScene.
+        _replacedSrs.Clear();
+        _replacedImgs.Clear();
     }
 
     // ================================================================
@@ -750,6 +779,8 @@ public static partial class T2DLoader
         _knownRenderers.Clear();
         _knownImages.Clear();
         _trackedSpriteNames.Clear();
+        _replacedSrs.Clear();
+        _replacedImgs.Clear();
 
         PreloadAllTextures();
 
