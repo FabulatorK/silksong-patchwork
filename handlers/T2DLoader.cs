@@ -590,9 +590,8 @@ public static partial class T2DLoader
         // native code, or freshly Instantiated objects where Unity copies sprite state
         // via native serialisation and bypasses the managed property setter).
         // OnSpriteSet → TrySwapTexture covers both spritesheets and individual sprites.
-        // FindObjectsInactive.Exclude: inactive renderers are invisible — no point checking them.
         int triggered = 0;
-        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
         {
             if (sr == null || sr.sprite == null) continue;
             CheckSprite(sr.GetInstanceID(), sr.sprite, out bool changed, out _);
@@ -603,7 +602,7 @@ public static partial class T2DLoader
             }
         }
 
-        foreach (var img in Object.FindObjectsByType<Image>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
         {
             if (img == null || img.sprite == null) continue;
             CheckSprite(img.GetInstanceID(), img.sprite, out bool changed, out _);
