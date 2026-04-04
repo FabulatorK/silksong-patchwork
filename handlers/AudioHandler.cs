@@ -9,6 +9,30 @@ using UnityEngine.Networking;
 
 namespace Patchwork.Handlers;
 
+/// <summary>
+/// One entry in the audio clip browser — produced by AudioHandler.GetClipInventory().
+/// </summary>
+public sealed class AudioClipEntry
+{
+    public readonly string       ClipName;
+    public readonly float        LengthSeconds;
+    public readonly int          Channels;
+    public readonly int          Frequency;
+    /// <summary>True when a replacement file exists in the active pack's sound index.</summary>
+    public readonly bool         HasReplacement;
+    /// <summary>Game-object paths of live AudioSources currently holding this clip.</summary>
+    public readonly List<string> SourcePaths = new();
+
+    public AudioClipEntry(string name, float length, int channels, int frequency, bool hasReplacement)
+    {
+        ClipName       = name;
+        LengthSeconds  = length;
+        Channels       = channels;
+        Frequency      = frequency;
+        HasReplacement = hasReplacement;
+    }
+}
+
 [HarmonyPatch]
 public static class AudioHandler
 {
@@ -40,10 +64,17 @@ public static class AudioHandler
     /// <summary>True when at least one audio replacement file exists across all active packs.</summary>
     public static bool HasAudioReplacements => _indexBuilt && _soundIndex.Count > 0;
 
-    /// <summary>Fired on the main thread whenever an AudioClip is about to play (vanilla or replaced).</summary>
-    public static event Action<AudioClip> OnAudioPlayed;
-    /// <summary>Fired during Reload() for every live AudioSource — lets GUI inventory the loaded clip set.</summary>
-    public static event Action<AudioSource> OnAudioSourceLoaded;
+    /// <summary>
+    /// Fired on the main thread whenever an AudioClip is about to play.
+    /// Second arg is the AudioSource that owns the clip (null for one-shot paths that lack a persistent source).
+    /// </summary>
+    public static event Action<AudioClip, AudioSource> OnAudioPlayed;
+
+    /// <summary>
+    /// Set by AudioPillar when the Audio tab is visible.
+    /// Gates the full clip/source sweep in GetClipInventory — zero cost when closed.
+    /// </summary>
+    public static bool IsAudioBrowserActive;
 
     public static void ApplyPatches(Harmony harmony)
     {
@@ -102,7 +133,7 @@ public static class AudioHandler
     {
         if (source.clip != null)
         {
-            OnAudioPlayed?.Invoke(source.clip);
+            OnAudioPlayed?.Invoke(source.clip, source);
             LoadAudio(source);
         }
     }
@@ -111,7 +142,7 @@ public static class AudioHandler
     {
         if (clip != null)
         {
-            OnAudioPlayed?.Invoke(clip);
+            OnAudioPlayed?.Invoke(clip, source);
             LoadAudio(ref clip);
         }
     }
@@ -120,7 +151,7 @@ public static class AudioHandler
     {
         if (value != null)
         {
-            OnAudioPlayed?.Invoke(value);
+            OnAudioPlayed?.Invoke(value, __instance);
             if (!_reverting &&
                 (!value.name.StartsWith("PATCHWORK_") || !LoadedClips.ContainsKey(value.name.Replace("PATCHWORK_", ""))))
                 LoadAudio(__instance);
@@ -281,7 +312,6 @@ public static class AudioHandler
                 }
             }
 
-            OnAudioSourceLoaded?.Invoke(source);
         }
 
         // Eagerly preload every replacement clip in the index, even those not currently
@@ -420,5 +450,57 @@ public static class AudioHandler
     {
         if (!_indexBuilt) RebuildSoundIndex();
         return _soundIndex.TryGetValue(soundName, out var path) ? path : null;
+    }
+
+    // ── Clip inventory for the browser ──────────────────────────────────────
+
+    /// <summary>
+    /// Full sweep of every AudioClip in memory paired with the AudioSources that hold it.
+    /// Mirrors the approach used by T2DLoader.GetSceneTextureEntries():
+    /// finds clips that never fire through a harmony-patched play path.
+    /// Only call when IsAudioBrowserActive is true.
+    /// </summary>
+    public static List<AudioClipEntry> GetClipInventory()
+    {
+        if (!_indexBuilt) RebuildSoundIndex();
+
+        // clip instance-ID → entry
+        var byId = new Dictionary<int, AudioClipEntry>();
+
+        // Primary: all clips loaded in memory
+        foreach (var clip in Resources.FindObjectsOfTypeAll<AudioClip>())
+        {
+            if (clip == null) continue;
+            string name = clip.name.Replace("PATCHWORK_", "");
+            int id = clip.GetInstanceID();
+            if (!byId.ContainsKey(id))
+                byId[id] = new AudioClipEntry(name, clip.length, clip.channels, clip.frequency,
+                    _soundIndex.ContainsKey(name));
+        }
+
+        // Secondary: scan live AudioSources to build clip → source-path associations
+        foreach (var src in Resources.FindObjectsOfTypeAll<AudioSource>())
+        {
+            if (src == null || src.clip == null) continue;
+            int id = src.clip.GetInstanceID();
+            if (!byId.TryGetValue(id, out var entry)) continue;
+            string path = GetGameObjectPath(src);
+            if (!entry.SourcePaths.Contains(path))
+                entry.SourcePaths.Add(path);
+        }
+
+        var result = new List<AudioClipEntry>(byId.Values);
+        result.Sort((a, b) => string.Compare(a.ClipName, b.ClipName, StringComparison.OrdinalIgnoreCase));
+        return result;
+    }
+
+    private static string GetGameObjectPath(AudioSource src)
+    {
+        if (src == null) return "";
+        // Walk up two levels max — enough context without becoming unwieldy
+        var t = src.transform;
+        string name = t.name;
+        if (t.parent != null) name = t.parent.name + "/" + name;
+        return name;
     }
 }

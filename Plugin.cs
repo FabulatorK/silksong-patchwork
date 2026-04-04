@@ -143,8 +143,7 @@ public class Plugin : BaseUnityPlugin
         // ── Wire handler → GUI events (keeps handlers free of GUI references) ──
         DialogueHandler.OnTextAccessed += (sheet, key, text) => TextLog.LogText(sheet, key, text);
         DialogueHandler.OnTextAccessed += (sheet, key, text) => { if (ShowDevHub) DialogueEditor.TrackText(sheet, key, text); };
-        AudioHandler.OnAudioPlayed    += clip   => AudioLog.LogAudio(clip);
-        AudioHandler.OnAudioSourceLoaded += src => AudioList.LogAudio(src);
+        AudioHandler.OnAudioPlayed += (clip, src) => AudioLog.LogAudio(clip, src);
         T2DLoader.OnT2DTrigger        += (tex, sprite) => T2DLog.LogTrigger(tex, sprite);
 
         RawKeyboardLeakBlocker.ApplyPatches(harmony);

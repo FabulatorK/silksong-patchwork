@@ -1,32 +1,43 @@
 using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
+using Patchwork.Handlers;
 
 namespace Patchwork.GUI;
 
+/// <summary>
+/// Clip inventory for the Audio browser.
+/// Populated on demand via AudioHandler.GetClipInventory() — a full memory sweep.
+/// Same approach as T2DLoader.GetSceneTextureEntries(): finds clips regardless of
+/// whether they have ever fired through a harmony-patched play path.
+/// </summary>
 public static class AudioList
 {
-    private static readonly HashSet<string> LoadedAudioClips = new();
+    private static List<AudioClipEntry> _entries = new();
+    private static bool _needsRefresh = true;
 
-    /// <summary>Returns a sorted copy of the loaded clip name set.</summary>
-    public static List<string> GetClipNames()
+    /// <summary>
+    /// Returns the cached entry list.  Stale until Refresh() is called or
+    /// NeedsRefresh is true and the pillar calls Refresh() explicitly.
+    /// </summary>
+    public static IReadOnlyList<AudioClipEntry> Entries => _entries;
+
+    public static bool NeedsRefresh => _needsRefresh;
+
+    /// <summary>Schedules a refresh on the next pillar draw.</summary>
+    public static void RequestRefresh() => _needsRefresh = true;
+
+    /// <summary>
+    /// Runs the full sweep. Only called when the Audio tab is visible
+    /// (AudioHandler.IsAudioBrowserActive is true at that point).
+    /// </summary>
+    public static void Refresh()
     {
-        var list = new List<string>(LoadedAudioClips);
-        list.Sort();
-        return list;
+        _needsRefresh = false;
+        _entries = AudioHandler.GetClipInventory();
     }
 
-    public static void LogAudio(AudioSource source)
-    {
-        if (source == null || string.IsNullOrEmpty(source.clip?.name))
-            return;
-
-        string soundName = source.clip.name.Replace("PATCHWORK_", "");
-        LoadedAudioClips.Add(soundName);
-    }
-    
     public static void ClearList()
     {
-        LoadedAudioClips.Clear();
+        _entries.Clear();
+        _needsRefresh = true;
     }
 }
