@@ -14,12 +14,17 @@ public static class SpriteLoader
     public static string LoadPath { get { return Path.Combine(Plugin.BasePath, "Sprites"); } }
     public static string AtlasLoadPath { get { return Path.Combine(Plugin.BasePath, "Spritesheets"); } }
 
+    // Runtime state dictionaries — keyed by instance key (see InstanceKey()) so that two
+    // tk2dSpriteCollectionData objects with the same .name (e.g. "Slab Prisoner Cln Data"
+    // appearing in both Assets/Collections/ and Assets/Collections/Hornet NPCs/) never
+    // collide.  File-index lookups still use collection.name — pack authors address folders
+    // by name, and applying a replacement to every same-named collection is correct.
     private static readonly Dictionary<string, HashSet<string>> LoadedAtlases = new();
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> LoadedAtlasesTextures = new();
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
     // Vanilla texture backups, captured before the first replacement.
-    // Keyed by collection name → material name.  Never cleared across reloads.
+    // Keyed by instance key → material name.  Never cleared across reloads.
     //
     // We blit the vanilla texture into a runtime-owned RenderTexture on first encounter.
     // Runtime RTs are NOT part of any AssetBundle, so AssetBundle.Unload(true) cannot
@@ -27,6 +32,18 @@ public static class SpriteLoader
     // Unload(true), causing Graphics.Blit to silently write nothing (transparent atlas).
     // DontUnloadUnusedAsset prevents Resources.UnloadUnusedAssets() from evicting them.
     private static readonly Dictionary<string, Dictionary<string, RenderTexture>> _originalTextures = new();
+
+    // Maps instance key → collection.name for MarkReload* lookups (which receive a name
+    // string from the file watcher and need to find all live instances with that name).
+    private static readonly Dictionary<string, string> _instanceKeyToName = new();
+
+    /// <summary>
+    /// Stable runtime key for a collection instance.
+    /// Combines the human-readable name with the Unity instance ID so two collections
+    /// sharing the same name are never confused.
+    /// </summary>
+    private static string InstanceKey(tk2dSpriteCollectionData coll)
+        => coll.name + "\x00" + coll.GetInstanceID();
 
     // Pre-built file indices: relative key (normalized, case-insensitive) → (absolute path, source pack).
     // Sprites:     key = "CollectionName/MaterialName/SpriteName.png"
@@ -67,6 +84,9 @@ public static class SpriteLoader
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
+        string ikey = InstanceKey(collection);
+        _instanceKeyToName[ikey] = collection.name;
+
         bool hasCustomSpritesheets = false;
         foreach (var mat in collection.materials)
         {
@@ -77,8 +97,8 @@ public static class SpriteLoader
             string matnameAbbr = mat.name.Split(' ')[0];
 
             // Capture vanilla texture on first encounter (blit into a persistent backup RT).
-            if (!_originalTextures.TryGetValue(collection.name, out var origMap))
-                _originalTextures[collection.name] = origMap = new();
+            if (!_originalTextures.TryGetValue(ikey, out var origMap))
+                _originalTextures[ikey] = origMap = new();
             if (mat.mainTexture is not RenderTexture && mat.mainTexture != null
                 && !origMap.ContainsKey(matname))
             {
@@ -99,10 +119,10 @@ public static class SpriteLoader
             if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
                 continue;
 
-            if (!LoadedAtlases.ContainsKey(collection.name))
-                LoadedAtlases[collection.name] = new HashSet<string>();
+            if (!LoadedAtlases.ContainsKey(ikey))
+                LoadedAtlases[ikey] = new HashSet<string>();
 
-            if (LoadedAtlases[collection.name].Add(matname))
+            if (LoadedAtlases[ikey].Add(matname))
             {
                 // First time in this reload cycle: (re-)blit the atlas for this material.
                 //
@@ -114,8 +134,8 @@ public static class SpriteLoader
                 Texture blitSrc = (Texture)customTex ?? vanillaTex;
                 if (customTex != null) hasCustomSpritesheets = true;
 
-                if (!LoadedAtlasesTextures.TryGetValue(collection.name, out var atlasMap))
-                    LoadedAtlasesTextures[collection.name] = atlasMap = new();
+                if (!LoadedAtlasesTextures.TryGetValue(ikey, out var atlasMap))
+                    LoadedAtlasesTextures[ikey] = atlasMap = new();
 
                 if (!atlasMap.TryGetValue(matname, out var atlasRT) || atlasRT == null
                     || atlasRT.width != blitSrc.width || atlasRT.height != blitSrc.height)
@@ -141,9 +161,10 @@ public static class SpriteLoader
             }
             else
             {
-                // Already processed in this reload cycle (duplicate collection instance).
+                // Already processed in this reload cycle (same instance seen twice — e.g.
+                // FindObjectsOfTypeAll returning it more than once on some Unity versions).
                 // Just ensure the material points at our RT.
-                if (LoadedAtlasesTextures.TryGetValue(collection.name, out var atlasMap)
+                if (LoadedAtlasesTextures.TryGetValue(ikey, out var atlasMap)
                     && atlasMap.TryGetValue(matname, out var atlasRT))
                     mat.mainTexture = atlasRT;
             }
@@ -165,11 +186,11 @@ public static class SpriteLoader
             foreach (var def in spriteDefinitions)
             {
                 if (string.IsNullOrEmpty(def.name)) continue;
-                if (!LoadedSprites.ContainsKey(collection.name))
-                    LoadedSprites[collection.name] = new Dictionary<string, HashSet<string>>();
-                if (!LoadedSprites[collection.name].ContainsKey(matname))
-                    LoadedSprites[collection.name][matname] = new HashSet<string>();
-                if (!LoadedSprites[collection.name][matname].Add(def.name)) continue;
+                if (!LoadedSprites.ContainsKey(ikey))
+                    LoadedSprites[ikey] = new Dictionary<string, HashSet<string>>();
+                if (!LoadedSprites[ikey].ContainsKey(matname))
+                    LoadedSprites[ikey][matname] = new HashSet<string>();
+                if (!LoadedSprites[ikey][matname].Add(def.name)) continue;
 
                 Texture2D spriteTex = FindSprite(collection.name, matnameAbbr, def.name);
                 if (spriteTex == null) continue;
@@ -286,32 +307,38 @@ public static class SpriteLoader
     {
         lock (LoadedSprites)
         {
-            if (!LoadedSprites.ContainsKey(collectionName))
-                return;
-            foreach (string key in LoadedSprites[collectionName].Keys.ToList())
+            foreach (var ikey in InstanceKeysForName(collectionName))
             {
-                if (key.StartsWith(atlasName))
-                    LoadedSprites[collectionName][key].Remove(spriteName);
+                if (!LoadedSprites.TryGetValue(ikey, out var matMap)) continue;
+                foreach (string key in matMap.Keys.ToList())
+                    if (key.StartsWith(atlasName))
+                        matMap[key].Remove(spriteName);
             }
         }
     }
-
 
     public static void MarkReloadAtlas(string collectionName, string atlasName)
     {
         lock (LoadedAtlases)
         {
-            if (LoadedAtlases.ContainsKey(collectionName))
+            foreach (var ikey in InstanceKeysForName(collectionName))
             {
-                foreach (string key in LoadedAtlases[collectionName].Where(a => a.StartsWith(atlasName)).ToList())
-                    LoadedAtlases[collectionName].Remove(key);
-            }
-            if (LoadedSprites.ContainsKey(collectionName))
-            {
-                foreach (string key in LoadedSprites[collectionName].Keys.Where(a => a.StartsWith(atlasName)).ToList())
-                    LoadedSprites[collectionName][key].Clear();
+                if (LoadedAtlases.TryGetValue(ikey, out var atlasSet))
+                    foreach (string key in atlasSet.Where(a => a.StartsWith(atlasName)).ToList())
+                        atlasSet.Remove(key);
+                if (LoadedSprites.TryGetValue(ikey, out var matMap))
+                    foreach (string key in matMap.Keys.Where(a => a.StartsWith(atlasName)).ToList())
+                        matMap[key].Clear();
             }
         }
+    }
+
+    /// <summary>Returns all live instance keys whose collection name matches <paramref name="collectionName"/>.</summary>
+    private static IEnumerable<string> InstanceKeysForName(string collectionName)
+    {
+        foreach (var kvp in _instanceKeyToName)
+            if (string.Equals(kvp.Value, collectionName, StringComparison.Ordinal))
+                yield return kvp.Key;
     }
 
     public static void Reload()
@@ -319,6 +346,7 @@ public static class SpriteLoader
         RebuildFileIndex();
         LoadedAtlases.Clear();
         LoadedSprites.Clear();
+        _instanceKeyToName.Clear();
         // LoadedAtlasesTextures is intentionally NOT cleared here.
         // Each atlas RT is reused in-place: we blit new content into the existing RT
         // rather than destroying and recreating it.  This means mat.mainTexture never
