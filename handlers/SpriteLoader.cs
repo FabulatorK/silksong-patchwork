@@ -152,7 +152,16 @@ public static class SpriteLoader
             RenderTexture.active = mat.mainTexture as RenderTexture;
             GL.PushMatrix();
             GL.LoadPixelMatrix(0, mat.mainTexture.width, mat.mainTexture.height, 0);
-            tk2dSpriteDefinition[] spriteDefinitions = [.. collection.spriteDefinitions.Where(def => def.material == mat)];
+
+            // Use materialId (authoritative index set at tk2d export time) rather than
+            // def.material reference equality.  Unity silently creates material instances
+            // when any renderer accesses .material instead of .sharedMaterial; this makes
+            // def.material diverge from collection.materials[i], causing entire sprite
+            // batches to be missed and those atlas regions to show wrong content.
+            int matIndex = System.Array.IndexOf(collection.materials, mat);
+            tk2dSpriteDefinition[] spriteDefinitions = matIndex < 0
+                ? System.Array.Empty<tk2dSpriteDefinition>()
+                : [.. collection.spriteDefinitions.Where(def => def.materialId == matIndex)];
             foreach (var def in spriteDefinitions)
             {
                 if (string.IsNullOrEmpty(def.name)) continue;
