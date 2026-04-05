@@ -44,10 +44,13 @@ public static class AudioLog
 
             GUILayout.BeginHorizontal();
 
-            // Clip name — click focuses browser
+            // Clip name — click copies to clipboard and focuses browser
             UnityEngine.GUI.contentColor = new Color(1f, 1f, 1f, opacity);
-            if (GUILayout.Button(entry.ClipName, GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
+            if (GUILayout.Button(GUIHelper.TT(entry.ClipName, "Click to copy name"), GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
+            {
+                GUIUtility.systemCopyBuffer = entry.ClipName;
                 _pendingFocusClip = entry.ClipName;
+            }
 
             // Source path — dimmed, right-aligned
             if (!string.IsNullOrEmpty(entry.SourcePath))

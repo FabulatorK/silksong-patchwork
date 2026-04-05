@@ -128,8 +128,9 @@ public static class AudioPillar
         GUILayout.BeginHorizontal();
 
         if (sel) UnityEngine.GUI.contentColor = new Color(0.6f, 0.9f, 1f);
-        if (GUILayout.Button(entry.ClipName, GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
+        if (GUILayout.Button(GUIHelper.TT(entry.ClipName, "Click to copy name"), GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
         {
+            GUIUtility.systemCopyBuffer = entry.ClipName;
             _selected     = entry;
             _hasSelection = true;
         }
