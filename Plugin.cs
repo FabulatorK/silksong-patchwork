@@ -230,6 +230,7 @@ public class Plugin : BaseUnityPlugin
         if (ShowPackManager)
             PackManagerWindow.Draw();
 
+        GUIHelper.EndOnGUI();
     }
     
     private void InitializeFolders()

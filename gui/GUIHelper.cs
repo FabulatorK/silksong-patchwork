@@ -277,8 +277,67 @@ public static class GUIHelper
     /// </summary>
     public static void EndOnGUI()
     {
-        // Intentionally minimal for now.
+        DrawTooltip();
     }
+
+    // ── Tooltip ─────────────────────────────────────────────────────────────
+
+    private static GUIStyle _tooltipStyle;
+
+    /// <summary>
+    /// Draws the tooltip for whatever control the mouse is over, if any.
+    /// Uses <see cref="GUI.tooltip"/> which IMGUI sets automatically when a
+    /// control was created with <c>new GUIContent(label, tooltip)</c>.
+    /// Must be called at the end of OnGUI so it renders on top of everything.
+    /// </summary>
+    public static void DrawTooltip()
+    {
+        // GUI.tooltip is only populated during Repaint; empty on other events.
+        if (string.IsNullOrEmpty(UnityEngine.GUI.tooltip)) return;
+        if (Event.current.type != EventType.Repaint) return;
+
+        if (_tooltipStyle == null)
+        {
+            _tooltipStyle = new GUIStyle(UnityEngine.GUI.skin.box)
+            {
+                fontSize  = FontSize(12),
+                alignment = TextAnchor.UpperLeft,
+                wordWrap  = true,
+                padding   = new RectOffset(ScaledInt(6), ScaledInt(6), ScaledInt(4), ScaledInt(4)),
+            };
+            _tooltipStyle.normal.textColor = new Color(0.9f, 0.9f, 0.9f);
+        }
+
+        float maxW   = Scaled(260f);
+        float mouseX = Event.current.mousePosition.x;
+        float mouseY = Event.current.mousePosition.y;
+
+        // Measure before drawing
+        var content = new GUIContent(UnityEngine.GUI.tooltip);
+        float h = _tooltipStyle.CalcHeight(content, maxW);
+
+        // Offset right-and-below the cursor; flip left/up when near screen edge
+        float offX = Scaled(14f);
+        float offY = Scaled(18f);
+        float x = mouseX + offX;
+        float y = mouseY + offY;
+        if (x + maxW > Screen.width)  x = mouseX - maxW - offX;
+        if (y + h    > Screen.height) y = mouseY - h   - offY;
+
+        // Semi-transparent background layer, then the styled box
+        var bgRect = new Rect(x, y, maxW, h);
+        UnityEngine.GUI.color = new Color(0f, 0f, 0f, 0.72f);
+        UnityEngine.GUI.DrawTexture(bgRect, Texture2D.whiteTexture);
+        UnityEngine.GUI.color = Color.white;
+        UnityEngine.GUI.Box(bgRect, content, _tooltipStyle);
+    }
+
+    /// <summary>
+    /// Convenience shorthand: <c>new GUIContent(label, tooltip)</c>.
+    /// Use this instead of a bare string wherever a tooltip is useful.
+    /// </summary>
+    public static GUIContent TT(string label, string tooltip)
+        => new GUIContent(label, tooltip);
 
     /// <summary>
     /// Focus a named Patchwork text control on the next OnGUI pass.
