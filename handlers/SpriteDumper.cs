@@ -41,7 +41,10 @@ public static class SpriteDumper
                 GL.LoadPixelMatrix(0, matTex.width, matTex.height, 0);
 
                 string matname = mat.name.Split(' ')[0];
-                tk2dSpriteDefinition[] spriteDefinitions = [.. collection.spriteDefinitions.Where(def => def.material == mat)];
+                int matIndex = System.Array.IndexOf(collection.materials, mat);
+                tk2dSpriteDefinition[] spriteDefinitions = matIndex < 0
+                    ? System.Array.Empty<tk2dSpriteDefinition>()
+                    : [.. collection.spriteDefinitions.Where(def => def.materialId == matIndex)];
                 
                 foreach (var def in spriteDefinitions)
                 {
@@ -149,7 +152,8 @@ public static class SpriteDumper
     {
         foreach (var mat in collection.materials)
         {
-            if (def.material != mat)
+            int matIndex = System.Array.IndexOf(collection.materials, mat);
+            if (matIndex < 0 || def.materialId != matIndex)
                 continue;
 
             if (mat == null || mat.mainTexture == null)
