@@ -670,6 +670,13 @@ public static partial class T2DLoader
     private static void CheckSprite(int instanceId, Sprite sprite, out bool nameChanged, out bool replacementMissing)
     {
         string key = KeyForSprite(sprite);
+
+        // HandleLoad has a _spriteNameToKey fallback for mismatched atlas names and non-T2D
+        // textures.  Mirror it here so the uninit sweep catches the same sprites.
+        if (!_loadedSprites.ContainsKey(key)
+            && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey))
+            key = fallbackKey;
+
         if (!_loadedSprites.ContainsKey(key))
         {
             nameChanged = false;
@@ -685,7 +692,13 @@ public static partial class T2DLoader
     }
 
     private static bool TryGetReplacement(Sprite sprite, out Sprite replacement)
-        => _loadedSprites.TryGetValue(KeyForSprite(sprite), out replacement) && replacement != null;
+    {
+        string key = KeyForSprite(sprite);
+        if (!_loadedSprites.TryGetValue(key, out replacement)
+            && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey))
+            _loadedSprites.TryGetValue(fallbackKey, out replacement);
+        return replacement != null;
+    }
 
     private static string KeyForSprite(Sprite sprite)
         => (sprite.texture != null && T2DUtil.IsT2DTexture(sprite.texture.name))
