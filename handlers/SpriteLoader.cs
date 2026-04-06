@@ -37,6 +37,12 @@ public static class SpriteLoader
     // string from the file watcher and need to find all live instances with that name).
     private static readonly Dictionary<string, string> _instanceKeyToName = new();
 
+    // Maps (instanceKey + "\x00" + matname) → the vanilla texture's .name, captured before
+    // the first replacement.  Used to resolve instance-specific spritesheet/sprite paths when
+    // two collections share the same .name and material abbreviation.
+    // Never cleared — mirrors _originalTextures lifetime (vanilla names don't change).
+    private static readonly Dictionary<string, string> _vanillaTexNames = new();
+
     /// <summary>
     /// Stable runtime key for a collection instance.
     /// Combines the human-readable name with the Unity instance ID so two collections
@@ -85,7 +91,19 @@ public static class SpriteLoader
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
         string ikey = InstanceKey(collection);
+        bool nameCollision = _instanceKeyToName.ContainsValue(collection.name);
         _instanceKeyToName[ikey] = collection.name;
+
+        // Warn on first detection of a same-name collision and tell pack authors what
+        // texture name to use for instance-specific targeting.
+        if (nameCollision)
+            Plugin.Logger.LogWarning(
+                $"[SpriteLoader] Duplicate collection name '{collection.name}' " +
+                $"(instanceId {collection.GetInstanceID()}). " +
+                $"Use the vanilla texture name as the folder/file name to target this " +
+                $"instance specifically: Sprites/{collection.name}/{{texName}}/... or " +
+                $"Spritesheets/{collection.name}/{{texName}}.png  " +
+                $"(texture names logged per material below when vanilla is first captured).");
 
         bool hasCustomSpritesheets = false;
         foreach (var mat in collection.materials)
@@ -112,6 +130,12 @@ public static class SpriteLoader
                 };
                 Graphics.Blit(mat.mainTexture, backupRT);
                 origMap[matname] = backupRT;
+                // Record vanilla texture name for instance-specific load path resolution.
+                string vTexName = mat.mainTexture.name;
+                _vanillaTexNames[ikey + "\x00" + matname] = vTexName;
+                if (nameCollision)
+                    Plugin.Logger.LogWarning(
+                        $"[SpriteLoader]   mat '{matnameAbbr}' → vanilla texture '{vTexName}'");
             }
 
             // If vanilla is not known yet (Reload() ran before this collection's Init()),
@@ -130,7 +154,7 @@ public static class SpriteLoader
                 // Blitting new content into the existing RT is safe because mat.mainTexture
                 // already points at that RT — nothing ever sees a null/destroyed texture.
                 // A new RT is only created on the very first encounter or on a dimension change.
-                Texture2D customTex = FindSpritesheetTex(collection, matnameAbbr);
+                Texture2D customTex = FindSpritesheetTex(collection, ikey, matname, matnameAbbr);
                 Texture blitSrc = (Texture)customTex ?? vanillaTex;
                 if (customTex != null) hasCustomSpritesheets = true;
 
@@ -192,7 +216,7 @@ public static class SpriteLoader
                     LoadedSprites[ikey][matname] = new HashSet<string>();
                 if (!LoadedSprites[ikey][matname].Add(def.name)) continue;
 
-                Texture2D spriteTex = FindSprite(collection.name, matnameAbbr, def.name);
+                Texture2D spriteTex = FindSprite(collection.name, ikey, matname, matnameAbbr, def.name);
                 if (spriteTex == null) continue;
 
                 Rect spriteRect = SpriteUtil.GetSpriteRect(def, mat.mainTexture);
@@ -279,12 +303,29 @@ public static class SpriteLoader
             : $"{type}:{noExt}";
     }
 
-    private static Texture2D FindSprite(string collectionName, string materialName, string spriteName)
+    /// <summary>
+    /// Looks up a replacement PNG for an individual sprite.
+    /// Tries an instance-specific path keyed by the vanilla texture name first, then
+    /// falls back to the material-abbreviation path for backward compatibility.
+    /// </summary>
+    private static Texture2D FindSprite(string collectionName, string ikey,
+        string matname, string matnameAbbr, string spriteName)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
-        string key = $"{collectionName}/{materialName}/{spriteName}.png";
-        return _spriteFileIndex.TryGetValue(key, out var entry)
-            ? TexUtil.LoadFromPNG(entry.FullPath)
+
+        // Instance-specific: Sprites/{collName}/{vanillaTexName}/{spriteName}.png
+        if (_vanillaTexNames.TryGetValue(ikey + "\x00" + matname, out var texName)
+            && !string.IsNullOrEmpty(texName))
+        {
+            string specific = $"{collectionName}/{texName}/{spriteName}.png";
+            if (_spriteFileIndex.TryGetValue(specific, out var s))
+                return TexUtil.LoadFromPNG(s.FullPath);
+        }
+
+        // General: Sprites/{collName}/{matAbbr}/{spriteName}.png
+        string general = $"{collectionName}/{matnameAbbr}/{spriteName}.png";
+        return _spriteFileIndex.TryGetValue(general, out var g)
+            ? TexUtil.LoadFromPNG(g.FullPath)
             : null;
     }
 
@@ -292,14 +333,27 @@ public static class SpriteLoader
     /// Returns a freshly loaded Texture2D for the custom spritesheet, or null if no
     /// custom sheet is found for this collection/material.  Caller must Destroy the
     /// returned texture when it is no longer needed.
+    /// Tries an instance-specific path keyed by the vanilla texture name first, then
+    /// falls back to the material-abbreviation path for backward compatibility.
     /// </summary>
     private static Texture2D FindSpritesheetTex(tk2dSpriteCollectionData collection,
-        string materialName)
+        string ikey, string matname, string matnameAbbr)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
-        string key = $"{collection.name}/{materialName}.png";
-        return _sheetFileIndex.TryGetValue(key, out var entry)
-            ? TexUtil.LoadFromPNG(entry.FullPath)
+
+        // Instance-specific: Spritesheets/{collName}/{vanillaTexName}.png
+        if (_vanillaTexNames.TryGetValue(ikey + "\x00" + matname, out var texName)
+            && !string.IsNullOrEmpty(texName))
+        {
+            string specific = $"{collection.name}/{texName}.png";
+            if (_sheetFileIndex.TryGetValue(specific, out var s))
+                return TexUtil.LoadFromPNG(s.FullPath);
+        }
+
+        // General: Spritesheets/{collName}/{matAbbr}.png
+        string general = $"{collection.name}/{matnameAbbr}.png";
+        return _sheetFileIndex.TryGetValue(general, out var g)
+            ? TexUtil.LoadFromPNG(g.FullPath)
             : null;
     }
 
