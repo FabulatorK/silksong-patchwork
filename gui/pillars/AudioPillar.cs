@@ -31,6 +31,18 @@ public static class AudioPillar
     private static bool           _hasSelection;
     private static string         _searchFilter = "";
 
+    // Filtered entry list — rebuilt only when filter text or AudioList.Version changes.
+    // Never iterated to draw all rows; virtual scroll reads a slice by index.
+    private static readonly List<AudioClipEntry> _filteredEntries = new();
+    private static string _lastAppliedFilter = null;
+    private static int    _lastListVersion   = -1;
+
+    // Height of the browser scroll view captured last Repaint — used to compute visible row range.
+    private static float _browserScrollViewH = 300f;
+
+    // Unscaled row height — must match the Height() constraint in DrawBrowserRow.
+    private const float RowH = 22f;
+
     // Disk-file count cached to avoid per-frame IO.
     private static int   _diskFileCount = 0;
     private static float _lastScanTime  = -999f;
@@ -88,20 +100,31 @@ public static class AudioPillar
             AudioList.RequestRefresh();
         GUILayout.EndHorizontal();
 
-        _leftScroll = GUILayout.BeginScrollView(_leftScroll, GUILayout.ExpandHeight(true));
-
-        bool any = false;
-        foreach (var entry in AudioList.Entries)
+        // Rebuild filtered list only when search text or list contents change.
+        if (_lastAppliedFilter != _searchFilter || _lastListVersion != AudioList.Version)
         {
-            if (!string.IsNullOrEmpty(_searchFilter) &&
-                entry.ClipName.IndexOf(_searchFilter, System.StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
-
-            any = true;
-            DrawBrowserRow(entry);
+            if (_lastAppliedFilter != _searchFilter)
+                _leftScroll.y = 0; // reset scroll when filter text changes
+            _lastAppliedFilter = _searchFilter;
+            _lastListVersion   = AudioList.Version;
+            _filteredEntries.Clear();
+            foreach (var e in AudioList.Entries)
+            {
+                if (string.IsNullOrEmpty(_searchFilter) ||
+                    e.ClipName.IndexOf(_searchFilter, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    _filteredEntries.Add(e);
+            }
         }
 
-        if (!any)
+        // Virtual scroll: only instantiate IMGUI controls for visible rows.
+        // GUILayout.BeginScrollView renders ALL children even when outside the viewport —
+        // this becomes the dominant OnGUI cost with 200+ clips.
+        float scaledRowH = GUIHelper.Scaled(RowH);
+        int   total      = _filteredEntries.Count;
+
+        _leftScroll = GUILayout.BeginScrollView(_leftScroll, GUILayout.ExpandHeight(true));
+
+        if (total == 0)
         {
             UnityEngine.GUI.contentColor = new Color(0.6f, 0.6f, 0.6f);
             GUILayout.Label(string.IsNullOrEmpty(_searchFilter)
@@ -109,8 +132,26 @@ public static class AudioPillar
                 : "No matches.", GUIHelper.LabelStyle);
             UnityEngine.GUI.contentColor = Color.white;
         }
+        else
+        {
+            int first = Mathf.Max(0, Mathf.FloorToInt(_leftScroll.y / scaledRowH) - 1);
+            int last  = Mathf.Min(total, first + Mathf.CeilToInt(_browserScrollViewH / scaledRowH) + 2);
+
+            if (first > 0)
+                GUILayout.Space(first * scaledRowH);
+
+            for (int i = first; i < last; i++)
+                DrawBrowserRow(_filteredEntries[i]);
+
+            if (last < total)
+                GUILayout.Space((total - last) * scaledRowH);
+        }
 
         GUILayout.EndScrollView();
+
+        // Capture scroll view height one frame after layout so the virtual window is accurate.
+        if (Event.current.type == EventType.Repaint)
+            _browserScrollViewH = GUILayoutUtility.GetLastRect().height;
 
         // Detail pane for selected clip (source associations + edit button)
         if (_hasSelection && _selected != null)
@@ -125,7 +166,8 @@ public static class AudioPillar
     private static void DrawBrowserRow(AudioClipEntry entry)
     {
         bool sel = _hasSelection && _selected?.ClipName == entry.ClipName;
-        GUILayout.BeginHorizontal();
+        // Height must match RowH so virtual scroll calculations stay accurate.
+        GUILayout.BeginHorizontal(GUIHelper.Height(RowH));
 
         if (sel) UnityEngine.GUI.contentColor = new Color(0.6f, 0.9f, 1f);
         if (GUILayout.Button(GUIHelper.TT(entry.ClipName, "Click to copy name"), GUIHelper.LabelStyle, GUILayout.ExpandWidth(true)))
@@ -205,16 +247,28 @@ public static class AudioPillar
 
     private static void FocusClipByName(string clipName)
     {
-        foreach (var entry in AudioList.Entries)
+        // Clear the search filter so the target clip is guaranteed to be in _filteredEntries.
+        if (!string.IsNullOrEmpty(_searchFilter))
         {
-            if (string.Equals(entry.ClipName, clipName, System.StringComparison.OrdinalIgnoreCase))
-            {
-                _selected     = entry;
-                _hasSelection = true;
-                return;
-            }
+            _searchFilter = "";
+            _lastAppliedFilter = null; // force filter rebuild next frame
         }
-        // Clip played but not yet in the sweep — schedule a refresh so it appears
+
+        for (int i = 0; i < _filteredEntries.Count; i++)
+        {
+            if (!string.Equals(_filteredEntries[i].ClipName, clipName, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            _selected     = _filteredEntries[i];
+            _hasSelection = true;
+
+            // Scroll so the row is centred in the visible window.
+            float scaledRowH = GUIHelper.Scaled(RowH);
+            _leftScroll.y = Mathf.Max(0f, i * scaledRowH - _browserScrollViewH * 0.5f);
+            return;
+        }
+
+        // Clip played but not yet in the sweep — schedule a refresh so it appears.
         AudioList.RequestRefresh();
     }
 

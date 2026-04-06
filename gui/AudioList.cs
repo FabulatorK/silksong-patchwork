@@ -13,6 +13,7 @@ public static class AudioList
 {
     private static List<AudioClipEntry> _entries = new();
     private static bool _needsRefresh = true;
+    private static int  _version;
 
     /// <summary>
     /// Returns the cached entry list.  Stale until Refresh() is called or
@@ -21,6 +22,12 @@ public static class AudioList
     public static IReadOnlyList<AudioClipEntry> Entries => _entries;
 
     public static bool NeedsRefresh => _needsRefresh;
+
+    /// <summary>
+    /// Incremented on every Refresh() or ClearList().
+    /// AudioPillar compares against this to know when to rebuild its filtered view.
+    /// </summary>
+    public static int Version => _version;
 
     /// <summary>Schedules a refresh on the next pillar draw.</summary>
     public static void RequestRefresh() => _needsRefresh = true;
@@ -33,11 +40,13 @@ public static class AudioList
     {
         _needsRefresh = false;
         _entries = AudioHandler.GetClipInventory();
+        _version++;
     }
 
     public static void ClearList()
     {
         _entries.Clear();
         _needsRefresh = true;
+        _version++;
     }
 }

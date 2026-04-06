@@ -249,6 +249,13 @@ public static class GUIHelper
     /// </summary>
     public static void BeginOnGUI()
     {
+        // Clear any stale tooltip from the Layout pass.  Unity sets GUI.tooltip during
+        // Layout-event control processing and doesn't always reset it before Repaint.
+        // If the mouse left a control between Layout and Repaint we'd draw a phantom
+        // tooltip.  Clearing here lets the Repaint pass re-derive the correct value.
+        if (Event.current.type == EventType.Repaint)
+            UnityEngine.GUI.tooltip = "";
+
         if (!string.IsNullOrEmpty(_pendingFocusControlName))
         {
             UnityEngine.GUI.FocusControl(_pendingFocusControlName);
