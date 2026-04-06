@@ -200,6 +200,15 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
+        // Force cursor on while any interactive Patchwork window is open.
+        // LateUpdate runs after all other scripts' Update(), so this overrides
+        // whatever lock state the game re-asserts each frame.
+        if (ShowDevHub || ShowPackManager)
+        {
+            Cursor.visible   = true;
+            Cursor.lockState = CursorLockMode.None;
+        }
+
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
         DevProfiler.RecordEnforceMs(DevProfiler.StopOp("EnforceT2D"));
