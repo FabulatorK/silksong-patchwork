@@ -245,13 +245,17 @@ Non-negotiable. Violations cause VRAM leaks or missing textures after long sessi
 ```
 PackRoot/
   Sprites/[CollectionName]/[MaterialName]/[SpriteName].png
+  Sprites/[CollectionName]/[VanillaTextureName]/[SpriteName].png   ← instance-specific (same-named collections)
   Spritesheets/[CollectionName]/[MaterialName].png
+  Spritesheets/[CollectionName]/[VanillaTextureName].png           ← instance-specific
   Sounds/[ClipName].ogg  (.wav .mp3 .aiff)
   Videos/[CinematicName].mp4  (.webm .ogv .mov .avi .m4v .mpg .mpeg .wmv)
   Text/[Sheet]/[LANG].yml
 ```
 
 File index keys: normalised to forward slashes, case-insensitive.
+Instance-specific paths take priority over material-abbreviation paths. The vanilla texture name
+for each material is logged when a same-named collection collision is first detected.
 
 ---
 
@@ -269,12 +273,15 @@ File index keys: normalised to forward slashes, case-insensitive.
 
 | Commit | Change |
 |---|---|
-| `ace4d28` | `_originalTextures` → backup RTs (survive `AssetBundle.Unload`) |
-| `bf2f59d` | Destroy sprite Texture2D after blit (fix GPU leak / hard-restart failure) |
-| `771d4f5` | `ShowStatusOverlay` → `ConfigEntry<bool>` (persist HUD toggle) |
-| `cd6117f` | `VideoHandler.Reload()` + eager video scan on startup and pack change |
-| `c0d2407` | T2D vanilla sprite `DontUnloadUnusedAsset` (fix revert failure) |
-| `6a6f28a` | tk2d atlas RT reuse in-place (fix all-objects transparency on toggle) |
+| `c1db6ac` | Profile conditions, GUI persistence (window pos + tab), video trigger log |
+| `cfbc722` | Cursor auto-show in `LateUpdate` when DevHub or PackManager is open |
+| `7ce9e8b` | Fix tooltip stuck on cursor; audio browser virtual scroll (FPS fix) |
+| `fdc1390` | Simplify pass: `GetGameObjectPath` dedup, `ResolveKey`, tooltip scale cache, edit-clip opens folder |
+| `c903c9f` | `_collectionsWithFiles` gate — skip atlas RT swap with no replacement files |
+| `ea4522e` | Instance-specific sprite/sheet paths via vanilla texture name discriminator |
+| `4047ab8` | tk2d same-name collection collision fix via composite instance key |
+| `3c5f1b3` | `def.materialId` replaces `def.material` reference equality in SpriteLoader + SpriteDumper |
+| `4591743` | Audio discovery: full `FindObjectsOfTypeAll` sweep + source context in log |
 
 ---
 

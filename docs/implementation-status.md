@@ -67,10 +67,10 @@ item is implemented or a new plan is recorded.
 | StatusOverlay corner badge | `gui/StatusOverlay.cs`, `Plugin.cs` | Always-on HUD; shows active packs, conflicts, sprite/clip counts; clicking opens Pack Manager |
 | DevHub tabbed shell | `gui/DevHub.cs`, `Plugin.cs`, `PatchworkConfig.cs` | Single tabbed window; Alpha2-5 open at Graphics/Audio/Text/Performance tabs; `ShowDevHub` / `DevHubTab` in Plugin |
 | PerformancePillar | `gui/pillars/PerformancePillar.cs`, `gui/DevProfiler.cs` | Absorbs DevProfiler content; `DevProfiler.DrawPillarContent()` exposed; DevProfiler.Draw() kept as transition shim |
-| AudioPillar | `gui/pillars/AudioPillar.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs` | Two-pane: loaded clips (left) + live log (right); `AudioLog.DrawEntries()` + `AudioList.GetClipNames()` exposed |
+| AudioPillar | `gui/pillars/AudioPillar.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs` | Two-pane: clip browser with virtual scroll + search (left) + live play log with source path (right); clipboard copy on click; log-to-browser focus |
 | TextPillar | `gui/pillars/TextPillar.cs`, `gui/TextLog.cs`, `gui/DialogueEditor.cs` | Two-pane: accessed keys (left, clickable) + editor surface (right); click bridges to editor in-pillar |
 | GraphicsPillar | `gui/pillars/GraphicsPillar.cs`, `gui/AnimationController.cs`, `gui/T2DTextureController.cs` | Sub-tabs: Animation (frame inspector + atlas preview) + T2D Textures (scene browser, edit/dump workflow, live preview) |
-| VideoPillar stub | `gui/pillars/VideoPillar.cs` | Placeholder until VideoHandler has content; reads `VideoHandler.VideoFileMap` |
+| VideoPillar | `gui/pillars/VideoPillar.cs`, `handlers/VideoHandler.cs` | Replacement table + live cinematic trigger log; `VideoHandler.OnCinematicTriggered` event fires `(name, hasReplacement)` from Harmony postfix |
 | Pack Manager "Dev Tools →" footer | `gui/PackManagerWindow.cs` | Blue button in footer opens Dev Hub at Graphics tab |
 | Keybind consolidation | `PatchworkConfig.cs`, `Plugin.cs` | Alpha1=PackManager; Alpha2–5 open DevHub at Graphics/Audio/Text/Performance; legacy shims kept one release |
 
@@ -90,12 +90,50 @@ item is implemented or a new plan is recorded.
 | T2DDumper standalone filter fix | `handlers/T2DDumper.cs` | Collects all tk2d material texture IDs before standalone sweep — excludes atlas textures even when their names don't match the `-BC7-` pattern |
 | T2DDumper duplicate fix | `handlers/T2DDumper.cs` | `dumpedSpriteKeys` HashSet prevents writing the same T2D sprite file multiple times per `DumpAllT2DSprites()` call |
 
+### Audio browser
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| Full clip inventory sweep | `handlers/AudioHandler.cs` | `GetClipInventory()` uses `Resources.FindObjectsOfTypeAll<AudioClip/AudioSource>()` — finds clips that never fire a play event; mirrors T2D approach |
+| `AudioClipEntry` model | `handlers/AudioHandler.cs` | Immutable snapshot: `ClipName`, `LengthSeconds`, `Channels`, `Frequency`, `HasReplacement`, `SourcePaths` |
+| `IsAudioBrowserActive` gate | `handlers/AudioHandler.cs` | Set true by `AudioPillar.Draw()`, reset false each `OnGUI` pass; sweep is zero-cost when tab is closed |
+| Virtual scroll in clip browser | `gui/pillars/AudioPillar.cs` | Only renders visible rows (IMGUI scroll views do not virtualise natively); fixes 200fps→40fps regression with 200+ clips |
+| Cached filter list | `gui/pillars/AudioPillar.cs`, `gui/AudioList.cs` | `_filteredEntries` rebuilt only when `_searchFilter` or `AudioList.Version` changes, not every frame |
+| Log source path + focus | `gui/AudioLog.cs` | Each play entry stores `GameObjectPath`; clicking focuses and scrolls the browser to that clip |
+| `GetGameObjectPath` deduplicated | `handlers/AudioHandler.cs` | Single `internal static` implementation; `AudioLog` delegates to it |
+
+### tk2d sprite loader — correctness
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| Instance key collision fix | `handlers/SpriteLoader.cs` | `InstanceKey(coll) = name + "\x00" + instanceID`; all runtime dicts keyed by ikey, not collection name |
+| Vanilla texture name disambiguation | `handlers/SpriteLoader.cs` | `_vanillaTexNames[ikey+"\x00"+matname]` captured before first replacement; used as path discriminator for same-named collections |
+| `_collectionsWithFiles` gate | `handlers/SpriteLoader.cs` | Built from first segment of every file index key; skips atlas RT swap entirely for collections with zero replacement files |
+| `def.materialId` fix | `handlers/SpriteLoader.cs`, `handlers/SpriteDumper.cs` | Replaces `def.material == mat` reference equality with `def.materialId == matIndex` — prevents sprite-batch misses when Unity creates material instances |
+| `ResolveKey()` helper | `handlers/T2DLoader.cs` | Centralises `_spriteNameToKey` fallback used by `CheckSprite` and `TryGetReplacement`; fixes uninit sweep missing atlas-qualified keys |
+
+### GUI — tooltip + polish
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| IMGUI tooltip system | `gui/GUIHelper.cs` | `TT(label, tooltip)` wraps `GUIContent`; `DrawTooltip()` renders semi-transparent box near cursor; `BeginOnGUI` clears `GUI.tooltip` at Repaint start to prevent stale Layout-pass phantom tooltips |
+| T2D browser sprite filter | `gui/T2DTextureController.cs` | Inline search field in the sprite list header; clears on atlas selection change |
+| `T2DLog` atlas-level dedup | `gui/T2DLog.cs` | One log entry per atlas; sprite name updated within 2 s cooldown before re-bumping to top — prevents animated backgrounds flooding the log |
+| Cursor auto-show | `Plugin.cs` | `LateUpdate` forces `Cursor.visible = true` / `CursorLockMode.None` when DevHub or PackManager is open |
+
+### Pack system — profiles and persistence
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| Profile conditions | `packs/PackManager.cs` | `SaveProfile` appends trigger + serialised conditions tab-separated; `StageProfile` restores them; backward compatible with old profiles |
+| Window position persistence | `PatchworkConfig.cs`, `gui/DevHub.cs`, `gui/PackManagerWindow.cs`, `Plugin.cs` | `DevHubX/Y`, `DevHubTab`, `PackManagerX/Y` ConfigEntries; loaded on first draw, written in `OnDestroy` |
+
 ### Technical debt resolved
 
 | Item | Files changed | Notes |
 |------|---------------|-------|
 | Legacy standalone window shim removal | `gui/DevProfiler.cs`, `gui/AnimationController.cs`, `gui/AudioLog.cs`, `gui/AudioList.cs`, `gui/TextLog.cs`, `Plugin.cs` | Removed `Draw()`/`DrawAnimationController()`/`DrawAudioLog()`/`DrawAudioList()`/`DrawTextLog()` and their window-only fields; pillar APIs unchanged |
-| Data layer independence | `handlers/AudioHandler.cs`, `handlers/DialogueHandler.cs`, `Plugin.cs` | Replaced direct GUI calls with `OnAudioPlayed`, `OnAudioSourceLoaded`, `OnTextAccessed` events; subscribers wired in `Plugin.Awake()` |
+| Data layer independence | `handlers/AudioHandler.cs`, `handlers/DialogueHandler.cs`, `Plugin.cs` | Replaced direct GUI calls with `OnAudioPlayed`, `OnTextAccessed` events; `OnAudioSourceLoaded` removed (superseded by `GetClipInventory`); subscribers wired in `Plugin.Awake()` |
 
 ### Documentation
 
