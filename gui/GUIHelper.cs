@@ -283,6 +283,7 @@ public static class GUIHelper
     // ── Tooltip ─────────────────────────────────────────────────────────────
 
     private static GUIStyle _tooltipStyle;
+    private static int      _cachedTooltipFontSize;
 
     /// <summary>
     /// Draws the tooltip for whatever control the mouse is over, if any.
@@ -296,11 +297,13 @@ public static class GUIHelper
         if (string.IsNullOrEmpty(UnityEngine.GUI.tooltip)) return;
         if (Event.current.type != EventType.Repaint) return;
 
-        if (_tooltipStyle == null)
+        int ttFontSize = FontSize(12);
+        if (_tooltipStyle == null || _cachedTooltipFontSize != ttFontSize)
         {
+            _cachedTooltipFontSize = ttFontSize;
             _tooltipStyle = new GUIStyle(UnityEngine.GUI.skin.box)
             {
-                fontSize  = FontSize(12),
+                fontSize  = ttFontSize,
                 alignment = TextAnchor.UpperLeft,
                 wordWrap  = true,
                 padding   = new RectOffset(ScaledInt(6), ScaledInt(6), ScaledInt(4), ScaledInt(4)),

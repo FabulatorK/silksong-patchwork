@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Patchwork.Handlers;
 using UnityEngine;
 
@@ -11,6 +10,8 @@ public static class AudioLog
     private static readonly List<AudioPlayEntry> AudioPlayEntries = new();
 
     // Queued by log-row click — applied on the next Draw pass.
+    // Safe to access from multiple threads: OnAudioPlayed fires from Harmony postfixes
+    // which always run on the main Unity thread, so no cross-thread contention.
     private static string _pendingFocusClip = null;
 
     /// <summary>
@@ -89,7 +90,7 @@ public static class AudioLog
     public static void LogAudio(AudioClip clip, AudioSource source)
     {
         string cleanName = clip.name.Replace("PATCHWORK_", "");
-        string srcPath   = source != null ? GetGameObjectPath(source) : "";
+        string srcPath   = source != null ? AudioHandler.GetGameObjectPath(source) : "";
 
         // Move to top; update source path if it's new/different
         var existing = AudioPlayEntries.Find(e => e.ClipName == cleanName);
@@ -118,15 +119,6 @@ public static class AudioLog
     public static void ClearLog()
     {
         AudioPlayEntries.Clear();
-    }
-
-    private static string GetGameObjectPath(AudioSource src)
-    {
-        if (src == null) return "";
-        var t    = src.transform;
-        string n = t.name;
-        if (t.parent != null) n = t.parent.name + "/" + n;
-        return n;
     }
 
     internal class AudioPlayEntry

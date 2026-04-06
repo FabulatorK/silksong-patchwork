@@ -229,14 +229,16 @@ public static class AudioPillar
             if (File.Exists(candidate)) { path = candidate; break; }
         }
 
-        if (!File.Exists(path))
+        if (File.Exists(path))
         {
-            IOUtil.EnsureDirectoryExists(dir);
-            // Create a zero-byte placeholder so the OS can open the folder context
-            File.WriteAllBytes(path, System.Array.Empty<byte>());
+            System.Diagnostics.Process.Start(path);
         }
-
-        System.Diagnostics.Process.Start(path);
+        else
+        {
+            // No replacement exists yet — open the target folder so the user can drop a file in.
+            IOUtil.EnsureDirectoryExists(dir);
+            System.Diagnostics.Process.Start(dir);
+        }
     }
 
     private static void EnsureScanned()

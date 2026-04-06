@@ -494,10 +494,15 @@ public static class AudioHandler
         return result;
     }
 
-    private static string GetGameObjectPath(AudioSource src)
+    /// <summary>
+    /// Returns a short human-readable path for the game object that owns an AudioSource.
+    /// Walks up two transform levels: [GrandParent/]Parent/AudioSourceOwner — enough to
+    /// disambiguate common prefab hierarchies without producing unwieldy strings.
+    /// Internal so GUI types in the same assembly can reuse it without duplication.
+    /// </summary>
+    internal static string GetGameObjectPath(AudioSource src)
     {
         if (src == null) return "";
-        // Walk up two levels max — enough context without becoming unwieldy
         var t = src.transform;
         string name = t.name;
         if (t.parent != null) name = t.parent.name + "/" + name;

@@ -217,8 +217,9 @@ public class Plugin : BaseUnityPlugin
     {
         GUIHelper.BeginOnGUI();
 
-        // Reset T2D log gate each pass — GraphicsPillar re-enables it if the T2D tab is visible.
-        T2DLoader.IsT2DLogActive = false;
+        // Reset per-frame gates — each pillar re-enables its own flag when visible.
+        T2DLoader.IsT2DLogActive        = false;
+        AudioHandler.IsAudioBrowserActive = false;
 
         // ── New unified UI ────────────────────────────────────────────────────
         if (ShowStatusOverlay)

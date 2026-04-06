@@ -669,13 +669,7 @@ public static partial class T2DLoader
     /// <summary>Checks if a sprite has a replacement loaded but is not yet showing it.</summary>
     private static void CheckSprite(int instanceId, Sprite sprite, out bool nameChanged, out bool replacementMissing)
     {
-        string key = KeyForSprite(sprite);
-
-        // HandleLoad has a _spriteNameToKey fallback for mismatched atlas names and non-T2D
-        // textures.  Mirror it here so the uninit sweep catches the same sprites.
-        if (!_loadedSprites.ContainsKey(key)
-            && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey))
-            key = fallbackKey;
+        string key = ResolveKey(sprite);
 
         if (!_loadedSprites.ContainsKey(key))
         {
@@ -691,12 +685,22 @@ public static partial class T2DLoader
             _trackedSpriteNames[instanceId] = sprite.name;
     }
 
-    private static bool TryGetReplacement(Sprite sprite, out Sprite replacement)
+    // Resolves the effective _loadedSprites key for a sprite, applying the _spriteNameToKey
+    // fallback when the primary key (atlas/spriteName) is not in the dict.
+    // Needed when a sprite's texture name doesn't match the atlas it was loaded from
+    // (e.g. non-T2D textures, or T2D textures loaded under a different instance name).
+    private static string ResolveKey(Sprite sprite)
     {
         string key = KeyForSprite(sprite);
-        if (!_loadedSprites.TryGetValue(key, out replacement)
+        if (!_loadedSprites.ContainsKey(key)
             && _spriteNameToKey.TryGetValue(sprite.name, out var fallbackKey))
-            _loadedSprites.TryGetValue(fallbackKey, out replacement);
+            return fallbackKey;
+        return key;
+    }
+
+    private static bool TryGetReplacement(Sprite sprite, out Sprite replacement)
+    {
+        _loadedSprites.TryGetValue(ResolveKey(sprite), out replacement);
         return replacement != null;
     }
 
