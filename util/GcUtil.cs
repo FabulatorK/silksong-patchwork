@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Scripting;
 
@@ -12,6 +13,70 @@ namespace Patchwork.Util;
 /// </summary>
 public static class GcUtil
 {
+    // ================================================================
+    //  TC GCManager bridge (reflection — graceful fallback if absent)
+    // ================================================================
+
+    private static bool   _bridgeInit;
+    private static MethodInfo _miMonoUsed;
+    private static MethodInfo _miMonoTotal;
+    private static MethodInfo _miMemUsed;
+    private static MethodInfo _miMemTotal;
+    private static PropertyInfo _piThreshold;
+
+    /// <summary>Fired whenever TC's GCManager detects a stutter and bumps the heap threshold.</summary>
+    public static event Action OnTCGCStutter;
+
+    /// <summary>
+    /// Call once after the game scene has loaded (GCManager is created via RuntimeInitializeOnLoadMethod).
+    /// Caches reflection handles and hooks the private OnGCStutter event.
+    /// </summary>
+    public static void InitBridge()
+    {
+        if (_bridgeInit) return;
+        _bridgeInit = true;
+
+        var t = Type.GetType("GCManager, Assembly-CSharp");
+        if (t == null) return;
+
+        const BindingFlags pub = BindingFlags.Public | BindingFlags.Static;
+        _miMonoUsed  = t.GetMethod("GetMonoHeapUsage",  pub);
+        _miMonoTotal = t.GetMethod("GetMonoHeapTotal",  pub);
+        _miMemUsed   = t.GetMethod("GetMemoryUsage",    pub);
+        _miMemTotal  = t.GetMethod("GetMemoryTotal",    pub);
+        _piThreshold = t.GetProperty("HeapUsageThreshold", pub);
+
+        // Wire TC's private OnGCStutter → our public event
+        var fi = t.GetField("OnGCStutter", BindingFlags.NonPublic | BindingFlags.Static);
+        if (fi != null)
+        {
+            Action handler = () => OnTCGCStutter?.Invoke();
+            var existing = (Action)fi.GetValue(null);
+            fi.SetValue(null, Delegate.Combine(existing, handler));
+        }
+    }
+
+    private static long InvokeLong(MethodInfo mi) =>
+        mi != null ? (long)mi.Invoke(null, null) : -1L;
+
+    /// <summary>Mono heap used (bytes). Falls back to GC.GetTotalMemory if bridge unavailable.</summary>
+    public static long TCMonoHeapUsed  => _miMonoUsed  != null ? InvokeLong(_miMonoUsed)  : GC.GetTotalMemory(false);
+    /// <summary>Mono heap total reserved (bytes).</summary>
+    public static long TCMonoHeapTotal => InvokeLong(_miMonoTotal);
+    /// <summary>Total Unity memory in use (bytes). -1 if bridge unavailable.</summary>
+    public static long TCMemUsed       => InvokeLong(_miMemUsed);
+    /// <summary>Total Unity memory reserved (bytes). -1 if bridge unavailable.</summary>
+    public static long TCMemTotal      => InvokeLong(_miMemTotal);
+    /// <summary>TC's current heap-usage threshold in MB. 0 if bridge unavailable.</summary>
+    public static double TCHeapThresholdMB =>
+        _piThreshold != null ? (double)_piThreshold.GetValue(null) : 0.0;
+    /// <summary>True if the TC GCManager bridge is active.</summary>
+    public static bool BridgeAvailable => _miMonoUsed != null;
+
+    // ================================================================
+    //  Heap management
+    // ================================================================
+
     /// <summary>
     /// Forces the Mono heap to expand to at least <paramref name="bytes"/> before gameplay.
     /// Safe to call from Plugin.Awake() — TC's GCManager is created via

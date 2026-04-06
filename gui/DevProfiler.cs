@@ -228,9 +228,26 @@ public static class DevProfiler
         // --- Memory ---
         GUIHelper.Space(8);
         SectionHeader("Memory");
-        long monoUsed = GC.GetTotalMemory(false);
-        Label($"Mono heap: {monoUsed / (1024 * 1024)}MB");
-        Label($"GC collections: {GC.CollectionCount(0)}/{GC.CollectionCount(1)}/{GC.CollectionCount(2)}");
+        if (GcUtil.BridgeAvailable)
+        {
+            long monoUsed  = GcUtil.TCMonoHeapUsed;
+            long monoTotal = GcUtil.TCMonoHeapTotal;
+            long memUsed   = GcUtil.TCMemUsed;
+            long memTotal  = GcUtil.TCMemTotal;
+            double threshold = GcUtil.TCHeapThresholdMB;
+            float heapFrac = monoTotal > 0 ? (float)monoUsed / monoTotal : 0f;
+            Color heapColor = monoUsed / (1024.0 * 1024.0) > threshold * 0.9 ? Color.red
+                            : monoUsed / (1024.0 * 1024.0) > threshold * 0.7 ? Color.yellow
+                            : Color.green;
+            ColorLabel($"Mono heap: {monoUsed >> 20}MB / {monoTotal >> 20}MB  (TC threshold {threshold:F0}MB)", heapColor);
+            Label($"Unity memory: {memUsed >> 20}MB used / {memTotal >> 20}MB reserved");
+        }
+        else
+        {
+            long monoUsed = GC.GetTotalMemory(false);
+            Label($"Mono heap: {monoUsed >> 20}MB  (TC bridge unavailable)");
+        }
+        Label($"GC collections: gen0={GC.CollectionCount(0)}  gen1={GC.CollectionCount(1)}  gen2={GC.CollectionCount(2)}");
 
         // --- Scene ---
         GUIHelper.Space(8);
@@ -257,11 +274,7 @@ public static class DevProfiler
         SectionHeader("Utilities");
 
         if (GUILayout.Button("Force GC Collect", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-        }
+            GcUtil.ForceCollect();
 
         if (GUILayout.Button("Reload All Sprites", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             SpriteLoader.Reload();

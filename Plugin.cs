@@ -152,6 +152,10 @@ public class Plugin : BaseUnityPlugin
         T2DLoader.OnT2DTrigger        += (tex, sprite)     => T2DLog.LogTrigger(tex, sprite);
         VideoHandler.OnCinematicTriggered += (name, replaced) => VideoPillar.LogCinematic(name, replaced);
 
+        // TC's GCManager is instantiated via RuntimeInitializeOnLoadMethod(AfterSceneLoad) — wire bridge after first scene load.
+        SceneManager.sceneLoaded += (_, _) => GcUtil.InitBridge();
+        GcUtil.OnTCGCStutter += () => DevProfiler.RecordSpike("TC GCManager stutter — threshold bumped 10%", 0f);
+
         RawKeyboardLeakBlocker.ApplyPatches(harmony);
 
         StartCoroutine(AwakeDelayed(harmony));
