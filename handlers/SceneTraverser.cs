@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Patchwork.Util;
 using UnityEngine;
 
 namespace Patchwork.Handlers;
@@ -38,21 +39,23 @@ public static class SceneTraverser
         _scenesSinceLastGC++;
 
 
-        // GC every N scenes for both dumping options
-        if (_scenesSinceLastGC >= GCEveryNScenes)
+        // Collect on N-scene interval OR when heap pressure exceeds 75% of TC's threshold.
+        // Pressure-based trigger handles heavy scenes that would otherwise push us over threshold
+        // and invite a TC mid-gameplay collect on the following frame.
+        bool heapPressure = GcUtil.HeapPressure > 0.75;
+        if (_scenesSinceLastGC >= GCEveryNScenes || heapPressure)
         {
-            Plugin.Logger.LogInfo($"[GC] Dumped {_scenesSinceLastGC} scenes, running cleanup...");
+            string reason = heapPressure ? $"heap pressure {GcUtil.HeapPressure:P0}" : $"{_scenesSinceLastGC} scenes";
+            Plugin.Logger.LogInfo($"[GC] Running cleanup after {reason}...");
             Resources.UnloadUnusedAssets();
-            System.GC.Collect();
-            System.GC.WaitForPendingFinalizers();
+            GcUtil.ForceCollect();
             _scenesSinceLastGC = 0;
         }
 
         // Progress logger only for full dump
         if (_isTraversing)
         {
-            int totalProcessed = sceneQueue.Count == 0 ? _scenesSinceLastGC : (scenesProcessed + 1);
-            Plugin.Logger.LogInfo($"Progress: {scenesProcessed + 1}/{scenesProcessed + 1 + sceneQueue.Count} scenes");
+            Plugin.Logger.LogInfo($"Progress: {scenesProcessed}/{scenesProcessed + sceneQueue.Count} scenes");
             LoadNextScene();
         }
     }
@@ -71,7 +74,7 @@ public static class SceneTraverser
         _isTraversing = false;
         Plugin.Logger.LogInfo($"Full dump complete! Processed {scenesProcessed} scenes. Running final cleanup...");
         Resources.UnloadUnusedAssets();
-        System.GC.Collect();
+        GcUtil.ForceCollect();
         return false;
     }
 }

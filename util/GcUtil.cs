@@ -73,6 +73,21 @@ public static class GcUtil
     /// <summary>True if the TC GCManager bridge is active.</summary>
     public static bool BridgeAvailable => _miMonoUsed != null;
 
+    /// <summary>
+    /// Heap pressure as a fraction of TC's threshold (0–1+).
+    /// 1.0 means heap used == TC's threshold; above 1.0 means TC would already have collected.
+    /// Returns 0 when bridge is unavailable.
+    /// </summary>
+    public static double HeapPressure
+    {
+        get
+        {
+            double threshold = TCHeapThresholdMB;
+            if (threshold <= 0.0) return 0.0;
+            return (TCMonoHeapUsed / (1024.0 * 1024.0)) / threshold;
+        }
+    }
+
     // ================================================================
     //  Heap management
     // ================================================================

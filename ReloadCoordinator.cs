@@ -1,5 +1,6 @@
 using Patchwork.GUI;
 using Patchwork.Handlers;
+using Patchwork.Util;
 using Patchwork.Watchers;
 
 namespace Patchwork;
@@ -30,6 +31,10 @@ internal static class ReloadCoordinator
             T2DLoader.ReloadSpritesInScene();
             float ms = DevProfiler.StopOp("T2DLoader.ReloadSpritesInScene");
             Plugin.Logger.LogInfo($"[Reload] T2DLoader.ReloadSpritesInScene completed in {ms:F1}ms");
+            // T2D reload destroys old sprites and textures — collect immediately if heap is elevated
+            // so TC's threshold check on the next frame doesn't trigger a mid-gameplay collect.
+            if (GcUtil.HeapPressure > 0.7)
+                GcUtil.ForceCollect();
         }
 
         if (AudioFileWatcher.ReloadAudio)
@@ -38,6 +43,9 @@ internal static class ReloadCoordinator
             DevProfiler.StartOp();
             AudioHandler.Reload();
             DevProfiler.StopOp("AudioHandler.Reload");
+            // Audio reload replaces clips — collect destroyed clips if heap is elevated.
+            if (GcUtil.HeapPressure > 0.7)
+                GcUtil.ForceCollect();
         }
 
         if (TextFileWatcher.ReloadText)
