@@ -32,6 +32,20 @@ public static partial class T2DLoader
 
     internal static bool HasStoredOriginals => _originalTextureData.Count > 0;
 
+    /// <summary>
+    /// Total bytes held in <c>_originalTextureData</c> — vanilla PNG copies on the managed heap.
+    /// Used by GcUtil to account for Patchwork's extra Mono allocation when calibrating TC's threshold.
+    /// </summary>
+    internal static long OriginalTextureDataBytes
+    {
+        get
+        {
+            long total = 0;
+            foreach (var b in _originalTextureData.Values) total += b.Length;
+            return total;
+        }
+    }
+
     // ================================================================
     //  In-place texture swap
     // ================================================================

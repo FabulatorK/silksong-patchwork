@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Patchwork.Handlers;
 using UnityEngine;
 using UnityEngine.Scripting;
 
@@ -23,6 +24,8 @@ public static class GcUtil
     private static MethodInfo _miMemUsed;
     private static MethodInfo _miMemTotal;
     private static PropertyInfo _piThreshold;
+    private static MethodInfo   _piThresholdSetter;
+    private static double _lastBumpMB;
 
     /// <summary>Fired whenever TC's GCManager detects a stutter and bumps the heap threshold.</summary>
     public static event Action OnTCGCStutter;
@@ -54,6 +57,40 @@ public static class GcUtil
             var existing = (Action)fi.GetValue(null);
             fi.SetValue(null, Delegate.Combine(existing, handler));
         }
+
+        // Cache the private setter for HeapUsageThreshold
+        _piThresholdSetter = _piThreshold?.GetSetMethod(nonPublic: true);
+
+        // Initial calibration now that bridge is live
+        BumpThresholdForPatchwork();
+    }
+
+    /// <summary>
+    /// Adjusts TC's HeapUsageThreshold to account for Patchwork's own managed-heap allocations:
+    /// vanilla PNG copies (_originalTextureData) and pinned pack bytes (PackRamCache).
+    /// TC's vanilla threshold was calibrated for the base game only — without this bump, a full
+    /// skin pack can push used-heap above TC's threshold and trigger constant stutter collections.
+    ///
+    /// Idempotent: tracks the previous bump and applies only the delta, so calling every frame is safe.
+    /// No-op when the bridge is unavailable or the change is less than 1 MB.
+    /// </summary>
+    public static void BumpThresholdForPatchwork()
+    {
+        if (_piThresholdSetter == null) return;
+
+        long extraBytes = T2DLoader.OriginalTextureDataBytes + PackRamCache.PinnedBytes;
+        double extraMB  = extraBytes / (1024.0 * 1024.0);
+
+        double delta = extraMB - _lastBumpMB;
+        if (Math.Abs(delta) < 1.0) return; // no meaningful change
+
+        double current  = TCHeapThresholdMB;
+        double newValue = current + delta;
+        _piThresholdSetter.Invoke(null, new object[] { newValue });
+        Plugin.Logger.LogInfo(
+            $"[GcUtil] TC heap threshold {(delta > 0 ? "raised" : "lowered")} " +
+            $"{current:F0}MB → {newValue:F0}MB  (Patchwork caches: {extraMB:F0}MB)");
+        _lastBumpMB = extraMB;
     }
 
     private static long InvokeLong(MethodInfo mi) =>

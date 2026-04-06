@@ -63,5 +63,10 @@ internal static class ReloadCoordinator
             VideoHandler.Reload();
             DevProfiler.StopOp("VideoHandler.Reload");
         }
+
+        // Re-calibrate TC's heap threshold whenever Patchwork's managed-heap caches change
+        // (originalTextureData after T2D reload, PackRamCache after pin/unpin).
+        // BumpThresholdForPatchwork is idempotent — no-op when delta < 1 MB.
+        GcUtil.BumpThresholdForPatchwork();
     }
 }
