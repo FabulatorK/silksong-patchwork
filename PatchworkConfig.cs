@@ -72,7 +72,7 @@ public class PatchworkConfig
     private readonly ConfigEntry<int> _HeapReserveMB;
     /// <summary>
     /// MB to pre-allocate at startup to raise the Mono GC's high-water mark.
-    /// -1 = auto (25% of system RAM, capped at 512 MB). 0 = disabled.
+    /// -1 = auto (40% of TC's heap threshold, capped at 512 MB). 0 = disabled.
     /// </summary>
     public int HeapReserveMB => _HeapReserveMB.Value;
 
@@ -130,7 +130,7 @@ public class PatchworkConfig
         _HeapReserveMB = config.Bind("Performance", "HeapReserveMB", -1,
             "Mono heap reserve in MB. Pre-allocates this much memory at startup to raise the GC's " +
             "high-water mark, reducing mid-gameplay stutter from heap-growth collections when custom " +
-            "asset packs are loaded. -1 = auto (25% of system RAM, capped at 512 MB). 0 = disabled.");
+            "asset packs are loaded. -1 = auto (40% of TC's heap threshold, capped at 512 MB). 0 = disabled.");
 
         _ShowStatusOverlay = config.Bind("GUI", "ShowStatusOverlay", true,
             "Show the HUD status badge in the bottom-left corner. Can also be toggled from the Pack Manager.");

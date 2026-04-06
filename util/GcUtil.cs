@@ -115,14 +115,18 @@ public static class GcUtil
     }
 
     /// <summary>
-    /// Suggests a heap reserve in MB from system RAM.
-    /// TC uses ~12.1%, clamped [384, 1024] MB. We use a more conservative 15%, clamped [64, 512] MB
-    /// to leave headroom for pack assets without fighting TC's threshold.
+    /// Suggests a heap prewarm size in MB, derived from TC's own threshold formula.
+    /// TC's threshold = 12.1% of RAM, clamped [384, 1024] MB.
+    /// We target 40% of that threshold: gives Mono committed headroom for pack assets
+    /// while staying well clear of the level where TC would trigger a collect.
+    /// Clamped [64, 512] MB so we don't over-commit on low-RAM or waste on idle sessions.
+    /// Safe to call at Awake() — does not require the GCManager bridge.
     /// </summary>
     public static int SuggestReserveMB()
     {
         int totalMb = SystemInfo.systemMemorySize;
-        return Math.Clamp((int)(totalMb * 0.15), 64, 512);
+        double tcThreshold = Math.Clamp(0.12102111566341002 * totalMb, 384.0, 1024.0);
+        return (int)Math.Clamp(tcThreshold * 0.4, 64.0, 512.0);
     }
 
     /// <summary>
