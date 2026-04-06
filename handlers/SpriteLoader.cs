@@ -59,6 +59,11 @@ public static class SpriteLoader
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, (string FullPath, string Pack)> _sheetFileIndex =
         new(StringComparer.OrdinalIgnoreCase);
+    // Collection names (case-insensitive) that have at least one file in either index.
+    // Used to skip the atlasRT creation/swap for collections with no replacements at all,
+    // so Patchwork doesn't alter mat.mainTexture when there's nothing to apply.
+    private static readonly HashSet<string> _collectionsWithFiles =
+        new(StringComparer.OrdinalIgnoreCase);
     private static bool _fileIndexBuilt;
 
     // Read-only stats for GUI
@@ -141,6 +146,14 @@ public static class SpriteLoader
             // If vanilla is not known yet (Reload() ran before this collection's Init()),
             // skip — InitPostfix will process this material when Init() provides a fresh texture.
             if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
+                continue;
+
+            // If no pack has any files for this collection, leave mat.mainTexture untouched.
+            // Replacing it with an RT copy when there's nothing to apply causes subtle
+            // rendering differences (color space, mip handling) for no benefit.
+            // The vanilla backup RT above is still captured so hot-reload can blit immediately
+            // if a pack is later added without requiring a fresh Init().
+            if (!_collectionsWithFiles.Contains(collection.name))
                 continue;
 
             if (!LoadedAtlases.ContainsKey(ikey))
@@ -289,6 +302,19 @@ public static class SpriteLoader
         IndexDir(AtlasLoadPath, null, _sheetFileIndex, "sheet");
         foreach (var p in Plugin.PluginPackPaths)
             IndexDir(Path.Combine(p, "Spritesheets"), p, _sheetFileIndex, "sheet");
+
+        // Build collection-name presence set — first path segment of every key is the collection name.
+        _collectionsWithFiles.Clear();
+        foreach (var key in _spriteFileIndex.Keys)
+        {
+            int slash = key.IndexOf('/');
+            if (slash > 0) _collectionsWithFiles.Add(key.Substring(0, slash));
+        }
+        foreach (var key in _sheetFileIndex.Keys)
+        {
+            int slash = key.IndexOf('/');
+            if (slash > 0) _collectionsWithFiles.Add(key.Substring(0, slash));
+        }
     }
 
     // Produces a conflict-tracker key matching the format used by the old per-sprite code.
