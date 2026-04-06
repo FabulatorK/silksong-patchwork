@@ -7,6 +7,7 @@ using HarmonyLib;
 using Patchwork.Handlers;
 using Patchwork.Util;
 using Patchwork.GUI;
+using Patchwork.GUI.Pillars;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Patchwork.Watchers;
@@ -43,8 +44,12 @@ public class Plugin : BaseUnityPlugin
     }
     /// <summary>Tabbed Dev Hub window for creators.</summary>
     public static bool ShowDevHub = false;
-    /// <summary>Currently active Dev Hub tab (0=Graphics … 4=Video).</summary>
-    public static int  DevHubTab = 0;
+    /// <summary>Currently active Dev Hub tab. Persisted via config.</summary>
+    public static int DevHubTab
+    {
+        get => Config?.DevHubTab ?? 0;
+        set { if (Config != null) Config.DevHubTab = value; }
+    }
 
     private void Awake()
     {
@@ -143,8 +148,9 @@ public class Plugin : BaseUnityPlugin
         // ── Wire handler → GUI events (keeps handlers free of GUI references) ──
         DialogueHandler.OnTextAccessed += (sheet, key, text) => TextLog.LogText(sheet, key, text);
         DialogueHandler.OnTextAccessed += (sheet, key, text) => { if (ShowDevHub) DialogueEditor.TrackText(sheet, key, text); };
-        AudioHandler.OnAudioPlayed += (clip, src) => AudioLog.LogAudio(clip, src);
-        T2DLoader.OnT2DTrigger        += (tex, sprite) => T2DLog.LogTrigger(tex, sprite);
+        AudioHandler.OnAudioPlayed    += (clip, src)       => AudioLog.LogAudio(clip, src);
+        T2DLoader.OnT2DTrigger        += (tex, sprite)     => T2DLog.LogTrigger(tex, sprite);
+        VideoHandler.OnCinematicTriggered += (name, replaced) => VideoPillar.LogCinematic(name, replaced);
 
         RawKeyboardLeakBlocker.ApplyPatches(harmony);
 
@@ -216,6 +222,14 @@ public class Plugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
+        // Persist window positions so they survive session restarts.
+        if (Config != null)
+        {
+            var dhRect = DevHub.WindowRect;
+            if (dhRect.width > 0) { Config.DevHubX = dhRect.x; Config.DevHubY = dhRect.y; }
+            var pmRect = PackManagerWindow.WindowRect;
+            if (pmRect.width > 0) { Config.PackManagerX = pmRect.x; Config.PackManagerY = pmRect.y; }
+        }
         GUIHelper.ForceRestoreGameActions();
         SpriteFileWatcher?.Dispose();
         AudioFileWatcher?.Dispose();

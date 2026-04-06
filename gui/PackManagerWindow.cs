@@ -65,11 +65,18 @@ public static class PackManagerWindow
     //  Public entry point
     // ================================================================
 
+    /// <summary>Current window rect — read by Plugin.OnDestroy to persist position.</summary>
+    public static Rect WindowRect => _windowRect;
+
     public static void Draw()
     {
         if (!_initialized || _windowRect.width < 1)
         {
-            _windowRect = GUIHelper.ScaledRect(LeftMargin, TopMargin, WindowWidth, WindowHeight);
+            float cx = Plugin.Config?.PackManagerX ?? 0f;
+            float cy = Plugin.Config?.PackManagerY ?? 0f;
+            _windowRect = (cx > 0f || cy > 0f)
+                ? new Rect(cx, cy, GUIHelper.Scaled(WindowWidth), GUIHelper.Scaled(WindowHeight))
+                : GUIHelper.ScaledRect(LeftMargin, TopMargin, WindowWidth, WindowHeight);
             _initialized = true;
         }
 

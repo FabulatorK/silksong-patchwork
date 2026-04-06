@@ -84,6 +84,19 @@ public class PatchworkConfig
         set => _ShowStatusOverlay.Value = value;
     }
 
+    // ── Window state persistence ─────────────────────────────────────────────
+    private readonly ConfigEntry<float> _DevHubX;
+    private readonly ConfigEntry<float> _DevHubY;
+    private readonly ConfigEntry<int>   _DevHubTab;
+    private readonly ConfigEntry<float> _PackManagerX;
+    private readonly ConfigEntry<float> _PackManagerY;
+
+    public float DevHubX      { get => _DevHubX.Value;      set => _DevHubX.Value = value; }
+    public float DevHubY      { get => _DevHubY.Value;      set => _DevHubY.Value = value; }
+    public int   DevHubTab    { get => _DevHubTab.Value;    set => _DevHubTab.Value = value; }
+    public float PackManagerX { get => _PackManagerX.Value; set => _PackManagerX.Value = value; }
+    public float PackManagerY { get => _PackManagerY.Value; set => _PackManagerY.Value = value; }
+
     public PatchworkConfig(ConfigFile config)
     {
         _LogAudioDuration = config.Bind("GUI", "LogAudioDuration", 5.0, "Duration (in seconds) to keep audio log entries visible.");
@@ -121,5 +134,11 @@ public class PatchworkConfig
 
         _ShowStatusOverlay = config.Bind("GUI", "ShowStatusOverlay", true,
             "Show the HUD status badge in the bottom-left corner. Can also be toggled from the Pack Manager.");
+
+        _DevHubX      = config.Bind("GUI", "DevHubX",      0f, "Dev Hub window X position (saved on exit).");
+        _DevHubY      = config.Bind("GUI", "DevHubY",      0f, "Dev Hub window Y position (saved on exit).");
+        _DevHubTab    = config.Bind("GUI", "DevHubTab",    0,  "Last active Dev Hub tab index (0=Dashboard … 5=Performance).");
+        _PackManagerX = config.Bind("GUI", "PackManagerX", 0f, "Pack Manager window X position (saved on exit).");
+        _PackManagerY = config.Bind("GUI", "PackManagerY", 0f, "Pack Manager window Y position (saved on exit).");
     }
 }

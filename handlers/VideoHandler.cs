@@ -13,6 +13,12 @@ public class VideoHandler
     public static Dictionary<string, string> VideoFileMap = new Dictionary<string, string>();
     public static bool ReloadVideos = false;
 
+    /// <summary>
+    /// Fired on the main thread whenever the game triggers a cinematic.
+    /// Args: cinematic name, true if a replacement file was applied.
+    /// </summary>
+    public static event Action<string, bool> OnCinematicTriggered;
+
     private static readonly string[] SupportedExtensions =
         { ".mp4", ".webm", ".ogv", ".mov", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv" };
 
@@ -109,7 +115,9 @@ public class VideoHandler
 
     private static void ConstructorPostfix(EmbeddedCinematicVideoPlayer __instance, CinematicVideoPlayerConfig config)
     {
-        string customVideoPath = FindVideoFile(config.VideoReference.VideoFileName);
+        string name           = config.VideoReference.VideoFileName;
+        string customVideoPath = FindVideoFile(name);
+        OnCinematicTriggered?.Invoke(name, customVideoPath != null);
         if (customVideoPath == null)
             return;
         

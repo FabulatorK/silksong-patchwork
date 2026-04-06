@@ -207,8 +207,9 @@ TextFileWatcher.ReloadText         → DialogueHandler.Reload()
 VideoHandler.ReloadVideos          → VideoHandler.Reload()
 ```
 
-**Known issue**: `TextFileWatcher.PackWatchers` is built once at startup. Packs enabled
-after startup have no watcher on their `Text/` dirs. Fix in `docs/text-replacement.md`.
+`TextFileWatcher.RebuildPackWatchers()` is called from `PackManager.TriggerFullReload()`
+whenever the active pack set changes, so packs enabled after startup have their `Text/`
+dirs watched correctly.
 
 ---
 

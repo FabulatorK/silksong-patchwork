@@ -27,11 +27,18 @@ public static class DevHub
     private static Rect _windowRect;
     private static bool _initialized;
 
+    /// <summary>Current window rect — read by Plugin.OnDestroy to persist position.</summary>
+    public static Rect WindowRect => _windowRect;
+
     public static void Draw()
     {
         if (!_initialized || _windowRect.width < 1)
         {
-            _windowRect = GUIHelper.ScaledRect(30, 30, WindowWidth, WindowHeight);
+            float cx = Plugin.Config?.DevHubX ?? 0f;
+            float cy = Plugin.Config?.DevHubY ?? 0f;
+            _windowRect = (cx > 0f || cy > 0f)
+                ? new Rect(cx, cy, GUIHelper.Scaled(WindowWidth), GUIHelper.Scaled(WindowHeight))
+                : GUIHelper.ScaledRect(30, 30, WindowWidth, WindowHeight);
             _initialized = true;
         }
 

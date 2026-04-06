@@ -298,17 +298,26 @@ public static class PackManager
             .ToArray();
     }
 
-    /// <summary>Saves the current pack order and enabled state as a named profile.</summary>
+    /// <summary>Saves the current pack order, enabled state, and conditions as a named profile.</summary>
     public static void SaveProfile(string name)
     {
         IOUtil.EnsureDirectoryExists(ProfilesDir);
         var lines = new List<string>
         {
             $"# Patchwork Profile: {name}",
-            "# Format: +|path (enabled)   or   -|path (disabled)"
+            "# Format: +|-|path[\\ttrigger\\tcond1\\tcond2...]  (conditions optional, tab-separated)"
         };
         foreach (var p in _packs)
-            lines.Add($"{(p.IsEnabled ? '+' : '-')}|{p.Path}");
+        {
+            string line = $"{(p.IsEnabled ? '+' : '-')}|{p.Path}";
+            if (p.HasConditions)
+            {
+                string trigger = p.ReloadTrigger == ReloadTrigger.HotReload ? "hot" : "scene";
+                string condStr = string.Join("\t", p.Conditions.Select(c => c.Serialize()));
+                line += $"\t{trigger}\t{condStr}";
+            }
+            lines.Add(line);
+        }
         File.WriteAllLines(Path.Combine(ProfilesDir, $"{name}.txt"), lines);
         Plugin.Logger.LogInfo($"[PackManager] Saved profile '{name}'");
     }
@@ -320,21 +329,38 @@ public static class PackManager
         string filePath = Path.Combine(ProfilesDir, $"{name}.txt");
         if (!File.Exists(filePath)) return null;
 
-        var entries = new List<(string Path, bool Enabled)>();
+        var entries = new List<(string Path, bool Enabled, string[] Parts)>();
         foreach (var line in File.ReadAllLines(filePath))
         {
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.Length < 3) continue;
-            entries.Add((line.Substring(2), line[0] == '+'));
+            bool     enabled = line[0] == '+';
+            string[] parts   = line.Substring(2).Split('\t');
+            entries.Add((parts[0], enabled, parts));
         }
 
         var result = new List<PackInfo>();
-        foreach (var (entryPath, enabled) in entries)
+        foreach (var (entryPath, enabled, parts) in entries)
         {
             var pack = _packs.Find(p =>
                 string.Equals(p.Path, entryPath, StringComparison.OrdinalIgnoreCase));
             if (pack == null) continue;
             var clone = pack.Clone();
             clone.IsEnabled = enabled;
+
+            // parts[0]=path, parts[1]=trigger, parts[2..]=conditions (absent in old-format profiles)
+            if (parts.Length > 2)
+            {
+                clone.ReloadTrigger = parts[1] == "hot"
+                    ? ReloadTrigger.HotReload
+                    : ReloadTrigger.OnSceneTransition;
+                clone.Conditions.Clear();
+                for (int i = 2; i < parts.Length; i++)
+                {
+                    var cond = PackCondition.TryDeserialize(parts[i]);
+                    if (cond != null) clone.Conditions.Add(cond);
+                }
+            }
+
             result.Add(clone);
         }
         // Append any currently-known packs absent from the profile (newly added since save).
