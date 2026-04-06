@@ -58,3 +58,35 @@ Discussed future extensions:
 - Random / weighted conditions
 
 The `HotReload` trigger mode in `ReloadTrigger` is already wired to poll every ~2 s in `Plugin.Update`, ready for non-scene condition types without further infrastructure changes.
+
+---
+
+## Material Color Tints — Creator Blind Spot
+
+**Observation:** Team Cherry applies per-material color corrections on top of raw sprite textures.
+A sprite that is white/grey in the source PNG renders with warm body tint, saturated cloak colour,
+and green ambient influence in-game. The raw atlas is unchanged; the transformation lives in the
+material's shader properties (`_Color`, brightness/saturation uniforms, possibly a custom TC shader).
+
+**Impact on pack authors:** Patchwork blits the replacement PNG into the atlas RT and sets
+`mat.mainTexture` — the same material colour properties then apply on top of the replacement.
+A creator working from the dumped PNG sees the untinted original, produces artwork to match it,
+and the in-game result looks wrong because the tint shifts their colours in ways they didn't account for.
+
+**What needs investigation:**
+1. Which shader properties carry the per-sprite colour correction — `_Color`, a brightness float,
+   a custom Team Cherry uniform? Dump `mat.shader.name` and iterate `mat.GetTexturePropertyNames()`
+   / `mat.GetFloat` / `mat.GetColor` for a known tinted collection to enumerate them.
+2. Whether the tint is on the `tk2dSpriteCollectionData` material, on a per-`SpriteRenderer`
+   `MaterialPropertyBlock`, or applied via Unity's lighting/post-processing stack.
+
+**Planned tooling improvements:**
+- **Material property readout** in AnimationController: display `mat.color` and any non-default
+  colour/float shader uniforms for the current frame's material so creators know what correction is active.
+- **Tinted preview**: when rendering the frame preview in AnimationController, blit using the full
+  material (not just `mat.mainTexture`) so the tool shows the same result as the game.
+- **Dump sidecar**: when dumping a sprite, write a `_material.txt` (or JSON) beside it listing the
+  active shader properties, so creators can pre-compensate in their image editor.
+
+**Note:** This is distinct from Patchwork's own atlas RT compositing. The RT blit is linear/unmodified;
+the colour shift happens after `mat.mainTexture` is read by the GPU during the render pass.
