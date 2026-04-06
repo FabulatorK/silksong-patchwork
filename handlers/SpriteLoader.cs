@@ -95,6 +95,12 @@ public static class SpriteLoader
 
     public static void LoadCollection(tk2dSpriteCollectionData collection)
     {
+        // Ensure the file index (and _collectionsWithFiles) is current before the gate below.
+        // LoadCollection fires from the tk2d Init postfix, which can run before any Reload()
+        // call that would otherwise trigger RebuildFileIndex().  Without this, _collectionsWithFiles
+        // is empty on first load and the gate skips every collection → no skins appear.
+        if (!_fileIndexBuilt) RebuildFileIndex();
+
         string ikey = InstanceKey(collection);
         bool nameCollision = _instanceKeyToName.ContainsValue(collection.name);
         _instanceKeyToName[ikey] = collection.name;
@@ -148,13 +154,17 @@ public static class SpriteLoader
             if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
                 continue;
 
-            // If no pack has any files for this collection, leave mat.mainTexture untouched.
-            // Replacing it with an RT copy when there's nothing to apply causes subtle
-            // rendering differences (color space, mip handling) for no benefit.
-            // The vanilla backup RT above is still captured so hot-reload can blit immediately
-            // if a pack is later added without requiring a fresh Init().
+            // If no pack has any files for this collection, restore vanilla if the material
+            // was previously customised (pack just disabled), then skip the custom blit.
+            // Without the restore, mat.mainTexture keeps pointing at the old custom RT
+            // and the skin remains visible after the pack is turned off.
             if (!_collectionsWithFiles.Contains(collection.name))
+            {
+                if (LoadedAtlasesTextures.TryGetValue(ikey, out var prevMap)
+                    && prevMap.ContainsKey(matname))
+                    mat.mainTexture = vanillaTex;
                 continue;
+            }
 
             if (!LoadedAtlases.ContainsKey(ikey))
                 LoadedAtlases[ikey] = new HashSet<string>();
