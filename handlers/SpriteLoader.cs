@@ -149,20 +149,45 @@ public static class SpriteLoader
                         $"[SpriteLoader]   mat '{matnameAbbr}' → vanilla texture '{vTexName}'");
             }
 
-            // If vanilla is not known yet (Reload() ran before this collection's Init()),
-            // skip — InitPostfix will process this material when Init() provides a fresh texture.
+            // If vanilla is not known yet for this ikey, check whether another collection
+            // instance captured a backup for the same material.  This handles the scene-transition
+            // case: tk2dSpriteCollectionData is scene-scoped (new GetInstanceID on reload) but
+            // collection.materials are persistent shared assets, so mat.mainTexture can already be
+            // one of our RenderTextures (from a previous instance's cycle) by the time the new
+            // instance's Init() fires.  In that state mat.mainTexture is an RT → backup capture
+            // is skipped → origMap for the new ikey is empty → vanillaTex not found → continue
+            // → the material is never processed and the old pack's content persists indefinitely.
             if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
-                continue;
+            {
+                // Search every other ikey for a backup of this matname (shared material,
+                // so vanilla content is identical across instances).
+                foreach (var otherMap in _originalTextures.Values)
+                {
+                    if (otherMap != origMap && otherMap.TryGetValue(matname, out var borrowed)
+                        && borrowed != null)
+                    {
+                        origMap[matname] = borrowed;
+                        vanillaTex = borrowed;
+                        // Also propagate the vanilla texture name for instance-specific path lookup.
+                        string otherIkeyTexKey = null;
+                        foreach (var kvp in _vanillaTexNames)
+                            if (kvp.Key.EndsWith("\x00" + matname)) { otherIkeyTexKey = kvp.Value; break; }
+                        string newTexKey = ikey + "\x00" + matname;
+                        if (otherIkeyTexKey != null && !_vanillaTexNames.ContainsKey(newTexKey))
+                            _vanillaTexNames[newTexKey] = otherIkeyTexKey;
+                        break;
+                    }
+                }
+                if (vanillaTex == null) continue; // no backup found anywhere — skip
+            }
 
-            // If no pack has any files for this collection, restore vanilla if the material
-            // was previously customised (pack just disabled), then skip the custom blit.
-            // Without the restore, mat.mainTexture keeps pointing at the old custom RT
-            // and the skin remains visible after the pack is turned off.
+            // If no pack has any files for this collection, restore vanilla and skip the
+            // custom blit.  Always restore unconditionally: the shared material may hold a
+            // custom RT from any prior instance (cross-ikey) so we cannot rely on
+            // LoadedAtlasesTextures having an entry for the current ikey.
             if (!_collectionsWithFiles.Contains(collection.name))
             {
-                if (LoadedAtlasesTextures.TryGetValue(ikey, out var prevMap)
-                    && prevMap.ContainsKey(matname))
-                    mat.mainTexture = vanillaTex;
+                mat.mainTexture = vanillaTex;
                 continue;
             }
 
