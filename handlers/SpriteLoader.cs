@@ -59,6 +59,9 @@ public static class SpriteLoader
     // get UV + position remapping this cycle.
     private sealed class AtlasExpansionPlan
     {
+        // Original atlas pixel dimensions (before expansion).
+        public int VanillaWidth;
+        public int VanillaHeight;
         // Expanded atlas pixel dimensions.
         public int Width;
         public int Height;
@@ -524,9 +527,11 @@ public static class SpriteLoader
 
         if (plan != null)
         {
-            extraH      += curRowH;
-            plan.Width   = atlasW;
-            plan.Height  = vanillaH + extraH;
+            extraH             += curRowH;
+            plan.VanillaWidth   = vanillaW;
+            plan.VanillaHeight  = vanillaH;
+            plan.Width          = atlasW;
+            plan.Height         = vanillaH + extraH;
         }
         return plan;
     }
@@ -540,71 +545,78 @@ public static class SpriteLoader
         tk2dSpriteCollectionData collection, AtlasExpansionPlan plan,
         int matId, int matIndex, int newW, int newH)
     {
+        // When the atlas is expanded every sprite on this material must have its UV
+        // Y-coordinates rescaled to account for the new texture height.  Vanilla content
+        // sits at the BOTTOM of the expanded RT (CopyTexture to Y=0), so a UV that was
+        // (oldV) against vanillaH now needs to be (oldV * vanillaH / newH) to reference
+        // the same pixel.  Enlarged sprites are remapped separately to their allocated slot.
+        float vScale = (float)plan.VanillaHeight / newH;
+        float uScale = (float)plan.VanillaWidth  / newW; // 1.0 unless atlas width grew
+
         foreach (var def in collection.spriteDefinitions)
         {
             if (def.materialId != matIndex || string.IsNullOrEmpty(def.name)) continue;
-            if (!plan.AllocatedRects.TryGetValue(def.name, out var allocRect)) continue;
-            if (!plan.VanillaRects.TryGetValue(def.name,   out var vRect))     continue;
-            if (!plan.RepDimensions.TryGetValue(def.name,  out var repDim))    continue;
 
-            var key = (matId, def.name);
+            var key        = (matId, def.name);
+            bool isExpanded = plan.AllocatedRects.ContainsKey(def.name);
 
-            // ── Backup before first modification ─────────────────────────────
+            // ── UV: copy-on-write then backup ─────────────────────────────────
             if (def.uvs != null && !_originalUVs.ContainsKey(key))
             {
-                // Copy-on-write: uvs arrays are shared across defs in tk2d just like
-                // positions arrays.  Clone to a private array before the first write so
-                // other defs that reference the same array are not affected.
                 foreach (var other in collection.spriteDefinitions)
                     if (!ReferenceEquals(other, def) && ReferenceEquals(other.uvs, def.uvs))
                         { def.uvs = (Vector2[])def.uvs.Clone(); break; }
                 _originalUVs[key] = (Vector2[])def.uvs.Clone();
             }
 
+            if (def.uvs != null && _originalUVs.TryGetValue(key, out var origUVs))
+            {
+                if (!isExpanded)
+                {
+                    // Vanilla sprite: scale UV to compensate for expanded atlas height.
+                    for (int i = 0; i < def.uvs.Length && i < origUVs.Length; i++)
+                        def.uvs[i] = new Vector2(origUVs[i].x * uScale,
+                                                  origUVs[i].y * vScale);
+                }
+                else if (plan.AllocatedRects.TryGetValue(def.name, out var allocRect))
+                {
+                    // Enlarged sprite: remap to the allocated slot in the expanded atlas.
+                    float oldMinU = float.MaxValue, oldMaxU = float.MinValue;
+                    float oldMinV = float.MaxValue, oldMaxV = float.MinValue;
+                    foreach (var v in origUVs)
+                    {
+                        if (v.x < oldMinU) oldMinU = v.x; if (v.x > oldMaxU) oldMaxU = v.x;
+                        if (v.y < oldMinV) oldMinV = v.y; if (v.y > oldMaxV) oldMaxV = v.y;
+                    }
+                    float newMinU = allocRect.x                      / newW;
+                    float newMaxU = (allocRect.x + allocRect.width)  / newW;
+                    float newMinV = allocRect.y                      / newH;
+                    float newMaxV = (allocRect.y + allocRect.height) / newH;
+                    float rangeU  = oldMaxU - oldMinU;
+                    float rangeV  = oldMaxV - oldMinV;
+                    for (int i = 0; i < def.uvs.Length && i < origUVs.Length; i++)
+                    {
+                        float tU = rangeU > 1e-6f ? (origUVs[i].x - oldMinU) / rangeU : 0.5f;
+                        float tV = rangeV > 1e-6f ? (origUVs[i].y - oldMinV) / rangeV : 0.5f;
+                        def.uvs[i] = new Vector2(newMinU + tU * (newMaxU - newMinU),
+                                                  newMinV + tV * (newMaxV - newMinV));
+                    }
+                }
+            }
+
+            // ── Position remap: enlarged sprites only ─────────────────────────
+            if (!isExpanded) continue;
+            if (!plan.VanillaRects.TryGetValue(def.name,  out var vRect))  continue;
+            if (!plan.RepDimensions.TryGetValue(def.name, out var repDim)) continue;
+
             if (def.positions != null && !_originalPositions.ContainsKey(key))
             {
-                // Copy-on-write: if another def shares this positions array, clone it first
-                // so our modification doesn't silently affect unrelated sprites.
                 foreach (var other in collection.spriteDefinitions)
                     if (!ReferenceEquals(other, def) && ReferenceEquals(other.positions, def.positions))
                         { def.positions = (Vector3[])def.positions.Clone(); break; }
                 _originalPositions[key] = (Vector3[])def.positions.Clone();
             }
 
-            // ── UV remap ─────────────────────────────────────────────────────
-            // Map each vanilla UV vertex linearly from the old [minU..maxU]×[minV..maxV]
-            // range into the new range corresponding to the allocated slot.
-            if (def.uvs != null && _originalUVs.TryGetValue(key, out var origUVs))
-            {
-                float oldMinU = float.MaxValue, oldMaxU = float.MinValue;
-                float oldMinV = float.MaxValue, oldMaxV = float.MinValue;
-                foreach (var v in origUVs)
-                {
-                    if (v.x < oldMinU) oldMinU = v.x; if (v.x > oldMaxU) oldMaxU = v.x;
-                    if (v.y < oldMinV) oldMinV = v.y; if (v.y > oldMaxV) oldMaxV = v.y;
-                }
-
-                // Convert allocated rect (texture pixel space, Y-up) to UV.
-                float newMinU = allocRect.x                       / newW;
-                float newMaxU = (allocRect.x + allocRect.width)   / newW;
-                float newMinV = allocRect.y                       / newH;
-                float newMaxV = (allocRect.y + allocRect.height)  / newH;
-
-                float rangeU = oldMaxU - oldMinU;
-                float rangeV = oldMaxV - oldMinV;
-                for (int i = 0; i < def.uvs.Length && i < origUVs.Length; i++)
-                {
-                    float tU = rangeU > 1e-6f ? (origUVs[i].x - oldMinU) / rangeU : 0.5f;
-                    float tV = rangeV > 1e-6f ? (origUVs[i].y - oldMinV) / rangeV : 0.5f;
-                    def.uvs[i] = new Vector2(
-                        newMinU + tU * (newMaxU - newMinU),
-                        newMinV + tV * (newMaxV - newMinV));
-                }
-            }
-
-            // ── Position remap ────────────────────────────────────────────────
-            // Compute new quad vertex positions in local unit space by expanding
-            // the vanilla bounding box according to the chosen anchor.
             if (def.positions != null && _originalPositions.TryGetValue(key, out var origPos)
                 && def.positions.Length == origPos.Length && origPos.Length >= 4)
             {
@@ -618,53 +630,39 @@ public static class SpriteLoader
 
                 float unitSpanX = oldMaxX - oldMinX;
                 float unitSpanY = oldMaxY - oldMinY;
-                if (unitSpanX < 1e-6f || unitSpanY < 1e-6f) continue; // degenerate — skip
+                if (unitSpanX < 1e-6f || unitSpanY < 1e-6f) continue;
 
-                // Derive units-per-pixel from vanilla position span and vanilla pixel rect.
                 float uppX = unitSpanX / vRect.width;
                 float uppY = unitSpanY / vRect.height;
-
-                int dW = repDim.w - (int)vRect.width;
-                int dH = repDim.h - (int)vRect.height;
+                int   dW   = repDim.w - (int)vRect.width;
+                int   dH   = repDim.h - (int)vRect.height;
 
                 float newMinX, newMaxX, newMinY, newMaxY;
-                string anchor = plan.Anchors.GetValueOrDefault(def.name, "bottom-center");
-                switch (anchor)
+                switch (plan.Anchors.GetValueOrDefault(def.name, "bottom-center"))
                 {
                     case "top-center":
-                        newMinX = oldMinX - dW * 0.5f * uppX;
-                        newMaxX = oldMaxX + dW * 0.5f * uppX;
-                        newMaxY = oldMaxY;                        // top fixed
-                        newMinY = oldMinY - dH * uppY;
+                        newMinX = oldMinX - dW * 0.5f * uppX; newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMaxY = oldMaxY; newMinY = oldMinY - dH * uppY;
                         break;
                     case "left-center":
-                        newMinX = oldMinX;                        // left fixed
-                        newMaxX = oldMaxX + dW * uppX;
-                        newMinY = oldMinY - dH * 0.5f * uppY;
-                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        newMinX = oldMinX; newMaxX = oldMaxX + dW * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY; newMaxY = oldMaxY + dH * 0.5f * uppY;
                         break;
                     case "right-center":
-                        newMaxX = oldMaxX;                        // right fixed
-                        newMinX = oldMinX - dW * uppX;
-                        newMinY = oldMinY - dH * 0.5f * uppY;
-                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        newMaxX = oldMaxX; newMinX = oldMinX - dW * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY; newMaxY = oldMaxY + dH * 0.5f * uppY;
                         break;
                     case "center":
-                        newMinX = oldMinX - dW * 0.5f * uppX;
-                        newMaxX = oldMaxX + dW * 0.5f * uppX;
-                        newMinY = oldMinY - dH * 0.5f * uppY;
-                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        newMinX = oldMinX - dW * 0.5f * uppX; newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY; newMaxY = oldMaxY + dH * 0.5f * uppY;
                         break;
                     default: // "bottom-center"
-                        newMinX = oldMinX - dW * 0.5f * uppX;
-                        newMaxX = oldMaxX + dW * 0.5f * uppX;
-                        newMinY = oldMinY;                        // bottom fixed
-                        newMaxY = oldMaxY + dH * uppY;
+                        newMinX = oldMinX - dW * 0.5f * uppX; newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMinY = oldMinY; newMaxY = oldMaxY + dH * uppY;
                         break;
                 }
 
-                float rangeX = unitSpanX;
-                float rangeY = unitSpanY;
+                float rangeX = unitSpanX, rangeY = unitSpanY;
                 for (int i = 0; i < def.positions.Length && i < origPos.Length; i++)
                 {
                     float tX = (origPos[i].x - oldMinX) / rangeX;
