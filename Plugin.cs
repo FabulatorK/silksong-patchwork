@@ -165,6 +165,7 @@ public class Plugin : BaseUnityPlugin
     {
         yield return null;
         DialogueHandler.ApplyPatches(harmony);
+        GUIHelper.ApplyCursorPatch(harmony);
 
         if (Config.DumpText)
             DialogueHandler.DumpText();
@@ -210,11 +211,6 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
-        // Do NOT touch Cursor.visible here.  If the hardware cursor is hidden the
-        // game will keep hiding it — our software cursor in OnGUI covers that case.
-        // If another mod (e.g. DebugMod) has forced the hardware cursor visible we
-        // must not suppress it, or the two mods fight every frame.
-
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
         DevProfiler.RecordEnforceMs(DevProfiler.StopOp("EnforceT2D"));

@@ -285,97 +285,36 @@ public static class GUIHelper
     public static void EndOnGUI()
     {
         DrawTooltip();
-        if (Plugin.ShowDevHub || Plugin.ShowPackManager)
-            DrawSoftCursor();
     }
 
-    // ── Software cursor ──────────────────────────────────────────────────────
+    // ── Cursor ───────────────────────────────────────────────────────────────
+    // Patch InputHandler.SetCursorVisible() — the game's own cursor control
+    // method — so that any call which would hide the cursor is suppressed while
+    // a Patchwork window is open.  This is the same technique used by DebugMod
+    // and means the two mods compose correctly: whichever one needs the cursor
+    // wins, without either fighting the other via Cursor.visible in Update loops.
+
+    public static void ApplyCursorPatch(Harmony harmony)
+    {
+        var method = AccessTools.Method(typeof(InputHandler), "SetCursorVisible");
+        if (method != null)
+            harmony.Patch(method,
+                prefix: new HarmonyMethod(typeof(GUIHelper), nameof(SetCursorVisiblePrefix)));
+        else
+            Plugin.Logger.LogWarning("[GUIHelper] InputHandler.SetCursorVisible not found — cursor patch skipped");
+    }
+
+    private static void SetCursorVisiblePrefix(ref bool visible)
+    {
+        if (Plugin.ShowDevHub || Plugin.ShowPackManager)
+            visible = true;
+    }
+
+    // ── Tooltip ──────────────────────────────────────────────────────────────
     // The game aggressively re-hides and re-locks the hardware cursor every frame
     // via InputSystem callbacks that fire even after LateUpdate.  Drawing a software
     // cursor in OnGUI/Repaint is the only reliable solution: it runs every render
     // frame and cannot be overridden by game code.
-    //
-    // Technique borrowed from SSDebug (SWCursor): reset GUI.matrix to identity so
-    // the cursor is drawn in raw screen pixels regardless of any IMGUI scale
-    // transform, call Cursor.lockState = None right before drawing so the mouse is
-    // free to move, then restore the matrix.
-
-    private static Texture2D _softCursorTex;
-    private const  int       CursorW = 20;
-    private const  int       CursorH = 27;
-
-    // 20×27 = 540 pixels, top-row-first in image space.
-    // SetPixels fills Y=0 (bottom) first, so the array is stored bottom-to-top
-    // relative to the texture — row 0 of this array = bottom row of the texture
-    // = top of the drawn rect (Unity flips IMGUI textures).  Net result: the
-    // arrow tip (first row of this array) lands at the Rect's top-left corner.
-    private static readonly Color[] s_cursorPixels = new Color[]
-    {
-        new Color(1,1,1,0),new Color(1,1,1,1),new Color(1,1,1,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(0,0,0,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(0,0,0,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(0,0,0,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(0,0,0,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(0,0,0,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),
-        new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,1),
-        new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(0,0,0,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,1),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-        new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),new Color(1,1,1,0),
-    };
-
-    private static void DrawSoftCursor()
-    {
-        if (Event.current.type != EventType.Repaint) return;
-
-        // If the hardware cursor is already visible — e.g. another mod such as
-        // DebugMod patched InputHandler.SetCursorVisible() to keep it on — skip
-        // the software draw.  The hardware cursor is doing the job; drawing on top
-        // would produce a double cursor.
-        if (Cursor.visible) return;
-        {
-            _softCursorTex = new Texture2D(CursorW, CursorH, TextureFormat.RGBAFloat, false)
-            {
-                hideFlags = HideFlags.DontUnloadUnusedAsset
-            };
-            _softCursorTex.SetPixels(s_cursorPixels);
-            _softCursorTex.Apply();
-        }
-
-        // Reset matrix so the cursor is drawn in raw screen pixels, bypassing any
-        // IMGUI scale transform that may be active from window/layout code.
-        var savedMatrix = UnityEngine.GUI.matrix;
-        UnityEngine.GUI.matrix = Matrix4x4.identity;
-
-        // Allow the mouse to move freely — this call is inside OnGUI so it fires
-        // every rendered frame and outlasts any per-Update lock the game may set.
-        Cursor.lockState = CursorLockMode.None;
-
-        // Input.mousePosition: Y=0 at bottom. GUI rects: Y=0 at top — flip.
-        float mx = Input.mousePosition.x;
-        float my = Screen.height - Input.mousePosition.y;
-        UnityEngine.GUI.DrawTexture(new Rect(mx, my, CursorW, CursorH), _softCursorTex);
-
-        UnityEngine.GUI.matrix = savedMatrix;
-    }
-
     // ── Tooltip ──────────────────────────────────────────────────────────────
 
     private static GUIStyle _tooltipStyle;
