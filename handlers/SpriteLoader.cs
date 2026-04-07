@@ -45,6 +45,18 @@ public static class SpriteLoader
     // Never cleared — mirrors _originalTextures lifetime (vanilla names don't change).
     private static readonly Dictionary<int, string> _vanillaTexNames = new();
 
+    // Secondary stable index — keyed by (collection.name, matIndex) instead of matId.
+    // collection.name is the tk2d asset name (unchanged across instance transitions).
+    // matIndex is the material's position in collection.materials[] (fixed at export time).
+    // Used as a fallback when the primary matId key is stale (material was unloaded and
+    // recreated by the game, giving it a new GetInstanceID()).  When the fallback fires,
+    // the new matId is registered in the primary dicts and a warning is logged so we can
+    // track how often this happens in practice.
+    private static readonly Dictionary<(string collName, int matIndex), RenderTexture>
+        _originalTexturesByColIndex = new();
+    private static readonly Dictionary<(string collName, int matIndex), string>
+        _vanillaTexNamesByColIndex = new();
+
     // UV and position backups for sprite defs that have been expanded.
     // Keyed by (matId, spriteName) — both are stable: matId is a persistent shared asset ID,
     // spriteName is fixed at tk2d export time.
@@ -178,13 +190,44 @@ public static class SpriteLoader
                 // Record vanilla texture name for instance-specific load path resolution.
                 string vTexName = mat.mainTexture.name;
                 _vanillaTexNames[matId] = vTexName;
+                // Also register under the stable (collName, matIndex) key so we can recover
+                // if matId becomes stale in a future session (material unloaded/recreated).
+                int captureIdx = System.Array.IndexOf(collection.materials, mat);
+                if (captureIdx >= 0)
+                {
+                    _originalTexturesByColIndex[(collection.name, captureIdx)] = backupRT;
+                    _vanillaTexNamesByColIndex[(collection.name, captureIdx)]  = vTexName;
+                }
                 if (nameCollision)
                     Plugin.Logger.LogWarning(
                         $"[SpriteLoader]   mat '{matnameAbbr}' → vanilla texture '{vTexName}'");
             }
 
             if (!_originalTextures.TryGetValue(matId, out var vanillaTex) || vanillaTex == null)
-                continue; // vanilla not captured yet — skip until next Init()
+            {
+                // Primary lookup failed — matId may be stale (material was unloaded and
+                // recreated by the game, giving it a new instance ID).  Try the stable
+                // (collName, matIndex) secondary index and re-register under the new matId
+                // so subsequent passes find it immediately via the fast primary path.
+                int fallbackIdx = System.Array.IndexOf(collection.materials, mat);
+                var colIdx = (collection.name, fallbackIdx);
+                if (fallbackIdx >= 0
+                    && _originalTexturesByColIndex.TryGetValue(colIdx, out vanillaTex)
+                    && vanillaTex != null && vanillaTex.IsCreated())
+                {
+                    _originalTextures[matId] = vanillaTex;
+                    if (!_vanillaTexNames.ContainsKey(matId)
+                        && _vanillaTexNamesByColIndex.TryGetValue(colIdx, out var tn))
+                        _vanillaTexNames[matId] = tn;
+                    Plugin.Logger.LogWarning(
+                        $"[SpriteLoader] matId refreshed for {collection.name}[{fallbackIdx}] " +
+                        $"(old lookup failed — material was likely reloaded by the game)");
+                }
+                else
+                {
+                    continue; // vanilla not captured yet — skip until next Init()
+                }
+            }
 
             // Compute matIndex here — needed by both the vanilla-restore gate and the
             // expansion pipeline below. Array.IndexOf on collection.materials is safe
