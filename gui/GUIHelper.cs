@@ -139,6 +139,147 @@ public static class GUIHelper
         }
     }
 
+    // ── Design tokens ─────────────────────────────────────────────────────────
+    public static readonly Color ColSurface  = new Color(0.10f, 0.10f, 0.13f, 1f);
+    public static readonly Color ColSurface1 = new Color(0.17f, 0.17f, 0.22f, 1f);
+    public static readonly Color ColBorder   = new Color(0.28f, 0.28f, 0.35f, 1f);
+    public static readonly Color ColAccent   = new Color(0.45f, 0.72f, 1.00f, 1f);
+    public static readonly Color ColMuted    = new Color(0.55f, 0.55f, 0.65f, 1f);
+    public static readonly Color ColSuccess  = new Color(0.35f, 0.90f, 0.50f, 1f);
+    public static readonly Color ColWarn     = new Color(1.00f, 0.75f, 0.20f, 1f);
+    public static readonly Color ColDanger   = new Color(1.00f, 0.40f, 0.40f, 1f);
+
+    /// <summary>Create a 1×1 solid-colour Texture2D. Style caches should hold the ref.</summary>
+    public static Texture2D MakeTex(Color c)
+    {
+        var t = new Texture2D(1, 1);
+        t.SetPixel(0, 0, c);
+        t.Apply();
+        return t;
+    }
+
+    /// <summary>Draw a 1px-tall horizontal rule tinted with <see cref="ColBorder"/>.</summary>
+    public static void DrawSeparator()
+    {
+        var r = GUILayoutUtility.GetRect(0, Scaled(1f), GUILayout.ExpandWidth(true));
+        UnityEngine.GUI.color = new Color(ColBorder.r, ColBorder.g, ColBorder.b, 0.6f);
+        UnityEngine.GUI.DrawTexture(r, Texture2D.whiteTexture);
+        UnityEngine.GUI.color = Color.white;
+    }
+
+    // ── Derived styles ───────────────────────────────────────────────────────
+
+    private static GUIStyle _cardStyle;
+    private static int      _cachedCardPad;
+
+    /// <summary>Flat-colour container background for list cards (pack rows).</summary>
+    public static GUIStyle CardStyle
+    {
+        get
+        {
+            int p = ScaledInt(6);
+            if (_cardStyle == null || _cachedCardPad != p)
+            {
+                _cachedCardPad = p;
+                _cardStyle = new GUIStyle(GUIStyle.none)
+                {
+                    padding = new RectOffset(p, p, ScaledInt(4), ScaledInt(4)),
+                };
+                _cardStyle.normal.background = MakeTex(ColSurface1);
+            }
+            return _cardStyle;
+        }
+    }
+
+    private static GUIStyle _chipStyle;
+    private static int      _cachedChipFontSize;
+
+    /// <summary>Non-clickable badge label (source origin, asset type tags).</summary>
+    public static GUIStyle ChipStyle
+    {
+        get
+        {
+            int fs = FontSize(11);
+            if (_chipStyle == null || _cachedChipFontSize != fs)
+            {
+                _cachedChipFontSize = fs;
+                _chipStyle = new GUIStyle(UnityEngine.GUI.skin.label)
+                {
+                    fontSize  = fs,
+                    alignment = TextAnchor.MiddleCenter,
+                    padding   = new RectOffset(ScaledInt(5), ScaledInt(5), ScaledInt(2), ScaledInt(2)),
+                };
+                _chipStyle.normal.textColor  = ColMuted;
+                _chipStyle.normal.background = MakeTex(new Color(0.22f, 0.22f, 0.28f, 1f));
+            }
+            return _chipStyle;
+        }
+    }
+
+    private static GUIStyle _tagStyle;
+    private static int      _cachedTagFontSize;
+
+    /// <summary>Compact clickable tag button (ON/OFF toggle, condition count).</summary>
+    public static GUIStyle TagStyle
+    {
+        get
+        {
+            int fs = FontSize(12);
+            if (_tagStyle == null || _cachedTagFontSize != fs)
+            {
+                _cachedTagFontSize = fs;
+                _tagStyle = new GUIStyle(UnityEngine.GUI.skin.button)
+                {
+                    fontSize = fs,
+                    padding  = new RectOffset(ScaledInt(6), ScaledInt(6), ScaledInt(2), ScaledInt(2)),
+                };
+            }
+            return _tagStyle;
+        }
+    }
+
+    private static GUIStyle _mutedLabelStyle;
+    private static int      _cachedMutedFontSize;
+
+    /// <summary>Secondary text in a muted colour (author, description, footprint).</summary>
+    public static GUIStyle MutedLabelStyle
+    {
+        get
+        {
+            int fs = FontSize(12);
+            if (_mutedLabelStyle == null || _cachedMutedFontSize != fs)
+            {
+                _cachedMutedFontSize = fs;
+                _mutedLabelStyle = new GUIStyle(UnityEngine.GUI.skin.label) { fontSize = fs };
+                _mutedLabelStyle.normal.textColor = ColMuted;
+            }
+            return _mutedLabelStyle;
+        }
+    }
+
+    private static GUIStyle _sectionHeaderStyle;
+    private static int      _cachedSectionFontSize;
+
+    /// <summary>Bold accent-coloured section divider heading.</summary>
+    public static GUIStyle SectionHeaderStyle
+    {
+        get
+        {
+            int fs = FontSize(12);
+            if (_sectionHeaderStyle == null || _cachedSectionFontSize != fs)
+            {
+                _cachedSectionFontSize = fs;
+                _sectionHeaderStyle = new GUIStyle(UnityEngine.GUI.skin.label)
+                {
+                    fontSize  = fs,
+                    fontStyle = FontStyle.Bold,
+                };
+                _sectionHeaderStyle.normal.textColor = ColAccent;
+            }
+            return _sectionHeaderStyle;
+        }
+    }
+
     // ============================================================================
     // SCALING
     // ============================================================================

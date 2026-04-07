@@ -203,50 +203,69 @@ public static class PackManagerWindow
         var livePack = PackManager.AllPacks.FirstOrDefault(p =>
             string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
 
-        GUILayout.BeginVertical(UnityEngine.GUI.skin.box);
+        GUILayout.BeginVertical(GUIHelper.CardStyle);
         {
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
             {
-                // Enable / disable button
-                if (pack.IsEnabled)
-                    UnityEngine.GUI.contentColor = new Color(0.3f, 1f, 0.3f);
-                bool clicked = GUILayout.Button(pack.IsEnabled ? "ON" : "OFF", GUIHelper.ButtonStyle, GUIHelper.Width(40));
-                UnityEngine.GUI.contentColor = Color.white;
+                // Enable / disable toggle — ColSuccess bg when on, muted when off
+                Color prevBg = UnityEngine.GUI.backgroundColor;
+                UnityEngine.GUI.backgroundColor = pack.IsEnabled
+                    ? new Color(0.15f, 0.50f, 0.22f)
+                    : new Color(0.20f, 0.20f, 0.25f);
+                UnityEngine.GUI.contentColor = pack.IsEnabled ? GUIHelper.ColSuccess : GUIHelper.ColMuted;
+                bool clicked = GUILayout.Button(
+                    pack.IsEnabled ? "ON" : "OFF",
+                    GUIHelper.TagStyle, GUIHelper.Width(40));
+                UnityEngine.GUI.backgroundColor = prevBg;
+                UnityEngine.GUI.contentColor    = Color.white;
                 if (clicked)
                 {
                     EnsureStaged();
                     _staged[i].IsEnabled = !pack.IsEnabled;
                 }
 
-                // Name + source badge
-                string badge = pack.IsLocal ? " [local]" : " [pack]";
-                GUILayout.Label(pack.Name + badge, GUIHelper.LabelStyle);
+                GUIHelper.Space(3);
 
-                // Conflict badge — show when this pack has shadowed assets
+                // Pack name
+                GUILayout.Label(pack.Name, GUIHelper.LabelStyle);
+
+                GUIHelper.Space(2);
+
+                // Source chip: "local" or "pack"
+                GUILayout.Label(pack.IsLocal ? "local" : "pack",
+                    GUIHelper.ChipStyle, GUILayout.ExpandWidth(false));
+
+                // Conflict badge
                 int shadowed = ConflictTracker.ShadowedCount(pack.Path);
                 if (shadowed > 0)
                 {
-                    UnityEngine.GUI.contentColor = new Color(1f, 0.75f, 0.2f);
+                    GUIHelper.Space(2);
+                    UnityEngine.GUI.contentColor = GUIHelper.ColWarn;
                     GUILayout.Label($"⚠ {shadowed}", GUIHelper.LabelStyle);
                     UnityEngine.GUI.contentColor = Color.white;
                 }
 
-                // Conditions toggle button (works on live list, not staged)
+                // Conditions toggle (works on live list, not staged)
                 if (livePack != null)
                 {
                     bool condOpen = _conditionsOpen.Contains(pack.Path);
+                    Color prevCondBg = UnityEngine.GUI.backgroundColor;
                     if (condOpen || livePack.HasConditions)
-                        UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                    {
+                        UnityEngine.GUI.backgroundColor = new Color(0.18f, 0.30f, 0.50f);
+                        UnityEngine.GUI.contentColor    = GUIHelper.ColAccent;
+                    }
                     string condLabel = livePack.HasConditions
-                        ? $"[{livePack.Conditions.Count} cond]"
-                        : "[+ cond]";
-                    if (GUILayout.Button(condLabel, GUIHelper.ButtonStyle, GUIHelper.Width(74)))
+                        ? $"{livePack.Conditions.Count} cond"
+                        : "+ cond";
+                    if (GUILayout.Button(condLabel, GUIHelper.TagStyle, GUIHelper.Width(62)))
                     {
                         if (condOpen) _conditionsOpen.Remove(pack.Path);
                         else          _conditionsOpen.Add(pack.Path);
                     }
-                    UnityEngine.GUI.contentColor = Color.white;
+                    UnityEngine.GUI.backgroundColor = prevCondBg;
+                    UnityEngine.GUI.contentColor    = Color.white;
                 }
 
                 GUILayout.FlexibleSpace();
@@ -270,7 +289,7 @@ public static class PackManagerWindow
             }
             GUILayout.EndHorizontal();
 
-            // ── Secondary info line ───────────────────────────────
+            // ── Secondary info ───────────────────────────────────
             var meta = new List<string>();
             if (!string.IsNullOrEmpty(pack.Author))  meta.Add($"by {pack.Author}");
             if (!string.IsNullOrEmpty(pack.Version)) meta.Add($"v{pack.Version}");
@@ -283,26 +302,39 @@ public static class PackManagerWindow
             }
 
             if (meta.Count > 0)
-                GUILayout.Label("  " + string.Join("   ", meta), GUIHelper.LabelStyle);
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(GUIHelper.Scaled(46));
+                GUILayout.Label(string.Join("   ", meta), GUIHelper.MutedLabelStyle);
+                GUILayout.EndHorizontal();
+            }
 
             // ── Asset footprint ───────────────────────────────────
             string footprint = pack.Stats.Badge;
             if (footprint != null)
             {
-                // Show scanned file counts (e.g. "12 sprites  3 sheets  5 sfx")
-                GUILayout.Label("  " + footprint, GUIHelper.LabelStyle);
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(GUIHelper.Scaled(46));
+                GUILayout.Label(footprint, GUIHelper.MutedLabelStyle);
+                GUILayout.EndHorizontal();
             }
             else
             {
-                // Fall back to directory-presence tags when stats haven't been scanned yet
-                var types = new List<string>();
-                if (Directory.Exists(Path.Combine(pack.Path, "Sprites")))      types.Add("sprites");
-                if (Directory.Exists(Path.Combine(pack.Path, "Spritesheets"))) types.Add("sheets");
-                if (Directory.Exists(Path.Combine(pack.Path, "Sounds")))       types.Add("audio");
-                if (Directory.Exists(Path.Combine(pack.Path, "Videos")))       types.Add("video");
-                if (Directory.Exists(Path.Combine(pack.Path, "Text")))         types.Add("text");
-                if (types.Count > 0)
-                    GUILayout.Label("  [" + string.Join(", ", types) + "]", GUIHelper.LabelStyle);
+                // Directory-presence chips when stats not yet scanned
+                var typeTags = new List<string>();
+                if (Directory.Exists(Path.Combine(pack.Path, "Sprites")))      typeTags.Add("sprites");
+                if (Directory.Exists(Path.Combine(pack.Path, "Spritesheets"))) typeTags.Add("sheets");
+                if (Directory.Exists(Path.Combine(pack.Path, "Sounds")))       typeTags.Add("audio");
+                if (Directory.Exists(Path.Combine(pack.Path, "Videos")))       typeTags.Add("video");
+                if (Directory.Exists(Path.Combine(pack.Path, "Text")))         typeTags.Add("text");
+                if (typeTags.Count > 0)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(GUIHelper.Scaled(46));
+                    foreach (var tag in typeTags)
+                        GUILayout.Label(tag, GUIHelper.ChipStyle, GUILayout.ExpandWidth(false));
+                    GUILayout.EndHorizontal();
+                }
             }
 
             // ── Inline condition editor ───────────────────────────
@@ -723,7 +755,9 @@ public static class PackManagerWindow
 
     private static void DrawProfilesSection()
     {
-        GUILayout.Label("── Profiles ──────────────────────────────", GUIHelper.LabelStyle);
+        GUIHelper.DrawSeparator();
+        GUIHelper.Space(4);
+        GUILayout.Label("Profiles", GUIHelper.SectionHeaderStyle);
 
         // Existing profiles
         var names = PackManager.GetProfileNames();
@@ -775,11 +809,10 @@ public static class PackManagerWindow
     private static void DrawConflictsSection()
     {
         int total = ConflictTracker.Total;
-        string header = total == 0
-            ? "── Conflicts: none ───────────────────────"
-            : $"── Conflicts: {total} ──────────────────────────";
-
-        if (GUILayout.Button(header, GUIHelper.LabelStyle))
+        GUIHelper.DrawSeparator();
+        GUIHelper.Space(4);
+        string header = total == 0 ? "Conflicts: none" : $"Conflicts: {total}";
+        if (GUILayout.Button(header, GUIHelper.SectionHeaderStyle))
             _conflictsFoldout = !_conflictsFoldout;
 
         if (!_conflictsFoldout || total == 0) return;

@@ -14,15 +14,15 @@ namespace Patchwork.GUI;
 /// </summary>
 public static class StatusOverlay
 {
-    private const float PaddingH   = 10f;
-    private const float PaddingV   = 6f;
-    private const float BadgeH     = 28f;
+    private const float PaddingH     = 10f;
+    private const float PaddingV     = 6f;
+    private const float BadgeH       = 28f;
     private const float BottomMargin = 10f;
     private const float LeftMargin   = 10f;
+    private const float AccentW      = 3f;
 
-    private static Texture2D _bgTex;
-    private static GUIStyle  _labelStyle;
-    private static int       _lastFontSize;
+    private static GUIStyle _labelStyle;
+    private static int      _lastFontSize;
 
     public static void Draw()
     {
@@ -33,29 +33,35 @@ public static class StatusOverlay
         int sprites     = SpriteLoader.LoadedSpriteCount;
         int clips       = AudioHandler.CachedClipCount;
 
-        string packPart = $"\u25A0 {activePacks} pack{(activePacks != 1 ? "s" : "")}";
+        // Rich-text label: each segment carries its design-token colour.
+        string packPart = $"<color=#59E680>\u25A0 {activePacks} pack{(activePacks != 1 ? "s" : "")}</color>";
+        string statPart = $"<color=#8C8CA6>{sprites} sprites  |  {clips} clips</color>";
         string text = conflicts > 0
-            ? $"{packPart}  \u26A0 {conflicts} conflict{(conflicts != 1 ? "s" : "")}  {sprites} sprites  |  {clips} clips"
-            : $"{packPart}  {sprites} sprites  |  {clips} clips";
+            ? $"{packPart}  <color=#FFBF33>\u26A0 {conflicts} conflict{(conflicts != 1 ? "s" : "")}</color>  {statPart}"
+            : $"{packPart}  {statPart}";
 
         Vector2 textSize = _labelStyle.CalcSize(new GUIContent(text));
-        float w = textSize.x + GUIHelper.Scaled(PaddingH * 2);
-        float h = GUIHelper.Scaled(BadgeH);
-        float x = GUIHelper.Scaled(LeftMargin);
-        float y = Screen.height - h - GUIHelper.Scaled(BottomMargin);
+        float w       = textSize.x + GUIHelper.Scaled(PaddingH * 2);
+        float h       = GUIHelper.Scaled(BadgeH);
+        float x       = GUIHelper.Scaled(LeftMargin);
+        float y       = Screen.height - h - GUIHelper.Scaled(BottomMargin);
+        float accentPx = GUIHelper.Scaled(AccentW);
 
         Rect bgRect = new Rect(x, y, w, h);
 
-        // Background
-        UnityEngine.GUI.color = new Color(0f, 0f, 0f, 0.72f);
-        UnityEngine.GUI.DrawTexture(bgRect, _bgTex);
+        // Dark panel background
+        UnityEngine.GUI.color = new Color(0.10f, 0.10f, 0.13f, 0.88f);
+        UnityEngine.GUI.DrawTexture(bgRect, Texture2D.whiteTexture);
+
+        // Left accent stripe
+        UnityEngine.GUI.color = GUIHelper.ColAccent;
+        UnityEngine.GUI.DrawTexture(new Rect(x, y, accentPx, h), Texture2D.whiteTexture);
+
         UnityEngine.GUI.color = Color.white;
 
-        // Text — warn colour when conflicts exist
-        Rect labelRect = new Rect(x + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV), w, h);
-        UnityEngine.GUI.contentColor = conflicts > 0 ? new Color(1f, 0.82f, 0.2f) : Color.white;
+        // Rich-text label (colours embedded in markup)
+        Rect labelRect = new Rect(x + accentPx + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV), w, h);
         UnityEngine.GUI.Label(labelRect, text, _labelStyle);
-        UnityEngine.GUI.contentColor = Color.white;
 
         // Invisible button over the whole badge — click opens Pack Manager
         if (UnityEngine.GUI.Button(bgRect, GUIContent.none, GUIStyle.none))
@@ -64,20 +70,14 @@ public static class StatusOverlay
 
     private static void EnsureStyles()
     {
-        if (_bgTex == null)
-        {
-            _bgTex = new Texture2D(1, 1);
-            _bgTex.SetPixel(0, 0, new Color(0.1f, 0.1f, 0.1f, 1f));
-            _bgTex.Apply();
-        }
-
         int fontSize = GUIHelper.FontSize(13);
         if (_labelStyle == null || _lastFontSize != fontSize)
         {
             _labelStyle = new GUIStyle(UnityEngine.GUI.skin.label)
             {
                 fontSize  = fontSize,
-                alignment = TextAnchor.MiddleLeft
+                alignment = TextAnchor.MiddleLeft,
+                richText  = true,
             };
             _lastFontSize = fontSize;
         }
