@@ -540,22 +540,35 @@ public static class SpriteLoader
             if (repW <= 0 || repH <= 0) continue;
 
             Rect vRect = SpriteUtil.GetSpriteRect(def, vanillaTex);
-            if (repW <= (int)vRect.width && repH <= (int)vRect.height) continue;
+
+            // Replacement PNGs are always saved in NATURAL orientation (the sprite as it
+            // appears on screen).  Rotated sprites (Tk2d / TPackerCW) are stored TRANSPOSED
+            // in the atlas, so their atlas rect dimensions are swapped vs natural dimensions.
+            // Compare replacement size against natural vanilla dimensions, not atlas-rect dims.
+            bool isRotated = def.flipped != tk2dSpriteDefinition.FlipMode.None;
+            int naturalVanillaW = isRotated ? (int)vRect.height : (int)vRect.width;
+            int naturalVanillaH = isRotated ? (int)vRect.width  : (int)vRect.height;
+            if (repW <= naturalVanillaW && repH <= naturalVanillaH) continue;
 
             plan ??= new AtlasExpansionPlan();
 
             string anchor = IOUtil.ReadAnchorEntry(
                 LoadPath, collection.name, matnameAbbr, def.name) ?? "bottom-center";
 
+            // Atlas allocation is in ATLAS space (transposed for rotated sprites).
+            // The draw step in LoadCollection applies the same rotation as the original,
+            // so we must allocate a slot that matches the rotated storage dimensions.
+            int atlasAllocW = isRotated ? repH : repW;
+            int atlasAllocH = isRotated ? repW : repH;
+
             // Shelf-pack into the extra rows above the vanilla atlas (texture Y-up, so above = higher Y).
-            // If a replacement is wider than the current atlas, expand the atlas width.
-            if (repW > atlasW) atlasW = repW;
-            if (curX + repW > atlasW) { extraH += curRowH; curX = 0; curRowH = 0; }
+            if (atlasAllocW > atlasW) atlasW = atlasAllocW;
+            if (curX + atlasAllocW > atlasW) { extraH += curRowH; curX = 0; curRowH = 0; }
 
             // Texture-space rect: Y starts at vanillaH and increases upward.
-            var allocRect = new Rect(curX, vanillaH + extraH, repW, repH);
-            curX    += repW;
-            curRowH  = Math.Max(curRowH, repH);
+            var allocRect = new Rect(curX, vanillaH + extraH, atlasAllocW, atlasAllocH);
+            curX    += atlasAllocW;
+            curRowH  = Math.Max(curRowH, atlasAllocH);
 
             plan.AllocatedRects[def.name] = allocRect;
             plan.VanillaRects[def.name]   = vRect;
@@ -675,10 +688,16 @@ public static class SpriteLoader
                 float unitSpanY = oldMaxY - oldMinY;
                 if (unitSpanX < 1e-6f || unitSpanY < 1e-6f) continue;
 
-                float uppX = unitSpanX / vRect.width;
-                float uppY = unitSpanY / vRect.height;
-                int   dW   = repDim.w - (int)vRect.width;
-                int   dH   = repDim.h - (int)vRect.height;
+                // Positions are in natural (screen) space — X right, Y up.
+                // For rotated sprites the atlas rect dimensions are transposed vs natural,
+                // so we derive units-per-pixel and canvas delta in natural space.
+                bool isRotatedDef = def.flipped != tk2dSpriteDefinition.FlipMode.None;
+                int natVanillaW = isRotatedDef ? (int)vRect.height : (int)vRect.width;
+                int natVanillaH = isRotatedDef ? (int)vRect.width  : (int)vRect.height;
+                float uppX = unitSpanX / natVanillaW;
+                float uppY = unitSpanY / natVanillaH;
+                int   dW   = repDim.w - natVanillaW;
+                int   dH   = repDim.h - natVanillaH;
 
                 float newMinX, newMaxX, newMinY, newMaxY;
                 switch (plan.Anchors.GetValueOrDefault(def.name, "bottom-center"))
