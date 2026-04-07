@@ -45,6 +45,31 @@ public static class SpriteLoader
     // Never cleared — mirrors _originalTextures lifetime (vanilla names don't change).
     private static readonly Dictionary<int, string> _vanillaTexNames = new();
 
+    // UV and position backups for sprite defs that have been expanded.
+    // Keyed by (matId, spriteName) — both are stable: matId is a persistent shared asset ID,
+    // spriteName is fixed at tk2d export time.
+    // Captured before the first expansion of each def; never cleared.
+    // Restored before each reload cycle so that defs whose replacements are removed or
+    // resized back to vanilla correctly revert, and the next pass can re-expand from scratch.
+    private static readonly Dictionary<(int matId, string name), Vector2[]> _originalUVs       = new();
+    private static readonly Dictionary<(int matId, string name), Vector3[]> _originalPositions = new();
+
+    // Expansion plan for one material, computed fresh at the start of each LoadCollection
+    // pass for that material.  Describes the enlarged atlas layout and which sprite defs
+    // get UV + position remapping this cycle.
+    private sealed class AtlasExpansionPlan
+    {
+        // Expanded atlas pixel dimensions.
+        public int Width;
+        public int Height;
+        // All rects are in TEXTURE pixel space: (0,0) = bottom-left, Y increases upward.
+        // This matches Unity's RenderTexture/UV convention and is what SpriteUtil.GetSpriteRect returns.
+        public readonly Dictionary<string, Rect>             AllocatedRects = new(); // key = spriteName
+        public readonly Dictionary<string, Rect>             VanillaRects   = new();
+        public readonly Dictionary<string, string>           Anchors        = new();
+        public readonly Dictionary<string, (int w, int h)>   RepDimensions  = new();
+    }
+
     /// <summary>
     /// Stable runtime key for a collection instance.
     /// Combines the human-readable name with the Unity instance ID so two collections
@@ -164,36 +189,56 @@ public static class SpriteLoader
             // material is still showing vanilla just because the current ikey has no atlas entry.
             if (!_collectionsWithFiles.Contains(collection.name))
             {
+                RestoreVanillaDefsForMat(collection, matId, matIndex);
                 mat.mainTexture = vanillaTex;
                 continue;
             }
+
+            // Use materialId (authoritative index set at tk2d export time) rather than
+            // def.material reference equality.  Unity silently creates material instances
+            // when any renderer accesses .material instead of .sharedMaterial; this makes
+            // def.material diverge from collection.materials[i], causing entire sprite
+            // batches to be missed and those atlas regions to show wrong content.
+            int matIndex = System.Array.IndexOf(collection.materials, mat);
 
             if (!LoadedAtlases.ContainsKey(ikey))
                 LoadedAtlases[ikey] = new HashSet<string>();
 
             if (LoadedAtlases[ikey].Add(matname))
             {
-                // First time in this reload cycle: (re-)blit the atlas for this material.
+                // First time in this reload cycle: build the atlas for this material.
                 //
-                // We REUSE the existing RenderTexture when possible (same dimensions).
-                // Blitting new content into the existing RT is safe because mat.mainTexture
-                // already points at that RT — nothing ever sees a null/destroyed texture.
-                // A new RT is only created on the very first encounter or on a dimension change.
+                // Step 1 — restore any UV/position data remapped in a previous cycle.
+                // This ensures defs whose enlarged replacements were removed or resized
+                // back to vanilla revert correctly before we re-evaluate the plan.
+                RestoreVanillaDefsForMat(collection, matId, matIndex);
+
+                // Step 2 — compute the expansion plan (null if no enlarged replacements).
+                AtlasExpansionPlan plan = matIndex >= 0
+                    ? PlanExpansion(collection, matIndex, matId, matnameAbbr, vanillaTex)
+                    : null;
+
                 Texture2D customTex = FindSpritesheetTex(collection, matId, matnameAbbr);
                 Texture blitSrc = (Texture)customTex ?? vanillaTex;
                 if (customTex != null) hasCustomSpritesheets = true;
+
+                // Step 3 — create or resize the atlas RT.
+                // Target dimensions come from the expansion plan when one exists;
+                // otherwise match the blit source (vanilla or custom spritesheet).
+                int targetW = plan?.Width  ?? blitSrc.width;
+                int targetH = plan?.Height ?? blitSrc.height;
 
                 if (!LoadedAtlasesTextures.TryGetValue(ikey, out var atlasMap))
                     LoadedAtlasesTextures[ikey] = atlasMap = new();
 
                 if (!atlasMap.TryGetValue(matname, out var atlasRT) || atlasRT == null
-                    || atlasRT.width != blitSrc.width || atlasRT.height != blitSrc.height)
+                    || atlasRT.width != targetW || atlasRT.height != targetH)
                 {
                     // Destroy the old RT only when we're about to replace it — at this point
                     // we are still about to set mat.mainTexture immediately below, so there
                     // is no frame where the material holds a destroyed texture.
                     if (atlasRT != null) { atlasRT.Release(); UnityEngine.Object.Destroy(atlasRT); }
-                    atlasRT = new RenderTexture(blitSrc.width, blitSrc.height, 0,
+                    atlasRT = new RenderTexture(targetW, targetH, 0,
                         RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
                     {
                         hideFlags = HideFlags.DontUnloadUnusedAsset,
@@ -202,9 +247,34 @@ public static class SpriteLoader
                     atlasMap[matname] = atlasRT;
                 }
 
-                // Blit the full atlas source into the RT (replaces all previous content).
-                Graphics.Blit(blitSrc, atlasRT);
+                // Step 4 — blit source content into the atlas RT.
+                // For an expanded atlas the extra area must be cleared first, then the
+                // vanilla/custom-sheet content is pixel-copied into the bottom region only.
+                // Graphics.CopyTexture is a direct GPU-side pixel copy (no interpolation,
+                // no Y-flip) and correctly handles both RenderTexture and Texture2D sources.
+                if (plan != null)
+                {
+                    var prevActive = RenderTexture.active;
+                    RenderTexture.active = atlasRT;
+                    GL.Clear(false, true, Color.clear);
+                    RenderTexture.active = prevActive;
+                    // Place vanilla/custom source at (0,0) = bottom-left in texture space.
+                    // Enlarged sprite slots occupy the rows above vanillaH — left clear here,
+                    // filled by individual sprite draws in the GL block below.
+                    Graphics.CopyTexture(blitSrc, 0, 0, 0, 0,
+                        blitSrc.width, blitSrc.height, atlasRT, 0, 0, 0, 0);
+                }
+                else
+                {
+                    Graphics.Blit(blitSrc, atlasRT);
+                }
                 if (customTex != null) UnityEngine.Object.Destroy(customTex);
+
+                // Step 5 — remap UV coordinates and quad vertices for enlarged sprites.
+                // Must happen before the GL block so GetSpriteRect returns the allocated rect.
+                if (plan != null)
+                    ApplyExpansionPlan(collection, plan, matId, matIndex,
+                        atlasRT.width, atlasRT.height);
 
                 mat.mainTexture = atlasRT;
             }
@@ -223,12 +293,6 @@ public static class SpriteLoader
             GL.PushMatrix();
             GL.LoadPixelMatrix(0, mat.mainTexture.width, mat.mainTexture.height, 0);
 
-            // Use materialId (authoritative index set at tk2d export time) rather than
-            // def.material reference equality.  Unity silently creates material instances
-            // when any renderer accesses .material instead of .sharedMaterial; this makes
-            // def.material diverge from collection.materials[i], causing entire sprite
-            // batches to be missed and those atlas regions to show wrong content.
-            int matIndex = System.Array.IndexOf(collection.materials, mat);
             tk2dSpriteDefinition[] spriteDefinitions = matIndex < 0
                 ? System.Array.Empty<tk2dSpriteDefinition>()
                 : [.. collection.spriteDefinitions.Where(def => def.materialId == matIndex)];
@@ -342,29 +406,32 @@ public static class SpriteLoader
     }
 
     /// <summary>
-    /// Looks up a replacement PNG for an individual sprite.
-    /// Tries an instance-specific path keyed by the vanilla texture name first, then
-    /// falls back to the material-abbreviation path for backward compatibility.
+    /// Returns the full filesystem path to the replacement PNG for a sprite, or
+    /// <c>null</c> if no replacement exists.  Instance-specific path is tried first.
     /// </summary>
-    private static Texture2D FindSprite(string collectionName, int matId,
+    private static string FindSpritePath(string collectionName, int matId,
         string matnameAbbr, string spriteName)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
 
-        // Instance-specific: Sprites/{collName}/{vanillaTexName}/{spriteName}.png
-        if (_vanillaTexNames.TryGetValue(matId, out var texName)
-            && !string.IsNullOrEmpty(texName))
+        if (_vanillaTexNames.TryGetValue(matId, out var texName) && !string.IsNullOrEmpty(texName))
         {
             string specific = $"{collectionName}/{texName}/{spriteName}.png";
-            if (_spriteFileIndex.TryGetValue(specific, out var s))
-                return TexUtil.LoadFromPNG(s.FullPath);
+            if (_spriteFileIndex.TryGetValue(specific, out var s)) return s.FullPath;
         }
-
-        // General: Sprites/{collName}/{matAbbr}/{spriteName}.png
         string general = $"{collectionName}/{matnameAbbr}/{spriteName}.png";
-        return _spriteFileIndex.TryGetValue(general, out var g)
-            ? TexUtil.LoadFromPNG(g.FullPath)
-            : null;
+        return _spriteFileIndex.TryGetValue(general, out var g) ? g.FullPath : null;
+    }
+
+    /// <summary>
+    /// Loads and returns a replacement Texture2D for a sprite, or <c>null</c> if none found.
+    /// Caller must <c>Destroy</c> the returned texture when it is no longer needed.
+    /// </summary>
+    private static Texture2D FindSprite(string collectionName, int matId,
+        string matnameAbbr, string spriteName)
+    {
+        string path = FindSpritePath(collectionName, matId, matnameAbbr, spriteName);
+        return path != null ? TexUtil.LoadFromPNG(path) : null;
     }
 
     /// <summary>
@@ -393,6 +460,233 @@ public static class SpriteLoader
         return _sheetFileIndex.TryGetValue(general, out var g)
             ? TexUtil.LoadFromPNG(g.FullPath)
             : null;
+    }
+
+    // ── Canvas expansion ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Scans replacement PNGs for this material pass and builds a layout plan for any
+    /// that are larger than their vanilla sprite rect.  Returns null when no sprite needs
+    /// expansion.  All rects are in TEXTURE pixel space (Y=0 at bottom).
+    /// </summary>
+    private static AtlasExpansionPlan PlanExpansion(
+        tk2dSpriteCollectionData collection, int matIndex,
+        int matId, string matnameAbbr, RenderTexture vanillaTex)
+    {
+        int vanillaW = vanillaTex.width;
+        int vanillaH = vanillaTex.height;
+        int atlasW   = vanillaW;
+        int curX = 0, curRowH = 0, extraH = 0;
+        AtlasExpansionPlan plan = null;
+
+        foreach (var def in collection.spriteDefinitions)
+        {
+            if (def.materialId != matIndex || string.IsNullOrEmpty(def.name)) continue;
+
+            string path = FindSpritePath(collection.name, matId, matnameAbbr, def.name);
+            if (path == null) continue;
+
+            var (repW, repH) = IOUtil.ReadPngDimensions(path);
+            if (repW <= 0 || repH <= 0) continue;
+
+            Rect vRect = SpriteUtil.GetSpriteRect(def, vanillaTex);
+            if (repW <= (int)vRect.width && repH <= (int)vRect.height) continue;
+
+            plan ??= new AtlasExpansionPlan();
+
+            string anchor = IOUtil.ReadAnchorEntry(
+                LoadPath, collection.name, matnameAbbr, def.name) ?? "bottom-center";
+
+            // Shelf-pack into the extra rows above the vanilla atlas (texture Y-up, so above = higher Y).
+            // If a replacement is wider than the current atlas, expand the atlas width.
+            if (repW > atlasW) atlasW = repW;
+            if (curX + repW > atlasW) { extraH += curRowH; curX = 0; curRowH = 0; }
+
+            // Texture-space rect: Y starts at vanillaH and increases upward.
+            var allocRect = new Rect(curX, vanillaH + extraH, repW, repH);
+            curX    += repW;
+            curRowH  = Math.Max(curRowH, repH);
+
+            plan.AllocatedRects[def.name] = allocRect;
+            plan.VanillaRects[def.name]   = vRect;
+            plan.Anchors[def.name]        = anchor;
+            plan.RepDimensions[def.name]  = (repW, repH);
+
+            Plugin.Logger.LogInfo(
+                $"[SpriteLoader] Expand: {collection.name}/{matnameAbbr}/{def.name}  " +
+                $"{(int)vRect.width}×{(int)vRect.height} → {repW}×{repH}  " +
+                $"anchor={anchor}  slot=({(int)allocRect.x},{(int)allocRect.y})");
+        }
+
+        if (plan != null)
+        {
+            extraH      += curRowH;
+            plan.Width   = atlasW;
+            plan.Height  = vanillaH + extraH;
+        }
+        return plan;
+    }
+
+    /// <summary>
+    /// Remaps <c>def.uvs</c> and <c>def.positions</c> for every sprite that has an
+    /// allocated slot in <paramref name="plan"/>.  Backups are captured once (copy-on-first-write)
+    /// so the originals can be restored on revert.
+    /// </summary>
+    private static void ApplyExpansionPlan(
+        tk2dSpriteCollectionData collection, AtlasExpansionPlan plan,
+        int matId, int matIndex, int newW, int newH)
+    {
+        foreach (var def in collection.spriteDefinitions)
+        {
+            if (def.materialId != matIndex || string.IsNullOrEmpty(def.name)) continue;
+            if (!plan.AllocatedRects.TryGetValue(def.name, out var allocRect)) continue;
+            if (!plan.VanillaRects.TryGetValue(def.name,   out var vRect))     continue;
+            if (!plan.RepDimensions.TryGetValue(def.name,  out var repDim))    continue;
+
+            var key = (matId, def.name);
+
+            // ── Backup before first modification ─────────────────────────────
+            if (def.uvs != null && !_originalUVs.ContainsKey(key))
+                _originalUVs[key] = (Vector2[])def.uvs.Clone();
+
+            if (def.positions != null && !_originalPositions.ContainsKey(key))
+            {
+                // Copy-on-write: if another def shares this positions array, clone it first
+                // so our modification doesn't silently affect unrelated sprites.
+                foreach (var other in collection.spriteDefinitions)
+                    if (!ReferenceEquals(other, def) && ReferenceEquals(other.positions, def.positions))
+                        { def.positions = (Vector3[])def.positions.Clone(); break; }
+                _originalPositions[key] = (Vector3[])def.positions.Clone();
+            }
+
+            // ── UV remap ─────────────────────────────────────────────────────
+            // Map each vanilla UV vertex linearly from the old [minU..maxU]×[minV..maxV]
+            // range into the new range corresponding to the allocated slot.
+            if (def.uvs != null && _originalUVs.TryGetValue(key, out var origUVs))
+            {
+                float oldMinU = float.MaxValue, oldMaxU = float.MinValue;
+                float oldMinV = float.MaxValue, oldMaxV = float.MinValue;
+                foreach (var v in origUVs)
+                {
+                    if (v.x < oldMinU) oldMinU = v.x; if (v.x > oldMaxU) oldMaxU = v.x;
+                    if (v.y < oldMinV) oldMinV = v.y; if (v.y > oldMaxV) oldMaxV = v.y;
+                }
+
+                // Convert allocated rect (texture pixel space, Y-up) to UV.
+                float newMinU = allocRect.x                       / newW;
+                float newMaxU = (allocRect.x + allocRect.width)   / newW;
+                float newMinV = allocRect.y                       / newH;
+                float newMaxV = (allocRect.y + allocRect.height)  / newH;
+
+                float rangeU = oldMaxU - oldMinU;
+                float rangeV = oldMaxV - oldMinV;
+                for (int i = 0; i < def.uvs.Length && i < origUVs.Length; i++)
+                {
+                    float tU = rangeU > 1e-6f ? (origUVs[i].x - oldMinU) / rangeU : 0.5f;
+                    float tV = rangeV > 1e-6f ? (origUVs[i].y - oldMinV) / rangeV : 0.5f;
+                    def.uvs[i] = new Vector2(
+                        newMinU + tU * (newMaxU - newMinU),
+                        newMinV + tV * (newMaxV - newMinV));
+                }
+            }
+
+            // ── Position remap ────────────────────────────────────────────────
+            // Compute new quad vertex positions in local unit space by expanding
+            // the vanilla bounding box according to the chosen anchor.
+            if (def.positions != null && _originalPositions.TryGetValue(key, out var origPos)
+                && def.positions.Length == origPos.Length && origPos.Length >= 4)
+            {
+                float oldMinX = float.MaxValue, oldMaxX = float.MinValue;
+                float oldMinY = float.MaxValue, oldMaxY = float.MinValue;
+                foreach (var p in origPos)
+                {
+                    if (p.x < oldMinX) oldMinX = p.x; if (p.x > oldMaxX) oldMaxX = p.x;
+                    if (p.y < oldMinY) oldMinY = p.y; if (p.y > oldMaxY) oldMaxY = p.y;
+                }
+
+                float unitSpanX = oldMaxX - oldMinX;
+                float unitSpanY = oldMaxY - oldMinY;
+                if (unitSpanX < 1e-6f || unitSpanY < 1e-6f) continue; // degenerate — skip
+
+                // Derive units-per-pixel from vanilla position span and vanilla pixel rect.
+                float uppX = unitSpanX / vRect.width;
+                float uppY = unitSpanY / vRect.height;
+
+                int dW = repDim.w - (int)vRect.width;
+                int dH = repDim.h - (int)vRect.height;
+
+                float newMinX, newMaxX, newMinY, newMaxY;
+                string anchor = plan.Anchors.GetValueOrDefault(def.name, "bottom-center");
+                switch (anchor)
+                {
+                    case "top-center":
+                        newMinX = oldMinX - dW * 0.5f * uppX;
+                        newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMaxY = oldMaxY;                        // top fixed
+                        newMinY = oldMinY - dH * uppY;
+                        break;
+                    case "left-center":
+                        newMinX = oldMinX;                        // left fixed
+                        newMaxX = oldMaxX + dW * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY;
+                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        break;
+                    case "right-center":
+                        newMaxX = oldMaxX;                        // right fixed
+                        newMinX = oldMinX - dW * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY;
+                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        break;
+                    case "center":
+                        newMinX = oldMinX - dW * 0.5f * uppX;
+                        newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMinY = oldMinY - dH * 0.5f * uppY;
+                        newMaxY = oldMaxY + dH * 0.5f * uppY;
+                        break;
+                    default: // "bottom-center"
+                        newMinX = oldMinX - dW * 0.5f * uppX;
+                        newMaxX = oldMaxX + dW * 0.5f * uppX;
+                        newMinY = oldMinY;                        // bottom fixed
+                        newMaxY = oldMaxY + dH * uppY;
+                        break;
+                }
+
+                float rangeX = unitSpanX;
+                float rangeY = unitSpanY;
+                for (int i = 0; i < def.positions.Length && i < origPos.Length; i++)
+                {
+                    float tX = (origPos[i].x - oldMinX) / rangeX;
+                    float tY = (origPos[i].y - oldMinY) / rangeY;
+                    def.positions[i] = new Vector3(
+                        newMinX + tX * (newMaxX - newMinX),
+                        newMinY + tY * (newMaxY - newMinY),
+                        origPos[i].z);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restores backed-up UV and position arrays for all sprite defs on this material.
+    /// Called before each reload cycle's expansion pass so that previously-enlarged
+    /// sprites that no longer have oversized replacements correctly revert to vanilla.
+    /// Also called when no files exist for the collection (full vanilla restore path).
+    /// </summary>
+    private static void RestoreVanillaDefsForMat(
+        tk2dSpriteCollectionData collection, int matId, int matIndex)
+    {
+        if (matIndex < 0) return;
+        foreach (var def in collection.spriteDefinitions)
+        {
+            if (def.materialId != matIndex || string.IsNullOrEmpty(def.name)) continue;
+            var key = (matId, def.name);
+            if (_originalUVs.TryGetValue(key, out var origUVs)
+                && def.uvs != null && def.uvs.Length == origUVs.Length)
+                Array.Copy(origUVs, def.uvs, origUVs.Length);
+            if (_originalPositions.TryGetValue(key, out var origPos)
+                && def.positions != null && def.positions.Length == origPos.Length)
+                Array.Copy(origPos, def.positions, origPos.Length);
+        }
     }
 
     public static void MarkReloadSprite(string collectionName, string atlasName, string spriteName)
