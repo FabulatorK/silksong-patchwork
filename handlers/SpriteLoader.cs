@@ -551,7 +551,15 @@ public static class SpriteLoader
 
             // ── Backup before first modification ─────────────────────────────
             if (def.uvs != null && !_originalUVs.ContainsKey(key))
+            {
+                // Copy-on-write: uvs arrays are shared across defs in tk2d just like
+                // positions arrays.  Clone to a private array before the first write so
+                // other defs that reference the same array are not affected.
+                foreach (var other in collection.spriteDefinitions)
+                    if (!ReferenceEquals(other, def) && ReferenceEquals(other.uvs, def.uvs))
+                        { def.uvs = (Vector2[])def.uvs.Clone(); break; }
                 _originalUVs[key] = (Vector2[])def.uvs.Clone();
+            }
 
             if (def.positions != null && !_originalPositions.ContainsKey(key))
             {
