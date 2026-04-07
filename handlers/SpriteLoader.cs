@@ -24,24 +24,26 @@ public static class SpriteLoader
     private static readonly Dictionary<string, Dictionary<string, HashSet<string>>> LoadedSprites = new();
 
     // Vanilla texture backups, captured before the first replacement.
-    // Keyed by instance key → material name.  Never cleared across reloads.
+    // Keyed by mat.GetInstanceID() — materials are persistent shared Unity assets that survive
+    // scene transitions, so the same ID is seen across every collection instance that references
+    // this material.  Never cleared across reloads.
     //
     // We blit the vanilla texture into a runtime-owned RenderTexture on first encounter.
     // Runtime RTs are NOT part of any AssetBundle, so AssetBundle.Unload(true) cannot
     // destroy them — unlike a raw Texture reference which becomes a "fake null" after
     // Unload(true), causing Graphics.Blit to silently write nothing (transparent atlas).
     // DontUnloadUnusedAsset prevents Resources.UnloadUnusedAssets() from evicting them.
-    private static readonly Dictionary<string, Dictionary<string, RenderTexture>> _originalTextures = new();
+    private static readonly Dictionary<int, RenderTexture> _originalTextures = new();
 
     // Maps instance key → collection.name for MarkReload* lookups (which receive a name
     // string from the file watcher and need to find all live instances with that name).
     private static readonly Dictionary<string, string> _instanceKeyToName = new();
 
-    // Maps (instanceKey + "\x00" + matname) → the vanilla texture's .name, captured before
-    // the first replacement.  Used to resolve instance-specific spritesheet/sprite paths when
-    // two collections share the same .name and material abbreviation.
+    // Maps mat.GetInstanceID() → the vanilla texture's .name, captured before the first
+    // replacement.  Used to resolve instance-specific spritesheet/sprite paths when two
+    // collections share the same .name and material abbreviation.
     // Never cleared — mirrors _originalTextures lifetime (vanilla names don't change).
-    private static readonly Dictionary<string, string> _vanillaTexNames = new();
+    private static readonly Dictionary<int, string> _vanillaTexNames = new();
 
     /// <summary>
     /// Stable runtime key for a collection instance.
@@ -124,12 +126,16 @@ public static class SpriteLoader
 
             string matname = mat.name;
             string matnameAbbr = mat.name.Split(' ')[0];
+            int matId = mat.GetInstanceID();
 
             // Capture vanilla texture on first encounter (blit into a persistent backup RT).
-            if (!_originalTextures.TryGetValue(ikey, out var origMap))
-                _originalTextures[ikey] = origMap = new();
+            // Keyed by matId: materials are persistent shared assets — the same matId is seen
+            // on every collection instance that references this material, including new instances
+            // created after scene transitions.  When mat.mainTexture is already one of our RTs
+            // (the material was processed in a prior instance's cycle) the capture is skipped and
+            // the existing backup is found immediately by matId on the lookup below.
             if (mat.mainTexture is not RenderTexture && mat.mainTexture != null
-                && !origMap.ContainsKey(matname))
+                && !_originalTextures.ContainsKey(matId))
             {
                 // Blit vanilla into a new runtime-owned RT.  Runtime RTs survive
                 // AssetBundle.Unload(true); a raw Texture reference does not.
@@ -140,51 +146,22 @@ public static class SpriteLoader
                     name      = matname + "_vanilla"
                 };
                 Graphics.Blit(mat.mainTexture, backupRT);
-                origMap[matname] = backupRT;
+                _originalTextures[matId] = backupRT;
                 // Record vanilla texture name for instance-specific load path resolution.
                 string vTexName = mat.mainTexture.name;
-                _vanillaTexNames[ikey + "\x00" + matname] = vTexName;
+                _vanillaTexNames[matId] = vTexName;
                 if (nameCollision)
                     Plugin.Logger.LogWarning(
                         $"[SpriteLoader]   mat '{matnameAbbr}' → vanilla texture '{vTexName}'");
             }
 
-            // If vanilla is not known yet for this ikey, check whether another collection
-            // instance captured a backup for the same material.  This handles the scene-transition
-            // case: tk2dSpriteCollectionData is scene-scoped (new GetInstanceID on reload) but
-            // collection.materials are persistent shared assets, so mat.mainTexture can already be
-            // one of our RenderTextures (from a previous instance's cycle) by the time the new
-            // instance's Init() fires.  In that state mat.mainTexture is an RT → backup capture
-            // is skipped → origMap for the new ikey is empty → vanillaTex not found → continue
-            // → the material is never processed and the old pack's content persists indefinitely.
-            if (!origMap.TryGetValue(matname, out var vanillaTex) || vanillaTex == null)
-            {
-                // Search every other ikey for a backup of this matname (shared material,
-                // so vanilla content is identical across instances).
-                foreach (var otherMap in _originalTextures.Values)
-                {
-                    if (otherMap != origMap && otherMap.TryGetValue(matname, out var borrowed)
-                        && borrowed != null)
-                    {
-                        origMap[matname] = borrowed;
-                        vanillaTex = borrowed;
-                        // Also propagate the vanilla texture name for instance-specific path lookup.
-                        string otherIkeyTexKey = null;
-                        foreach (var kvp in _vanillaTexNames)
-                            if (kvp.Key.EndsWith("\x00" + matname)) { otherIkeyTexKey = kvp.Value; break; }
-                        string newTexKey = ikey + "\x00" + matname;
-                        if (otherIkeyTexKey != null && !_vanillaTexNames.ContainsKey(newTexKey))
-                            _vanillaTexNames[newTexKey] = otherIkeyTexKey;
-                        break;
-                    }
-                }
-                if (vanillaTex == null) continue; // no backup found anywhere — skip
-            }
+            if (!_originalTextures.TryGetValue(matId, out var vanillaTex) || vanillaTex == null)
+                continue; // vanilla not captured yet — skip until next Init()
 
             // If no pack has any files for this collection, restore vanilla and skip the
-            // custom blit.  Always restore unconditionally: the shared material may hold a
-            // custom RT from any prior instance (cross-ikey) so we cannot rely on
-            // LoadedAtlasesTextures having an entry for the current ikey.
+            // custom blit.  The shared material may already hold a custom RT from a prior
+            // instance's cycle, so unconditional restore is required — we cannot assume the
+            // material is still showing vanilla just because the current ikey has no atlas entry.
             if (!_collectionsWithFiles.Contains(collection.name))
             {
                 mat.mainTexture = vanillaTex;
@@ -202,7 +179,7 @@ public static class SpriteLoader
                 // Blitting new content into the existing RT is safe because mat.mainTexture
                 // already points at that RT — nothing ever sees a null/destroyed texture.
                 // A new RT is only created on the very first encounter or on a dimension change.
-                Texture2D customTex = FindSpritesheetTex(collection, ikey, matname, matnameAbbr);
+                Texture2D customTex = FindSpritesheetTex(collection, matId, matnameAbbr);
                 Texture blitSrc = (Texture)customTex ?? vanillaTex;
                 if (customTex != null) hasCustomSpritesheets = true;
 
@@ -264,7 +241,7 @@ public static class SpriteLoader
                     LoadedSprites[ikey][matname] = new HashSet<string>();
                 if (!LoadedSprites[ikey][matname].Add(def.name)) continue;
 
-                Texture2D spriteTex = FindSprite(collection.name, ikey, matname, matnameAbbr, def.name);
+                Texture2D spriteTex = FindSprite(collection.name, matId, matnameAbbr, def.name);
                 if (spriteTex == null) continue;
 
                 Rect spriteRect = SpriteUtil.GetSpriteRect(def, mat.mainTexture);
@@ -369,13 +346,13 @@ public static class SpriteLoader
     /// Tries an instance-specific path keyed by the vanilla texture name first, then
     /// falls back to the material-abbreviation path for backward compatibility.
     /// </summary>
-    private static Texture2D FindSprite(string collectionName, string ikey,
-        string matname, string matnameAbbr, string spriteName)
+    private static Texture2D FindSprite(string collectionName, int matId,
+        string matnameAbbr, string spriteName)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
 
         // Instance-specific: Sprites/{collName}/{vanillaTexName}/{spriteName}.png
-        if (_vanillaTexNames.TryGetValue(ikey + "\x00" + matname, out var texName)
+        if (_vanillaTexNames.TryGetValue(matId, out var texName)
             && !string.IsNullOrEmpty(texName))
         {
             string specific = $"{collectionName}/{texName}/{spriteName}.png";
@@ -398,12 +375,12 @@ public static class SpriteLoader
     /// falls back to the material-abbreviation path for backward compatibility.
     /// </summary>
     private static Texture2D FindSpritesheetTex(tk2dSpriteCollectionData collection,
-        string ikey, string matname, string matnameAbbr)
+        int matId, string matnameAbbr)
     {
         if (!_fileIndexBuilt) RebuildFileIndex();
 
         // Instance-specific: Spritesheets/{collName}/{vanillaTexName}.png
-        if (_vanillaTexNames.TryGetValue(ikey + "\x00" + matname, out var texName)
+        if (_vanillaTexNames.TryGetValue(matId, out var texName)
             && !string.IsNullOrEmpty(texName))
         {
             string specific = $"{collection.name}/{texName}.png";
