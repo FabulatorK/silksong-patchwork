@@ -362,6 +362,15 @@ public static class AnimationController
 
     private static Texture2D _previewWhite;
 
+    // ── Anchor cache ──────────────────────────────────────────────────────────
+    // Recomputed whenever the selected frame changes (different cacheKey).
+    // Avoids reading the replacement PNG on every GUI frame.
+    private static string _anchorCacheKey    = null; // "{collName}/{matName}/{spriteName}"
+    private static bool   _anchorIsEnlarged  = false;
+    private static int    _anchorRepW        = 0;
+    private static int    _anchorRepH        = 0;
+    private static string _anchorCurrent     = null; // null → default (bottom-center)
+
     /// <summary>
     /// Atlas preview + edit buttons for the currently selected animator's current frame.
     /// Rendered below the scrollable list — always visible, independent of scroll position.
@@ -390,6 +399,7 @@ public static class AnimationController
 
         // ── Info row: collection · atlas · sprite · frame ────────────────────
         string atlasName = mat.name.Split(' ')[0];
+        string matName   = atlasName; // alias used by anchor + edit sections
         GUI.contentColor = new Color(0.6f, 0.85f, 1f);
         GUILayout.Label(
             $"{coll.name}  ·  {atlasName}  ·  {frameDef.name}" +
@@ -440,7 +450,6 @@ public static class AnimationController
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Edit Current Sprite", GUIHelper.ButtonStyle))
         {
-            string matName  = frameDef.material.name.Split(' ')[0];
             string openPath = Path.Combine(SpriteLoader.LoadPath, coll.name, matName, frameDef.name + ".png");
             if (File.Exists(openPath))
                 Process.Start(openPath);
@@ -470,7 +479,7 @@ public static class AnimationController
                 if (fc == null || fr.spriteId < 0 || fr.spriteId >= fc.spriteDefinitions.Length) continue;
                 var fd   = fc.spriteDefinitions[fr.spriteId];
                 if (string.IsNullOrEmpty(fd.name)) continue;
-                string mn    = fd.material.name.Split(' ')[0];
+                string mn    = (fd.materialInst ?? fd.material).name.Split(' ')[0];
                 string lpath = Path.Combine(SpriteLoader.LoadPath, fc.name, mn, fd.name + ".png");
                 if (File.Exists(lpath)) { dumped++; continue; }
                 SpriteDumper.DumpSingleSprite(fd, fc);
@@ -488,12 +497,99 @@ public static class AnimationController
                 if (fc2 == null || fr2.spriteId < 0 || fr2.spriteId >= fc2.spriteDefinitions.Length) continue;
                 var fd2 = fc2.spriteDefinitions[fr2.spriteId];
                 if (string.IsNullOrEmpty(fd2.name)) continue;
-                string mn2    = fd2.material.name.Split(' ')[0];
+                string mn2    = (fd2.materialInst ?? fd2.material).name.Split(' ')[0];
                 string opath2 = Path.Combine(SpriteLoader.LoadPath, fc2.name, mn2, fd2.name + ".png");
                 if (File.Exists(opath2)) Process.Start(opath2);
             }
         }
         GUILayout.EndHorizontal();
+
+        // ── Anchor warning + picker ───────────────────────────────────────────
+        // Shown when the replacement PNG is larger than the vanilla sprite rect,
+        // or when a saved anchor entry exists (may have become stale).
+        string repPath  = Path.Combine(SpriteLoader.LoadPath, coll.name, matName, frameDef.name + ".png");
+        string cacheKey = $"{coll.name}/{matName}/{frameDef.name}";
+
+        if (_anchorCacheKey != cacheKey)
+        {
+            _anchorCacheKey   = cacheKey;
+            _anchorIsEnlarged = false;
+            _anchorRepW       = 0;
+            _anchorRepH       = 0;
+            _anchorCurrent    = null;
+
+            if (File.Exists(repPath))
+            {
+                var (rw, rh) = Patchwork.Util.IOUtil.ReadPngDimensions(repPath);
+                Rect vRect   = SpriteUtil.GetSpriteRect(frameDef, mat.mainTexture);
+                _anchorIsEnlarged = rw > (int)vRect.width || rh > (int)vRect.height;
+                _anchorRepW = rw;
+                _anchorRepH = rh;
+                _anchorCurrent = Patchwork.Util.IOUtil.ReadAnchorEntry(
+                    SpriteLoader.LoadPath, coll.name, matName, frameDef.name);
+            }
+        }
+
+        bool hasSavedAnchor = _anchorCurrent != null;
+
+        if (_anchorIsEnlarged || hasSavedAnchor)
+        {
+            GUIHelper.Space(6);
+
+            if (_anchorIsEnlarged)
+            {
+                Rect vRect2 = SpriteUtil.GetSpriteRect(frameDef, mat.mainTexture);
+                Color prev  = GUI.contentColor;
+                GUI.contentColor = new Color(1f, 0.82f, 0.2f);
+                GUILayout.Label(
+                    $"\u26A0 Replacement {_anchorRepW}\u00D7{_anchorRepH}px " +
+                    $"(vanilla {(int)vRect2.width}\u00D7{(int)vRect2.height}px) \u2014 choose anchor:",
+                    GUIHelper.LabelStyle);
+                GUI.contentColor = prev;
+            }
+            else
+            {
+                // Saved anchor but replacement is now vanilla-sized — stale entry.
+                Color prev = GUI.contentColor;
+                GUI.contentColor = new Color(0.55f, 0.55f, 0.55f);
+                GUILayout.Label(
+                    $"Anchor \u2018{_anchorCurrent}\u2019 saved but replacement is now vanilla-sized \u2014 stale.",
+                    GUIHelper.LabelStyle);
+                GUI.contentColor = prev;
+            }
+
+            GUILayout.BeginHorizontal();
+
+            // ↺ Default — removes entry; lit green when nothing is saved (already default)
+            GUI.contentColor = !hasSavedAnchor ? Color.green : Color.white;
+            if (GUILayout.Button("\u21BA Default", GUIHelper.ButtonStyle))
+            {
+                Patchwork.Util.IOUtil.WriteAnchorEntry(
+                    SpriteLoader.LoadPath, coll.name, matName, frameDef.name, null);
+                _anchorCurrent = null;
+            }
+            GUI.contentColor = Color.white;
+
+            DrawAnchorButton("\u2191 Top",    "top-center",   coll.name, matName, frameDef.name);
+            DrawAnchorButton("\u2190 Left",   "left-center",  coll.name, matName, frameDef.name);
+            DrawAnchorButton("\u2192 Right",  "right-center", coll.name, matName, frameDef.name);
+            DrawAnchorButton("\u25C6 Center", "center",       coll.name, matName, frameDef.name);
+
+            GUILayout.EndHorizontal();
+        }
+    }
+
+    private static void DrawAnchorButton(string label, string anchor,
+        string collName, string matName, string spriteName)
+    {
+        GUI.contentColor = _anchorCurrent == anchor ? Color.green : Color.white;
+        if (GUILayout.Button(label, GUIHelper.ButtonStyle))
+        {
+            Patchwork.Util.IOUtil.WriteAnchorEntry(
+                SpriteLoader.LoadPath, collName, matName, spriteName, anchor);
+            _anchorCurrent = anchor;
+        }
+        GUI.contentColor = Color.white;
     }
 
     #endregion
