@@ -183,6 +183,11 @@ public static class SpriteLoader
             if (!_originalTextures.TryGetValue(matId, out var vanillaTex) || vanillaTex == null)
                 continue; // vanilla not captured yet — skip until next Init()
 
+            // Compute matIndex here — needed by both the vanilla-restore gate and the
+            // expansion pipeline below. Array.IndexOf on collection.materials is safe
+            // because mat comes directly from iterating that same array.
+            int matIndex = System.Array.IndexOf(collection.materials, mat);
+
             // If no pack has any files for this collection, restore vanilla and skip the
             // custom blit.  The shared material may already hold a custom RT from a prior
             // instance's cycle, so unconditional restore is required — we cannot assume the
@@ -199,7 +204,6 @@ public static class SpriteLoader
             // when any renderer accesses .material instead of .sharedMaterial; this makes
             // def.material diverge from collection.materials[i], causing entire sprite
             // batches to be missed and those atlas regions to show wrong content.
-            int matIndex = System.Array.IndexOf(collection.materials, mat);
 
             if (!LoadedAtlases.ContainsKey(ikey))
                 LoadedAtlases[ikey] = new HashSet<string>();
