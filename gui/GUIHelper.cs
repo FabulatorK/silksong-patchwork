@@ -311,7 +311,7 @@ public static class GUIHelper
 
         // Cache the InputHandler instance on first use (singleton, stable after scene load).
         if (_inputHandlerInstance == null || _inputHandlerInstance.Equals(null))
-            _inputHandlerInstance = Object.FindObjectOfType<InputHandler>();
+            _inputHandlerInstance = UnityEngine.Object.FindAnyObjectByType<InputHandler>();
         if (_inputHandlerInstance == null) return;
 
         _setCursorVisibleMethod.Invoke(_inputHandlerInstance, new object[] { true });
