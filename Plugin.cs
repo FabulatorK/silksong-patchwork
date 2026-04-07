@@ -165,7 +165,7 @@ public class Plugin : BaseUnityPlugin
     {
         yield return null;
         DialogueHandler.ApplyPatches(harmony);
-        GUIHelper.ApplyCursorPatch(harmony);
+        GUIHelper.InitCursor();
 
         if (Config.DumpText)
             DialogueHandler.DumpText();
@@ -211,6 +211,9 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
+        if (ShowDevHub || ShowPackManager)
+            GUIHelper.ShowCursorForWindow();
+
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
         DevProfiler.RecordEnforceMs(DevProfiler.StopOp("EnforceT2D"));

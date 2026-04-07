@@ -288,26 +288,33 @@ public static class GUIHelper
     }
 
     // ── Cursor ───────────────────────────────────────────────────────────────
-    // Patch InputHandler.SetCursorVisible() — the game's own cursor control
-    // method — so that any call which would hide the cursor is suppressed while
-    // a Patchwork window is open.  This is the same technique used by DebugMod
-    // and means the two mods compose correctly: whichever one needs the cursor
-    // wins, without either fighting the other via Cursor.visible in Update loops.
+    // Call InputHandler.SetCursorVisible(true) directly from LateUpdate rather
+    // than patching it.  Patching the same method DebugMod patches caused its
+    // "Always Show Cursor" option to break (Harmony patch-chain corruption from
+    // the ref parameter name mismatch).  Calling the method instead means
+    // DebugMod's own prefix fires on our call — both mods request visibility
+    // independently and neither interferes with the other.
 
-    public static void ApplyCursorPatch(Harmony harmony)
+    private static System.Reflection.MethodInfo _setCursorVisibleMethod;
+    private static object                        _inputHandlerInstance;
+
+    public static void InitCursor()
     {
-        var method = AccessTools.Method(typeof(InputHandler), "SetCursorVisible");
-        if (method != null)
-            harmony.Patch(method,
-                prefix: new HarmonyMethod(typeof(GUIHelper), nameof(SetCursorVisiblePrefix)));
-        else
-            Plugin.Logger.LogWarning("[GUIHelper] InputHandler.SetCursorVisible not found — cursor patch skipped");
+        _setCursorVisibleMethod = AccessTools.Method(typeof(InputHandler), "SetCursorVisible");
+        if (_setCursorVisibleMethod == null)
+            Plugin.Logger.LogWarning("[GUIHelper] InputHandler.SetCursorVisible not found — cursor call skipped");
     }
 
-    private static void SetCursorVisiblePrefix(ref bool visible)
+    public static void ShowCursorForWindow()
     {
-        if (Plugin.ShowDevHub || Plugin.ShowPackManager)
-            visible = true;
+        if (_setCursorVisibleMethod == null) return;
+
+        // Cache the InputHandler instance on first use (singleton, stable after scene load).
+        if (_inputHandlerInstance == null || _inputHandlerInstance.Equals(null))
+            _inputHandlerInstance = Object.FindObjectOfType<InputHandler>();
+        if (_inputHandlerInstance == null) return;
+
+        _setCursorVisibleMethod.Invoke(_inputHandlerInstance, new object[] { true });
     }
 
     // ── Tooltip ──────────────────────────────────────────────────────────────
