@@ -357,8 +357,8 @@ public static class GUIHelper
 
         // Reset matrix so the cursor is drawn in raw screen pixels, bypassing any
         // IMGUI scale transform that may be active from window/layout code.
-        var savedMatrix = GUI.matrix;
-        GUI.matrix = Matrix4x4.identity;
+        var savedMatrix = UnityEngine.GUI.matrix;
+        UnityEngine.GUI.matrix = Matrix4x4.identity;
 
         // Allow the mouse to move freely — this call is inside OnGUI so it fires
         // every rendered frame and outlasts any per-Update lock the game may set.
@@ -367,9 +367,9 @@ public static class GUIHelper
         // Input.mousePosition: Y=0 at bottom. GUI rects: Y=0 at top — flip.
         float mx = Input.mousePosition.x;
         float my = Screen.height - Input.mousePosition.y;
-        GUI.DrawTexture(new Rect(mx, my, CursorW, CursorH), _softCursorTex);
+        UnityEngine.GUI.DrawTexture(new Rect(mx, my, CursorW, CursorH), _softCursorTex);
 
-        GUI.matrix = savedMatrix;
+        UnityEngine.GUI.matrix = savedMatrix;
     }
 
     // ── Tooltip ──────────────────────────────────────────────────────────────
