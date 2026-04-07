@@ -210,14 +210,12 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
-        // Force cursor on while any interactive Patchwork window is open.
-        // LateUpdate runs after all other scripts' Update(), so this overrides
-        // whatever lock state the game re-asserts each frame.
+        // Hide the hardware cursor when our windows are open — we draw a software
+        // cursor in OnGUI instead, which can't be suppressed by game code.
+        // (Cursor.visible = true was unreliable; the game re-hides it via
+        //  InputSystem callbacks that fire after LateUpdate.)
         if (ShowDevHub || ShowPackManager)
-        {
-            Cursor.visible   = true;
-            Cursor.lockState = CursorLockMode.None;
-        }
+            Cursor.visible = false;
 
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
