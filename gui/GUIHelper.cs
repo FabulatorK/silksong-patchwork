@@ -345,7 +345,11 @@ public static class GUIHelper
     {
         if (Event.current.type != EventType.Repaint) return;
 
-        if (_softCursorTex == null)
+        // If the hardware cursor is already visible — e.g. another mod such as
+        // DebugMod patched InputHandler.SetCursorVisible() to keep it on — skip
+        // the software draw.  The hardware cursor is doing the job; drawing on top
+        // would produce a double cursor.
+        if (Cursor.visible) return;
         {
             _softCursorTex = new Texture2D(CursorW, CursorH, TextureFormat.RGBAFloat, false)
             {

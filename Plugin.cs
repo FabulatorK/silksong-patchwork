@@ -210,12 +210,10 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
-        // Hide the hardware cursor when our windows are open — we draw a software
-        // cursor in OnGUI instead, which can't be suppressed by game code.
-        // (Cursor.visible = true was unreliable; the game re-hides it via
-        //  InputSystem callbacks that fire after LateUpdate.)
-        if (ShowDevHub || ShowPackManager)
-            Cursor.visible = false;
+        // Do NOT touch Cursor.visible here.  If the hardware cursor is hidden the
+        // game will keep hiding it — our software cursor in OnGUI covers that case.
+        // If another mod (e.g. DebugMod) has forced the hardware cursor visible we
+        // must not suppress it, or the two mods fight every frame.
 
         DevProfiler.StartOp();
         T2DLoader.EnforceT2DReplacements();
