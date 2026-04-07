@@ -66,6 +66,14 @@ public static class SpriteLoader
     private static readonly Dictionary<(int matId, string name), Vector2[]> _originalUVs       = new();
     private static readonly Dictionary<(int matId, string name), Vector3[]> _originalPositions = new();
 
+    // Collections that had an expansion plan applied during the current Reload() cycle.
+    // After all LoadCollection calls complete, every active tk2dBaseSprite in these
+    // collections gets ForceBuild() so its cached mesh vertices and UVs reflect the
+    // updated def.positions / def.uvs.  Without this, already-built sprite instances keep
+    // their old mesh data and don't pick up anchor or canvas-size changes.
+    // Cleared at the top of each Reload().
+    private static readonly HashSet<tk2dSpriteCollectionData> _collectionsExpandedThisReload = new();
+
     // Expansion plan for one material, computed fresh at the start of each LoadCollection
     // pass for that material.  Describes the enlarged atlas layout and which sprite defs
     // get UV + position remapping this cycle.
@@ -323,8 +331,12 @@ public static class SpriteLoader
                 // Step 5 — remap UV coordinates and quad vertices for enlarged sprites.
                 // Must happen before the GL block so GetSpriteRect returns the allocated rect.
                 if (plan != null)
+                {
                     ApplyExpansionPlan(collection, plan, matId, matIndex,
                         atlasRT.width, atlasRT.height);
+                    // Record for post-reload ForceBuild sweep (see Reload()).
+                    _collectionsExpandedThisReload.Add(collection);
+                }
 
                 mat.mainTexture = atlasRT;
             }
@@ -805,6 +817,7 @@ public static class SpriteLoader
         LoadedAtlases.Clear();
         LoadedSprites.Clear();
         _instanceKeyToName.Clear();
+        _collectionsExpandedThisReload.Clear();
         // LoadedAtlasesTextures is intentionally NOT cleared here.
         // Each atlas RT is reused in-place: we blit new content into the existing RT
         // rather than destroying and recreating it.  This means mat.mainTexture never
@@ -813,6 +826,24 @@ public static class SpriteLoader
 
         foreach (var collection in Resources.FindObjectsOfTypeAll<tk2dSpriteCollectionData>())
             LoadCollection(collection);
+
+        // For collections where an expansion plan was applied, sprite mesh data cached by
+        // active tk2dBaseSprite instances is now stale (def.positions / def.uvs changed).
+        // ForceBuild() rebuilds the mesh from the current def, so anchor and canvas-size
+        // changes become visible immediately without requiring a scene reload.
+        if (_collectionsExpandedThisReload.Count > 0)
+        {
+            int rebuilt = 0;
+            foreach (var sprite in Resources.FindObjectsOfTypeAll<tk2dBaseSprite>())
+            {
+                if (sprite == null || !_collectionsExpandedThisReload.Contains(sprite.Collection))
+                    continue;
+                sprite.ForceBuild();
+                rebuilt++;
+            }
+            if (rebuilt > 0)
+                Plugin.Logger.LogInfo($"[SpriteLoader] ForceBuild on {rebuilt} sprite instance(s) after expansion plan update");
+        }
 
         Plugin.Logger.LogInfo($"[SpriteLoader] Reload complete: {LoadedSpriteCount} sprite(s) blitted across {LoadedAtlases.Count} atlas(es)");
     }
