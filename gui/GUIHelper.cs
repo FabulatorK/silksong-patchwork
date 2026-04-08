@@ -160,8 +160,8 @@ public static class GUIHelper
     // Proportions: 40% red, 10% orange, 5% green transition, 5% blue transition, 40% bone.
     public static readonly Color StripRed    = new Color(0.80f, 0.13f, 0.13f, 1f); // #CC2222 Hornet crimson
     public static readonly Color StripOrange = new Color(0.91f, 0.46f, 0.19f, 1f); // = ColAccent
-    public static readonly Color StripGreen  = new Color(0.24f, 0.73f, 0.48f, 1f); // = ColPop1
-    public static readonly Color StripBlue   = new Color(0.24f, 0.56f, 0.73f, 1f); // = ColPop2
+    public static readonly Color StripGreen  = new Color(0.15f, 0.92f, 0.55f, 1f); // #26EB8C vivid specular green
+    public static readonly Color StripBlue   = new Color(0.30f, 0.70f, 1.00f, 1f); // #4DB3FF vivid specular blue
     public static readonly Color StripBone   = new Color(0.87f, 0.85f, 0.82f, 1f); // = ColBone
 
     /// <summary>Band ratios for the cassette strip (must sum to 1.0).</summary>
@@ -174,24 +174,72 @@ public static class GUIHelper
         (StripBone,   0.40f),
     };
 
+    // Slant height in base pixels at band transitions.
+    private const float SlantPx = 4f;
+
     /// <summary>
-    /// Draw a vertical cassette-label strip. Uses window-local coordinates (0,0 = top-left
-    /// of the window), so call from inside a <c>GUILayout.Window</c> callback.
+    /// Draw a vertical cassette-label strip with slanted transitions between bands.
+    /// Uses window-local coordinates, so call from inside a <c>GUILayout.Window</c> callback.
     /// </summary>
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
-        // Window-local coords: x starts at a small inset, y starts below the title bar.
-        float x  = Scaled(4f);
-        float y  = Scaled(20f);
-        float h  = windowRect.height - Scaled(28f);
+        float x  = Scaled(6f);
+        float y  = Scaled(22f);
+        float h  = windowRect.height - Scaled(30f);
+        float slant = Scaled(SlantPx);
 
         float yOff = 0f;
-        foreach (var (color, ratio) in StripBands)
+        for (int b = 0; b < StripBands.Length; b++)
         {
+            var (color, ratio) = StripBands[b];
             float bandH = h * ratio;
-            UnityEngine.GUI.color = color;
-            UnityEngine.GUI.DrawTexture(new Rect(x, y + yOff, sw, bandH), Texture2D.whiteTexture);
+
+            // Main band body (excluding slant zones)
+            float bodyStart = yOff;
+            float bodyEnd   = yOff + bandH;
+            // Shrink body to make room for slant at top (except first band) and bottom (except last)
+            if (b > 0) bodyStart += slant * 0.5f;
+            if (b < StripBands.Length - 1) bodyEnd -= slant * 0.5f;
+
+            if (bodyEnd > bodyStart)
+            {
+                UnityEngine.GUI.color = color;
+                UnityEngine.GUI.DrawTexture(
+                    new Rect(x, y + bodyStart, sw, bodyEnd - bodyStart), Texture2D.whiteTexture);
+            }
+
+            // Slanted transition at the bottom of this band (except last)
+            if (b < StripBands.Length - 1)
+            {
+                Color nextColor = StripBands[b + 1].color;
+                float transY = yOff + bandH - slant * 0.5f;
+                int steps = Mathf.Max(Mathf.RoundToInt(slant), 2);
+                for (int s = 0; s < steps; s++)
+                {
+                    float t = (float)s / steps;
+                    float rowY = transY + slant * t;
+                    float split = sw * t; // split point slides left→right
+
+                    // Current colour (left portion, shrinking)
+                    if (sw - split > 0.5f)
+                    {
+                        UnityEngine.GUI.color = color;
+                        UnityEngine.GUI.DrawTexture(
+                            new Rect(x, y + rowY, sw - split, slant / steps + 0.5f),
+                            Texture2D.whiteTexture);
+                    }
+                    // Next colour (right portion, growing)
+                    if (split > 0.5f)
+                    {
+                        UnityEngine.GUI.color = nextColor;
+                        UnityEngine.GUI.DrawTexture(
+                            new Rect(x + sw - split, y + rowY, split, slant / steps + 0.5f),
+                            Texture2D.whiteTexture);
+                    }
+                }
+            }
+
             yOff += bandH;
         }
         UnityEngine.GUI.color = Color.white;

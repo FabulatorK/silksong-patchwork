@@ -40,7 +40,7 @@ public static class PackManagerWindow
     private static Vector2 _pdScrollPos = Vector2.zero;
 
     // ── Cassette strip ─────────────────────────────────────────────────
-    private const float StripW = 14f; // scaled cassette-label strip width
+    private const float StripW = 8f;  // scaled cassette-label strip width
 
     // ── Condition-editor layout constants ─────────────────────────────
     // Conditions sit 2 indent columns to the right.
@@ -113,7 +113,7 @@ public static class PackManagerWindow
         var list = _staged ?? PackManager.AllPacks.ToList();
 
         // Indent content past the strip.
-        float indent = GUIHelper.Scaled(StripW + 6f);
+        float indent = GUIHelper.Scaled(StripW + 12f);
         GUILayout.BeginHorizontal();
         GUILayout.Space(indent);
         GUILayout.BeginVertical();

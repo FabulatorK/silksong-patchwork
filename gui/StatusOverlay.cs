@@ -58,8 +58,8 @@ public static class StatusOverlay
 
         UnityEngine.GUI.color = Color.white;
 
-        // Rich-text label (colours embedded in markup)
-        Rect labelRect = new Rect(x + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV), w, h);
+        // Rich-text label — raised slightly to clear the bottom strip
+        Rect labelRect = new Rect(x + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV) - GUIHelper.Scaled(3f), w, h);
         UnityEngine.GUI.Label(labelRect, text, _labelStyle);
 
         // Invisible button over the whole badge — click opens Pack Manager
