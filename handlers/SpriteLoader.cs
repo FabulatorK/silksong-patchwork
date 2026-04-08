@@ -39,6 +39,10 @@ public static class SpriteLoader
     // string from the file watcher and need to find all live instances with that name).
     private static readonly Dictionary<string, string> _instanceKeyToName = new();
 
+    // Tracks collection names for which we've already logged a duplicate-name warning,
+    // so the message fires once per name, not on every LoadCollection call.
+    private static readonly HashSet<string> _duplicateNameWarned = new();
+
     // Maps mat.GetInstanceID() → the vanilla texture's .name, captured before the first
     // replacement.  Used to resolve instance-specific spritesheet/sprite paths when two
     // collections share the same .name and material abbreviation.
@@ -155,9 +159,9 @@ public static class SpriteLoader
         bool nameCollision = _instanceKeyToName.ContainsValue(collection.name);
         _instanceKeyToName[ikey] = collection.name;
 
-        // Warn on first detection of a same-name collision and tell pack authors what
-        // texture name to use for instance-specific targeting.
-        if (nameCollision)
+        // Warn once per collection name on same-name collision.
+        bool firstDupWarning = nameCollision && _duplicateNameWarned.Add(collection.name);
+        if (firstDupWarning)
             Plugin.Logger.LogWarning(
                 $"[SpriteLoader] Duplicate collection name '{collection.name}' " +
                 $"(instanceId {collection.GetInstanceID()}). " +
@@ -206,7 +210,7 @@ public static class SpriteLoader
                     _originalTexturesByColIndex[(collection.name, captureIdx)] = backupRT;
                     _vanillaTexNamesByColIndex[(collection.name, captureIdx)]  = vTexName;
                 }
-                if (nameCollision)
+                if (firstDupWarning)
                     Plugin.Logger.LogWarning(
                         $"[SpriteLoader]   mat '{matnameAbbr}' → vanilla texture '{vTexName}'");
             }
