@@ -379,18 +379,22 @@ public static class GUIHelper
     /// Draw a vertical cassette-label strip with procedural texture (rounded caps,
     /// anti-aliased diagonals, depth gradient). Window-local coordinates.
     /// </summary>
+    /// <summary>
+    /// Draw a vertical cassette-label strip in screen-space, flush with the
+    /// left edge of <paramref name="windowRect"/>. Call outside the Window callback.
+    /// </summary>
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
-        float x  = 0f;             // flush with window edge
-        float y  = Scaled(4f);     // small top margin
-        float h  = windowRect.height - Scaled(8f);  // small top+bottom margin
+        float margin = Scaled(4f);
+        float x  = windowRect.x;                          // true window left edge
+        float y  = windowRect.y + margin;
+        float h  = windowRect.height - margin * 2f;
 
         int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
         Texture2D tex = GetVerticalStripTex(texW, texH);
 
-        // Colours are baked into the texture — ensure GUI.color doesn't tint it.
         var prevColor = UnityEngine.GUI.color;
         UnityEngine.GUI.color = Color.white;
         UnityEngine.GUI.DrawTexture(new Rect(x, y, sw, h), tex);

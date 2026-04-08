@@ -92,6 +92,10 @@ public static class PackManagerWindow
             GUIHelper.BorderlessWindowStyle,
             GUIHelper.WindowLayout(WindowWidth, WindowHeight)
         );
+
+        // Cassette strip as a screen-space overlay — flush with the window's
+        // true left edge, not inside the padded content area.
+        GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
     }
 
     // ================================================================
@@ -131,9 +135,6 @@ public static class PackManagerWindow
 
     private static void DrawWindow(int _)
     {
-        // Cassette-label strip flush with the left window edge.
-        GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
-
         // Custom title bar
         GUILayout.BeginHorizontal();
         GUILayout.Label("Patchwork — Resource Packs", TitleStyle);
