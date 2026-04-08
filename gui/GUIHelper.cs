@@ -351,7 +351,11 @@ public static class GUIHelper
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
         Texture2D tex = GetVerticalStripTex(texW, texH);
 
+        // Colours are baked into the texture — ensure GUI.color doesn't tint it.
+        var prevColor = UnityEngine.GUI.color;
+        UnityEngine.GUI.color = Color.white;
         UnityEngine.GUI.DrawTexture(new Rect(x, y, sw, h), tex);
+        UnityEngine.GUI.color = prevColor;
     }
 
     /// <summary>
@@ -369,7 +373,10 @@ public static class GUIHelper
         int texH = Mathf.Max(Mathf.RoundToInt(sh), 2);
         Texture2D tex = GetHorizontalStripTex(texW, texH);
 
+        var prevColor = UnityEngine.GUI.color;
+        UnityEngine.GUI.color = Color.white;
         UnityEngine.GUI.DrawTexture(new Rect(x, y, totalW, sh), tex);
+        UnityEngine.GUI.color = prevColor;
     }
 
     /// <summary>
