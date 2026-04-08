@@ -375,21 +375,19 @@ public static class PackManagerWindow
         }
         GUILayout.EndVertical();
 
-        // ── Card fill + border overlay ───────────────────────────
-        // Drawn after EndVertical so GetLastRect returns the full card rect.
+        // ── Card border overlay (no fill) ────────────────────────
         Rect cardRect = GUILayoutUtility.GetLastRect();
         if (pack.IsEnabled)
         {
             Color borderCol = hasConds ? GUIHelper.ColAccent : GUIHelper.ColConfirm;
-            GUIHelper.DrawActiveCardFill(cardRect, borderCol);
-            GUIHelper.DrawBorder(cardRect, new Color(borderCol.r, borderCol.g, borderCol.b, 0.6f), 1f);
+            GUIHelper.DrawBorder(cardRect, new Color(borderCol.r, borderCol.g, borderCol.b, 0.7f), 2f);
         }
         else if (hasConds)
         {
-            GUIHelper.DrawBorder(cardRect, new Color(GUIHelper.ColAccent.r, GUIHelper.ColAccent.g, GUIHelper.ColAccent.b, 0.35f), 1f);
+            GUIHelper.DrawBorder(cardRect, new Color(GUIHelper.ColAccent.r, GUIHelper.ColAccent.g, GUIHelper.ColAccent.b, 0.4f), 2f);
         }
 
-        GUIHelper.Space(2);
+        GUIHelper.Space(4);
     }
 
     // ── Action bar: status + Discard / Apply ────────────────────────
