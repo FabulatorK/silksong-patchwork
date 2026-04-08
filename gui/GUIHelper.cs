@@ -174,106 +174,202 @@ public static class GUIHelper
         (StripBone,   0.40f),
     };
 
-    // Slant height in base pixels at band transitions.
-    private const float SlantPx = 4f;
+    // ── Procedural strip textures ────────────────────────────────────────────
+    // Generated once at startup (and on resolution change). Single DrawTexture
+    // call replaces dozens of IMGUI rects — gives us rounded caps, anti-aliased
+    // diagonal transitions, and a subtle depth gradient.
+
+    private static Texture2D _vertStripTex;
+    private static int       _vertStripH;      // height at which it was generated
+    private static Texture2D _horzStripTex;
+    private static int       _horzStripW;      // width at which it was generated
+
+    /// <summary>Radius of the rounded caps at top/bottom of the vertical strip (base px).</summary>
+    private const float StripCornerRadius = 6f;
+    /// <summary>Height of diagonal transition zones between bands (base px).</summary>
+    private const float StripSlantPx = 5f;
 
     /// <summary>
-    /// Draw a vertical cassette-label strip with slanted transitions between bands.
-    /// Uses window-local coordinates, so call from inside a <c>GUILayout.Window</c> callback.
+    /// Get (or regenerate) the vertical cassette strip texture for a given pixel height.
+    /// </summary>
+    private static Texture2D GetVerticalStripTex(int texW, int texH)
+    {
+        if (_vertStripTex != null && _vertStripH == texH) return _vertStripTex;
+
+        if (_vertStripTex != null) UnityEngine.Object.Destroy(_vertStripTex);
+        _vertStripTex = GenerateStripTexture(texW, texH, false);
+        _vertStripH = texH;
+        return _vertStripTex;
+    }
+
+    /// <summary>
+    /// Get (or regenerate) the horizontal cassette strip texture for a given pixel width.
+    /// </summary>
+    private static Texture2D GetHorizontalStripTex(int texW, int texH)
+    {
+        if (_horzStripTex != null && _horzStripW == texW) return _horzStripTex;
+
+        if (_horzStripTex != null) UnityEngine.Object.Destroy(_horzStripTex);
+        _horzStripTex = GenerateStripTexture(texW, texH, true);
+        _horzStripW = texW;
+        return _horzStripTex;
+    }
+
+    /// <summary>
+    /// Procedurally generate a cassette strip texture with rounded caps, anti-aliased
+    /// diagonal band transitions, and a subtle horizontal depth gradient.
+    /// When <paramref name="horizontal"/> is true, bands run left-to-right with a fade.
+    /// </summary>
+    private static Texture2D GenerateStripTexture(int w, int h, bool horizontal)
+    {
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+        var pixels = new Color[w * h];
+
+        int length = horizontal ? w : h;
+        int breadth = horizontal ? h : w;
+        float cornerR = horizontal ? Mathf.Min(Scaled(3f), breadth * 0.4f) : Scaled(StripCornerRadius);
+        float slant = Scaled(StripSlantPx);
+
+        // Pre-compute band boundaries along the length axis
+        float[] bandStarts = new float[StripBands.Length];
+        float[] bandEnds   = new float[StripBands.Length];
+        float acc = 0f;
+        for (int b = 0; b < StripBands.Length; b++)
+        {
+            bandStarts[b] = acc;
+            acc += length * StripBands[b].ratio;
+            bandEnds[b] = acc;
+        }
+
+        // Fade for horizontal mode: last 40% fades to transparent
+        float fadeStart = horizontal ? 0.60f : 1f;
+
+        for (int py = 0; py < h; py++)
+        {
+            for (int px = 0; px < w; px++)
+            {
+                // Map to length/breadth coordinates
+                // For vertical: length runs top→bottom (inverted Y since texture Y=0 is bottom)
+                float along  = horizontal ? (float)px : (float)(h - 1 - py);
+                float across = horizontal ? (float)(h - 1 - py) : (float)px;
+                float alongNorm = along / Mathf.Max(length - 1, 1);
+
+                // ── Determine band colour at this pixel ──────────────
+                Color col = StripBands[StripBands.Length - 1].color;
+                for (int b = 0; b < StripBands.Length; b++)
+                {
+                    if (along < bandEnds[b])
+                    {
+                        col = StripBands[b].color;
+
+                        // Diagonal transition: blend with next band near the boundary
+                        if (b < StripBands.Length - 1)
+                        {
+                            float distToEnd = bandEnds[b] - along;
+                            float halfSlant = slant * 0.5f;
+                            if (distToEnd < halfSlant)
+                            {
+                                // How far across the breadth affects the transition point
+                                float acrossNorm = across / Mathf.Max(breadth - 1, 1);
+                                float threshold = halfSlant * (1f - acrossNorm);
+                                if (distToEnd < threshold)
+                                {
+                                    // Smooth blend at the diagonal edge
+                                    float edge = Mathf.Clamp01((threshold - distToEnd) / 1.5f);
+                                    col = Color.Lerp(col, StripBands[b + 1].color, edge);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // ── Depth gradient across the breadth ────────────────
+                // Subtle: brighter at the outer edge (across=0), slightly darker inward
+                float acrossN = across / Mathf.Max(breadth - 1, 1);
+                float depthMul = 1f + 0.12f * (1f - acrossN); // 1.12 at edge, 1.0 inside
+                col = new Color(
+                    Mathf.Clamp01(col.r * depthMul),
+                    Mathf.Clamp01(col.g * depthMul),
+                    Mathf.Clamp01(col.b * depthMul),
+                    col.a);
+
+                // ── Rounded corners ──────────────────────────────────
+                float alpha = 1f;
+
+                // Top-left / bottom-left rounding for vertical; left/right for horizontal
+                if (along < cornerR && across < cornerR)
+                {
+                    float dx = cornerR - across;
+                    float dy = cornerR - along;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    alpha = Mathf.Clamp01(cornerR - dist + 0.5f); // +0.5 for AA
+                }
+                else if (along > length - 1 - cornerR && across < cornerR)
+                {
+                    float dx = cornerR - across;
+                    float dy = cornerR - (length - 1 - along);
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    alpha = Mathf.Clamp01(cornerR - dist + 0.5f);
+                }
+
+                // ── Horizontal fade ──────────────────────────────────
+                if (horizontal && alongNorm > fadeStart)
+                {
+                    float fade = 1f - (alongNorm - fadeStart) / (1f - fadeStart);
+                    alpha *= Mathf.Clamp01(fade) * 0.85f;
+                }
+                else if (horizontal)
+                {
+                    alpha *= 0.85f;
+                }
+
+                col.a = alpha;
+                pixels[py * w + px] = col;
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Draw a vertical cassette-label strip with procedural texture (rounded caps,
+    /// anti-aliased diagonals, depth gradient). Window-local coordinates.
     /// </summary>
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
         float x  = Scaled(6f);
-        float y  = Scaled(22f);
-        float h  = windowRect.height - Scaled(30f);
-        float slant = Scaled(SlantPx);
+        float y  = Scaled(20f);
+        float h  = windowRect.height - Scaled(28f);
 
-        float yOff = 0f;
-        for (int b = 0; b < StripBands.Length; b++)
-        {
-            var (color, ratio) = StripBands[b];
-            float bandH = h * ratio;
+        int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
+        int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
+        Texture2D tex = GetVerticalStripTex(texW, texH);
 
-            // Main band body (excluding slant zones)
-            float bodyStart = yOff;
-            float bodyEnd   = yOff + bandH;
-            // Shrink body to make room for slant at top (except first band) and bottom (except last)
-            if (b > 0) bodyStart += slant * 0.5f;
-            if (b < StripBands.Length - 1) bodyEnd -= slant * 0.5f;
-
-            if (bodyEnd > bodyStart)
-            {
-                UnityEngine.GUI.color = color;
-                UnityEngine.GUI.DrawTexture(
-                    new Rect(x, y + bodyStart, sw, bodyEnd - bodyStart), Texture2D.whiteTexture);
-            }
-
-            // Slanted transition at the bottom of this band (except last)
-            if (b < StripBands.Length - 1)
-            {
-                Color nextColor = StripBands[b + 1].color;
-                float transY = yOff + bandH - slant * 0.5f;
-                int steps = Mathf.Max(Mathf.RoundToInt(slant), 2);
-                for (int s = 0; s < steps; s++)
-                {
-                    float t = (float)s / steps;
-                    float rowY = transY + slant * t;
-                    float split = sw * t; // split point slides left→right
-
-                    // Current colour (left portion, shrinking)
-                    if (sw - split > 0.5f)
-                    {
-                        UnityEngine.GUI.color = color;
-                        UnityEngine.GUI.DrawTexture(
-                            new Rect(x, y + rowY, sw - split, slant / steps + 0.5f),
-                            Texture2D.whiteTexture);
-                    }
-                    // Next colour (right portion, growing)
-                    if (split > 0.5f)
-                    {
-                        UnityEngine.GUI.color = nextColor;
-                        UnityEngine.GUI.DrawTexture(
-                            new Rect(x + sw - split, y + rowY, split, slant / steps + 0.5f),
-                            Texture2D.whiteTexture);
-                    }
-                }
-            }
-
-            yOff += bandH;
-        }
-        UnityEngine.GUI.color = Color.white;
+        UnityEngine.GUI.DrawTexture(new Rect(x, y, sw, h), tex);
     }
 
     /// <summary>
-    /// Draw a horizontal cassette-label strip. Runs left-to-right with a transparency
-    /// fade over the final 40% of its length. Designed for compact elements like StatusOverlay.
+    /// Draw a horizontal cassette-label strip with procedural texture (fade, rounded caps).
+    /// Screen-space coordinates for StatusOverlay.
     /// </summary>
     public static void DrawCassetteStripHorizontal(Rect area, float stripHeight)
     {
         float sh = Scaled(stripHeight);
-        float y  = area.yMax - sh - Scaled(2f); // 2px margin above bottom edge
-        float totalW = area.width - Scaled(4f); // 2px margin each side
+        float y  = area.yMax - sh - Scaled(2f);
+        float totalW = area.width - Scaled(4f);
         float x  = area.x + Scaled(2f);
 
-        // Fade: last 40% of the strip length fades to transparent.
-        float fadeStart = 0.60f;
+        int texW = Mathf.Max(Mathf.RoundToInt(totalW), 2);
+        int texH = Mathf.Max(Mathf.RoundToInt(sh), 2);
+        Texture2D tex = GetHorizontalStripTex(texW, texH);
 
-        float xOff = 0f;
-        foreach (var (color, ratio) in StripBands)
-        {
-            float bandW = totalW * ratio;
-            // How far into the total strip is this band's midpoint?
-            float midNorm = (xOff + bandW * 0.5f) / totalW;
-            float alpha = midNorm < fadeStart ? 1f
-                        : 1f - (midNorm - fadeStart) / (1f - fadeStart);
-            alpha = Mathf.Clamp01(alpha) * 0.85f; // slightly translucent overall
-
-            UnityEngine.GUI.color = new Color(color.r, color.g, color.b, alpha);
-            UnityEngine.GUI.DrawTexture(new Rect(x + xOff, y, bandW, sh), Texture2D.whiteTexture);
-            xOff += bandW;
-        }
-        UnityEngine.GUI.color = Color.white;
+        UnityEngine.GUI.DrawTexture(new Rect(x, y, totalW, sh), tex);
     }
 
     /// <summary>
