@@ -380,16 +380,18 @@ public static class GUIHelper
     /// anti-aliased diagonals, depth gradient). Window-local coordinates.
     /// </summary>
     /// <summary>
-    /// Draw a vertical cassette-label strip in screen-space, flush with the
-    /// left edge of <paramref name="windowRect"/>. Call outside the Window callback.
+    /// Draw a vertical cassette-label strip flush with the true left edge of the
+    /// window. Call from inside a <c>GUILayout.Window</c> callback — uses a negative
+    /// x offset to punch through the <see cref="BorderlessWindowStyle"/> left padding.
     /// </summary>
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
-        float margin = Scaled(4f);
-        float x  = windowRect.x;                          // true window left edge
-        float y  = windowRect.y + margin;
-        float h  = windowRect.height - margin * 2f;
+        float padL = ScaledInt(4);   // must match BorderlessWindowStyle left padding
+        float padT = ScaledInt(8);   // must match BorderlessWindowStyle top padding
+        float x  = -padL;           // punch through padding to true window edge
+        float y  = -padT + Scaled(4f);
+        float h  = windowRect.height - Scaled(8f);
 
         int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
