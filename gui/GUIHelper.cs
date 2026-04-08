@@ -228,6 +228,24 @@ public static class GUIHelper
         UnityEngine.GUI.color = Color.white;
     }
 
+    /// <summary>
+    /// Draw a thin rectangular border (outline only) around <paramref name="rect"/>.
+    /// </summary>
+    public static void DrawBorder(Rect rect, Color color, float thickness = 1f)
+    {
+        float t = Scaled(thickness);
+        UnityEngine.GUI.color = color;
+        // Top
+        UnityEngine.GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, t), Texture2D.whiteTexture);
+        // Bottom
+        UnityEngine.GUI.DrawTexture(new Rect(rect.x, rect.yMax - t, rect.width, t), Texture2D.whiteTexture);
+        // Left
+        UnityEngine.GUI.DrawTexture(new Rect(rect.x, rect.y, t, rect.height), Texture2D.whiteTexture);
+        // Right
+        UnityEngine.GUI.DrawTexture(new Rect(rect.xMax - t, rect.y, t, rect.height), Texture2D.whiteTexture);
+        UnityEngine.GUI.color = Color.white;
+    }
+
     /// <summary>Create a 1×1 solid-colour Texture2D. Style caches should hold the ref.</summary>
     public static Texture2D MakeTex(Color c)
     {

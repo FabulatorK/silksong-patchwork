@@ -98,12 +98,18 @@ public static class PackManagerWindow
     //  Window content
     // ================================================================
 
+    // ON/OFF square dimensions: 80% of the main row height.
+    private const float ToggleSquare = 22f;
+    // Gear button for conditions.
+    private const float GearSquare   = 22f;
+    // Secondary info indent — past the toggle square + gap.
+    private const float InfoIndent   = 30f;
+
     private static void DrawWindow(int _)
     {
         // Cassette-label strip along the left edge (drawn behind content).
         GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
 
-        // The list we're rendering — staged changes if pending, live list otherwise.
         var list = _staged ?? PackManager.AllPacks.ToList();
 
         // Indent content past the strip.
@@ -113,15 +119,19 @@ public static class PackManagerWindow
         GUILayout.BeginVertical();
 
         GUIHelper.Space(16);
-        DrawToolbar(list);
-        GUIHelper.Space(4);
+        DrawToolbar();
+        GUIHelper.Space(6);
         DrawPackList(list);
-        GUIHelper.Space(4);
-        DrawFooter(list);
         GUIHelper.Space(4);
         DrawProfilesSection();
         GUIHelper.Space(4);
         DrawConflictsSection();
+        GUIHelper.Space(4);
+        DrawPinRow();
+        GUIHelper.Space(6);
+        DrawActionBar(list);
+        GUIHelper.Space(6);
+        DrawFooter();
 
         GUILayout.EndVertical();
         GUILayout.EndHorizontal();
@@ -129,37 +139,19 @@ public static class PackManagerWindow
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
 
-    private static void DrawToolbar(List<PackInfo> list)
+    // ── Top bar: Rescan (left) + × close (right) ────────────────────
+
+    private static void DrawToolbar()
     {
         GUILayout.BeginHorizontal();
         {
-            if (GUILayout.Button("Rescan", GUIHelper.ButtonStyle, GUIHelper.Width(80)))
+            if (GUILayout.Button("Rescan", GUIHelper.ButtonStyle, GUIHelper.Width(72)))
             {
                 PackManager.Rescan();
                 _staged = null;
             }
 
             GUILayout.FlexibleSpace();
-
-            UnityEngine.GUI.enabled = HasChanges;
-            if (GUILayout.Button("Discard", GUIHelper.ButtonStyle, GUIHelper.Width(72)))
-                _staged = null;
-
-            // Apply — teal-green confirm colour
-            Color prevApply = UnityEngine.GUI.backgroundColor;
-            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.45f,
-                GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f);
-            if (GUILayout.Button("Apply", GUIHelper.ButtonStyle, GUIHelper.Width(66)))
-            {
-                PackManager.Apply(_staged);
-                _staged = null;
-            }
-            UnityEngine.GUI.backgroundColor = prevApply;
-            UnityEngine.GUI.enabled = true;
-
-            GUIHelper.Space(6);
-            DrawPinButton();
-            GUIHelper.Space(4);
 
             // Close button — magenta-red danger
             Color prevClose = UnityEngine.GUI.backgroundColor;
@@ -172,32 +164,7 @@ public static class PackManagerWindow
         GUILayout.EndHorizontal();
     }
 
-    private static void DrawPinButton()
-    {
-        Color prev = UnityEngine.GUI.backgroundColor;
-
-        if (PackRamCache.IsPinned)
-        {
-            // Pinned — teal confirm, click to unpin
-            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.45f,
-                GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f);
-            string label = $"Unpin ({PackRamCache.PinnedSizeLabel})";
-            if (GUILayout.Button(label, GUIHelper.ButtonStyle, GUIHelper.Height(22)))
-                PackRamCache.Unpin();
-        }
-        else
-        {
-            // Unpinned — amber experimental button
-            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColWarn.r * 0.6f,
-                GUIHelper.ColWarn.g * 0.6f, GUIHelper.ColWarn.b * 0.6f);
-            UnityEngine.GUI.contentColor    = GUIHelper.ColWarn;
-            if (GUILayout.Button("⚠ Pin to RAM", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
-                PackRamCache.Pin(PackManager.ActivePackPaths);
-            UnityEngine.GUI.contentColor = Color.white;
-        }
-
-        UnityEngine.GUI.backgroundColor = prev;
-    }
+    // ── Pack list ────────────────────────────────────────────────────
 
     private static void DrawPackList(List<PackInfo> list)
     {
@@ -221,25 +188,28 @@ public static class PackManagerWindow
     {
         var pack = list[i];
 
-        // Resolved against live list (not staged) so condition editor always operates
-        // on committed state, avoiding stale-reference issues during staged edits.
         var livePack = PackManager.AllPacks.FirstOrDefault(p =>
             string.Equals(p.Path, pack.Path, System.StringComparison.OrdinalIgnoreCase));
+
+        bool hasConds = livePack != null && livePack.HasConditions;
 
         GUILayout.BeginVertical(GUIHelper.CardStyle);
         {
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
             {
-                // Enable / disable toggle — teal confirm when on, muted when off
+                // ON/OFF toggle — large square, 80% of row height
                 Color prevBg = UnityEngine.GUI.backgroundColor;
                 UnityEngine.GUI.backgroundColor = pack.IsEnabled
-                    ? new Color(GUIHelper.ColConfirm.r * 0.45f, GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f)
-                    : GUIHelper.ColSurface1;
-                UnityEngine.GUI.contentColor = pack.IsEnabled ? GUIHelper.ColConfirm : GUIHelper.ColMuted;
+                    ? GUIHelper.ColConfirm
+                    : GUIHelper.ColSurface;
+                UnityEngine.GUI.contentColor = pack.IsEnabled
+                    ? Color.white
+                    : GUIHelper.ColMuted;
                 bool clicked = GUILayout.Button(
-                    pack.IsEnabled ? "ON" : "OFF",
-                    GUIHelper.TagStyle, GUIHelper.Width(40));
+                    pack.IsEnabled ? "✓" : "",
+                    GUIHelper.ButtonStyle,
+                    GUIHelper.Width(ToggleSquare), GUIHelper.Height(ToggleSquare));
                 UnityEngine.GUI.backgroundColor = prevBg;
                 UnityEngine.GUI.contentColor    = Color.white;
                 if (clicked)
@@ -248,49 +218,31 @@ public static class PackManagerWindow
                     _staged[i].IsEnabled = !pack.IsEnabled;
                 }
 
-                GUIHelper.Space(3);
+                GUIHelper.Space(4);
 
-                // Pack name
-                GUILayout.Label(pack.Name, GUIHelper.LabelStyle);
-
-                GUIHelper.Space(2);
-
-                // Source chip: "local" or "pack"
-                GUILayout.Label(pack.IsLocal ? "local" : "pack",
-                    GUIHelper.ChipStyle, GUILayout.ExpandWidth(false));
-
-                // Conflict badge
-                int shadowed = ConflictTracker.ShadowedCount(pack.Path);
-                if (shadowed > 0)
+                // Pack name + source chip inline
+                GUILayout.BeginVertical();
                 {
-                    GUIHelper.Space(2);
-                    UnityEngine.GUI.contentColor = GUIHelper.ColWarn;
-                    GUILayout.Label($"⚠ {shadowed}", GUIHelper.LabelStyle);
-                    UnityEngine.GUI.contentColor = Color.white;
-                }
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(pack.Name, GUIHelper.LabelStyle);
+                    GUIHelper.Space(4);
+                    GUILayout.Label(pack.IsLocal ? "local" : "pack",
+                        GUIHelper.ChipStyle, GUILayout.ExpandWidth(false));
 
-                // Conditions toggle (works on live list, not staged)
-                if (livePack != null)
-                {
-                    bool condOpen = _conditionsOpen.Contains(pack.Path);
-                    Color prevCondBg = UnityEngine.GUI.backgroundColor;
-                    if (condOpen || livePack.HasConditions)
+                    // Conflict badge
+                    int shadowed = ConflictTracker.ShadowedCount(pack.Path);
+                    if (shadowed > 0)
                     {
-                        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColAccent.r * 0.30f,
-                            GUIHelper.ColAccent.g * 0.30f, GUIHelper.ColAccent.b * 0.30f);
-                        UnityEngine.GUI.contentColor    = GUIHelper.ColAccent;
+                        GUIHelper.Space(2);
+                        UnityEngine.GUI.contentColor = GUIHelper.ColWarn;
+                        GUILayout.Label($"⚠ {shadowed}", GUIHelper.LabelStyle);
+                        UnityEngine.GUI.contentColor = Color.white;
                     }
-                    string condLabel = livePack.HasConditions
-                        ? $"{livePack.Conditions.Count} cond"
-                        : "+ cond";
-                    if (GUILayout.Button(condLabel, GUIHelper.TagStyle, GUIHelper.Width(62)))
-                    {
-                        if (condOpen) _conditionsOpen.Remove(pack.Path);
-                        else          _conditionsOpen.Add(pack.Path);
-                    }
-                    UnityEngine.GUI.backgroundColor = prevCondBg;
-                    UnityEngine.GUI.contentColor    = Color.white;
+
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
                 }
+                GUILayout.EndVertical();
 
                 GUILayout.FlexibleSpace();
 
@@ -301,15 +253,36 @@ public static class PackManagerWindow
                     EnsureStaged();
                     (_staged[i - 1], _staged[i]) = (_staged[i], _staged[i - 1]);
                 }
-
                 UnityEngine.GUI.enabled = i < list.Count - 1;
                 if (GUILayout.Button("▼", GUIHelper.ButtonStyle, GUIHelper.Width(26)))
                 {
                     EnsureStaged();
                     (_staged[i + 1], _staged[i]) = (_staged[i], _staged[i + 1]);
                 }
-
                 UnityEngine.GUI.enabled = true;
+
+                GUIHelper.Space(2);
+
+                // Gear button — opens condition editor
+                if (livePack != null)
+                {
+                    bool condOpen = _conditionsOpen.Contains(pack.Path);
+                    Color prevGearBg = UnityEngine.GUI.backgroundColor;
+                    if (condOpen || hasConds)
+                    {
+                        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColAccent.r * 0.40f,
+                            GUIHelper.ColAccent.g * 0.40f, GUIHelper.ColAccent.b * 0.40f);
+                        UnityEngine.GUI.contentColor    = GUIHelper.ColAccent;
+                    }
+                    if (GUILayout.Button("⚙", GUIHelper.ButtonStyle,
+                            GUIHelper.Width(GearSquare), GUIHelper.Height(GearSquare)))
+                    {
+                        if (condOpen) _conditionsOpen.Remove(pack.Path);
+                        else          _conditionsOpen.Add(pack.Path);
+                    }
+                    UnityEngine.GUI.backgroundColor = prevGearBg;
+                    UnityEngine.GUI.contentColor    = Color.white;
+                }
             }
             GUILayout.EndHorizontal();
 
@@ -328,23 +301,22 @@ public static class PackManagerWindow
             if (meta.Count > 0)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Space(GUIHelper.Scaled(46));
+                GUILayout.Space(GUIHelper.Scaled(InfoIndent));
                 GUILayout.Label(string.Join("   ", meta), GUIHelper.MutedLabelStyle);
                 GUILayout.EndHorizontal();
             }
 
-            // ── Asset footprint ───────────────────────────────────
+            // ── Asset footprint ──────────────────────────────────
             string footprint = pack.Stats.Badge;
             if (footprint != null)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Space(GUIHelper.Scaled(46));
+                GUILayout.Space(GUIHelper.Scaled(InfoIndent));
                 GUILayout.Label(footprint, GUIHelper.MutedLabelStyle);
                 GUILayout.EndHorizontal();
             }
             else
             {
-                // Directory-presence chips when stats not yet scanned
                 var typeTags = new List<string>();
                 if (Directory.Exists(Path.Combine(pack.Path, "Sprites")))      typeTags.Add("sprites");
                 if (Directory.Exists(Path.Combine(pack.Path, "Spritesheets"))) typeTags.Add("sheets");
@@ -354,52 +326,158 @@ public static class PackManagerWindow
                 if (typeTags.Count > 0)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Space(GUIHelper.Scaled(46));
+                    GUILayout.Space(GUIHelper.Scaled(InfoIndent));
                     foreach (var tag in typeTags)
                         GUILayout.Label(tag, GUIHelper.ChipStyle, GUILayout.ExpandWidth(false));
                     GUILayout.EndHorizontal();
                 }
             }
 
-            // ── Inline condition editor ───────────────────────────
+            // ── Inline condition editor ──────────────────────────
             if (livePack != null && _conditionsOpen.Contains(pack.Path))
+            {
+                GUIHelper.DrawSeparator();
                 DrawConditionEditor(livePack);
+            }
         }
         GUILayout.EndVertical();
+
+        // ── Card border overlay ──────────────────────────────────
+        // Drawn after EndVertical so GetLastRect returns the full card rect.
+        Rect cardRect = GUILayoutUtility.GetLastRect();
+        if (pack.IsEnabled)
+        {
+            Color borderCol = hasConds ? GUIHelper.ColAccent : GUIHelper.ColConfirm;
+            GUIHelper.DrawBorder(cardRect, new Color(borderCol.r, borderCol.g, borderCol.b, 0.6f), 1f);
+        }
+        else if (hasConds)
+        {
+            GUIHelper.DrawBorder(cardRect, new Color(GUIHelper.ColAccent.r, GUIHelper.ColAccent.g, GUIHelper.ColAccent.b, 0.35f), 1f);
+        }
 
         GUIHelper.Space(2);
     }
 
-    private static void DrawFooter(List<PackInfo> list)
+    // ── Pin to RAM — own row, visually demoted ──────────────────────
+
+    private static void DrawPinRow()
     {
-        int active = list.Count(p => p.IsEnabled);
-        string status = HasChanges
-            ? $"{active}/{list.Count} active  •  unsaved changes"
-            : $"{active}/{list.Count} active";
+        Color prev = UnityEngine.GUI.backgroundColor;
+        UnityEngine.GUI.contentColor = GUIHelper.ColMuted;
 
         GUILayout.BeginHorizontal();
-        GUILayout.Label(status, GUIHelper.LabelStyle);
         GUILayout.FlexibleSpace();
 
-        // HUD overlay toggle
-        Color prev = UnityEngine.GUI.backgroundColor;
-        UnityEngine.GUI.backgroundColor = Plugin.ShowStatusOverlay
-            ? new Color(GUIHelper.ColConfirm.r * 0.45f, GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f)
-            : GUIHelper.ColBorder;
-        if (GUILayout.Button("HUD", GUIHelper.ButtonStyle, GUIHelper.Height(22), GUIHelper.Width(40)))
-            Plugin.ShowStatusOverlay = !Plugin.ShowStatusOverlay;
-        UnityEngine.GUI.backgroundColor = prev;
+        if (PackRamCache.IsPinned)
+        {
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.30f,
+                GUIHelper.ColConfirm.g * 0.30f, GUIHelper.ColConfirm.b * 0.30f);
+            UnityEngine.GUI.contentColor = GUIHelper.ColConfirm;
+            if (GUILayout.Button($"Unpin RAM ({PackRamCache.PinnedSizeLabel})",
+                    GUIHelper.ButtonStyle, GUIHelper.Height(20), GUIHelper.Width(180)))
+                PackRamCache.Unpin();
+        }
+        else
+        {
+            UnityEngine.GUI.backgroundColor = GUIHelper.ColSurface1;
+            string costLabel = PackRamCache.PinnedBytes > 0
+                ? $"Pin to RAM ({PackRamCache.PinnedSizeLabel})"
+                : "Pin to RAM";
+            if (GUILayout.Button(costLabel, GUIHelper.ButtonStyle, GUIHelper.Height(20), GUIHelper.Width(180)))
+                PackRamCache.Pin(PackManager.ActivePackPaths);
+        }
 
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
+
+        UnityEngine.GUI.backgroundColor = prev;
+        UnityEngine.GUI.contentColor    = Color.white;
+    }
+
+    // ── Action bar: status + Discard / Apply ────────────────────────
+
+    private static void DrawActionBar(List<PackInfo> list)
+    {
+        int active = list.Count(p => p.IsEnabled);
+
+        GUIHelper.DrawSeparator();
         GUIHelper.Space(4);
 
-        // Dev Tools button — specular blue pop (reserved accent)
-        prev = UnityEngine.GUI.backgroundColor;
-        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColPop2.r * 0.50f,
-            GUIHelper.ColPop2.g * 0.50f, GUIHelper.ColPop2.b * 0.50f);
-        if (GUILayout.Button("Dev Tools \u2192", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
-            DevHub.OpenAt(DevHub.TabGraphics);
-        UnityEngine.GUI.backgroundColor = prev;
+        // Layer 1: status count + unsaved changes notice
+        GUILayout.BeginHorizontal();
+        {
+            GUILayout.Label($"{active}/{list.Count} active", GUIHelper.LabelStyle);
+            GUILayout.FlexibleSpace();
+            if (HasChanges)
+            {
+                UnityEngine.GUI.contentColor = GUIHelper.ColWarn;
+                GUILayout.Label("unsaved changes", GUIHelper.MutedLabelStyle);
+                UnityEngine.GUI.contentColor = Color.white;
+            }
+        }
+        GUILayout.EndHorizontal();
 
+        GUIHelper.Space(2);
+
+        // Layer 2: Discard + Apply (Apply slightly heavier)
+        UnityEngine.GUI.enabled = HasChanges;
+        GUILayout.BeginHorizontal();
+        {
+            if (GUILayout.Button("Discard", GUIHelper.ButtonStyle, GUIHelper.Height(26)))
+                _staged = null;
+
+            GUIHelper.Space(4);
+
+            Color prevApply = UnityEngine.GUI.backgroundColor;
+            UnityEngine.GUI.backgroundColor = HasChanges
+                ? new Color(GUIHelper.ColConfirm.r * 0.50f,
+                    GUIHelper.ColConfirm.g * 0.50f, GUIHelper.ColConfirm.b * 0.50f)
+                : GUIHelper.ColSurface1;
+            if (GUILayout.Button("Apply", GUIHelper.ButtonStyle,
+                    GUIHelper.Height(26), GUILayout.MinWidth(GUIHelper.Scaled(100))))
+            {
+                PackManager.Apply(_staged);
+                _staged = null;
+            }
+            UnityEngine.GUI.backgroundColor = prevApply;
+        }
+        GUILayout.EndHorizontal();
+        UnityEngine.GUI.enabled = true;
+    }
+
+    // ── Footer: Status overlay banner + Dev Tools square ────────────
+
+    private static void DrawFooter()
+    {
+        GUIHelper.DrawSeparator();
+        GUIHelper.Space(4);
+
+        GUILayout.BeginHorizontal();
+        {
+            // Status overlay toggle — ~70% of footer width
+            Color prev = UnityEngine.GUI.backgroundColor;
+            UnityEngine.GUI.backgroundColor = Plugin.ShowStatusOverlay
+                ? new Color(GUIHelper.ColConfirm.r * 0.35f,
+                    GUIHelper.ColConfirm.g * 0.35f, GUIHelper.ColConfirm.b * 0.35f)
+                : GUIHelper.ColSurface1;
+            string hudLabel = Plugin.ShowStatusOverlay ? "Status Overlay: ON" : "Status Overlay: OFF";
+            if (GUILayout.Button(hudLabel, GUIHelper.ButtonStyle, GUIHelper.Height(24)))
+                Plugin.ShowStatusOverlay = !Plugin.ShowStatusOverlay;
+            UnityEngine.GUI.backgroundColor = prev;
+
+            GUIHelper.Space(4);
+
+            // Dev Tools square — specular blue pop
+            prev = UnityEngine.GUI.backgroundColor;
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColPop2.r * 0.40f,
+                GUIHelper.ColPop2.g * 0.40f, GUIHelper.ColPop2.b * 0.40f);
+            UnityEngine.GUI.contentColor = GUIHelper.ColPop2;
+            if (GUILayout.Button("⚒", GUIHelper.ButtonStyle,
+                    GUIHelper.Width(28), GUIHelper.Height(24)))
+                DevHub.OpenAt(DevHub.TabGraphics);
+            UnityEngine.GUI.backgroundColor = prev;
+            UnityEngine.GUI.contentColor    = Color.white;
+        }
         GUILayout.EndHorizontal();
     }
 
