@@ -140,14 +140,93 @@ public static class GUIHelper
     }
 
     // ── Design tokens ─────────────────────────────────────────────────────────
-    public static readonly Color ColSurface  = new Color(0.10f, 0.10f, 0.13f, 1f);
-    public static readonly Color ColSurface1 = new Color(0.17f, 0.17f, 0.22f, 1f);
-    public static readonly Color ColBorder   = new Color(0.28f, 0.28f, 0.35f, 1f);
-    public static readonly Color ColAccent   = new Color(0.45f, 0.72f, 1.00f, 1f);
-    public static readonly Color ColMuted    = new Color(0.55f, 0.55f, 0.65f, 1f);
-    public static readonly Color ColSuccess  = new Color(0.35f, 0.90f, 0.50f, 1f);
-    public static readonly Color ColWarn     = new Color(1.00f, 0.75f, 0.20f, 1f);
-    public static readonly Color ColDanger   = new Color(1.00f, 0.40f, 0.40f, 1f);
+    // Cassette-label palette: warm orange accent, teal confirm, magenta-red danger.
+    // Strip identity colours (StripRed / StripBone) are for the side-band only.
+    public static readonly Color ColSurface    = new Color(0.10f, 0.10f, 0.13f, 1f);
+    public static readonly Color ColSurface1   = new Color(0.17f, 0.17f, 0.22f, 1f);
+    public static readonly Color ColBorder     = new Color(0.28f, 0.28f, 0.35f, 1f);
+    public static readonly Color ColAccent     = new Color(0.91f, 0.46f, 0.19f, 1f); // #E87530 orange
+    public static readonly Color ColAccentSoft = new Color(0.80f, 0.33f, 0.13f, 1f); // #CC5522 burnt orange
+    public static readonly Color ColMuted      = new Color(0.55f, 0.55f, 0.65f, 1f);
+    public static readonly Color ColConfirm    = new Color(0.20f, 0.67f, 0.53f, 1f); // #33AA88 teal-green
+    public static readonly Color ColSuccess    = new Color(0.20f, 0.67f, 0.53f, 1f); // alias → ColConfirm
+    public static readonly Color ColWarn       = new Color(1.00f, 0.75f, 0.20f, 1f);
+    public static readonly Color ColDanger     = new Color(0.80f, 0.20f, 0.40f, 1f); // #CC3366 magenta-red
+    public static readonly Color ColBone       = new Color(0.87f, 0.85f, 0.82f, 1f); // #DDD8D0 mask off-white
+    public static readonly Color ColPop1       = new Color(0.24f, 0.73f, 0.48f, 1f); // #3DBB7A specular green
+    public static readonly Color ColPop2       = new Color(0.24f, 0.56f, 0.73f, 1f); // #3D8EBB specular blue
+
+    // ── Cassette strip bands ─────────────────────────────────────────────────
+    // Proportions: 40% red, 10% orange, 5% green transition, 5% blue transition, 40% bone.
+    public static readonly Color StripRed    = new Color(0.80f, 0.13f, 0.13f, 1f); // #CC2222 Hornet crimson
+    public static readonly Color StripOrange = new Color(0.91f, 0.46f, 0.19f, 1f); // = ColAccent
+    public static readonly Color StripGreen  = new Color(0.24f, 0.73f, 0.48f, 1f); // = ColPop1
+    public static readonly Color StripBlue   = new Color(0.24f, 0.56f, 0.73f, 1f); // = ColPop2
+    public static readonly Color StripBone   = new Color(0.87f, 0.85f, 0.82f, 1f); // = ColBone
+
+    /// <summary>Band ratios for the cassette strip (must sum to 1.0).</summary>
+    private static readonly (Color color, float ratio)[] StripBands =
+    {
+        (StripRed,    0.40f),
+        (StripOrange, 0.10f),
+        (StripGreen,  0.05f),
+        (StripBlue,   0.05f),
+        (StripBone,   0.40f),
+    };
+
+    /// <summary>
+    /// Draw a vertical cassette-label strip. Uses window-local coordinates (0,0 = top-left
+    /// of the window), so call from inside a <c>GUILayout.Window</c> callback.
+    /// </summary>
+    public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
+    {
+        float sw = Scaled(stripWidth);
+        // Window-local coords: x starts at a small inset, y starts below the title bar.
+        float x  = Scaled(4f);
+        float y  = Scaled(20f);
+        float h  = windowRect.height - Scaled(28f);
+
+        float yOff = 0f;
+        foreach (var (color, ratio) in StripBands)
+        {
+            float bandH = h * ratio;
+            UnityEngine.GUI.color = color;
+            UnityEngine.GUI.DrawTexture(new Rect(x, y + yOff, sw, bandH), Texture2D.whiteTexture);
+            yOff += bandH;
+        }
+        UnityEngine.GUI.color = Color.white;
+    }
+
+    /// <summary>
+    /// Draw a horizontal cassette-label strip. Runs left-to-right with a transparency
+    /// fade over the final 40% of its length. Designed for compact elements like StatusOverlay.
+    /// </summary>
+    public static void DrawCassetteStripHorizontal(Rect area, float stripHeight)
+    {
+        float sh = Scaled(stripHeight);
+        float y  = area.yMax - sh - Scaled(2f); // 2px margin above bottom edge
+        float totalW = area.width - Scaled(4f); // 2px margin each side
+        float x  = area.x + Scaled(2f);
+
+        // Fade: last 40% of the strip length fades to transparent.
+        float fadeStart = 0.60f;
+
+        float xOff = 0f;
+        foreach (var (color, ratio) in StripBands)
+        {
+            float bandW = totalW * ratio;
+            // How far into the total strip is this band's midpoint?
+            float midNorm = (xOff + bandW * 0.5f) / totalW;
+            float alpha = midNorm < fadeStart ? 1f
+                        : 1f - (midNorm - fadeStart) / (1f - fadeStart);
+            alpha = Mathf.Clamp01(alpha) * 0.85f; // slightly translucent overall
+
+            UnityEngine.GUI.color = new Color(color.r, color.g, color.b, alpha);
+            UnityEngine.GUI.DrawTexture(new Rect(x + xOff, y, bandW, sh), Texture2D.whiteTexture);
+            xOff += bandW;
+        }
+        UnityEngine.GUI.color = Color.white;
+    }
 
     /// <summary>Create a 1×1 solid-colour Texture2D. Style caches should hold the ref.</summary>
     public static Texture2D MakeTex(Color c)

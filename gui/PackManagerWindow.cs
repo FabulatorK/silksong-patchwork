@@ -39,12 +39,15 @@ public static class PackManagerWindow
     private static string  _pdSearch    = "";
     private static Vector2 _pdScrollPos = Vector2.zero;
 
+    // ── Cassette strip ─────────────────────────────────────────────────
+    private const float StripW = 14f; // scaled cassette-label strip width
+
     // ── Condition-editor layout constants ─────────────────────────────
     // Conditions sit 2 indent columns to the right.
     // OR buttons live in column 1 (outer), AND buttons in column 2 (inner).
     private const  float kOrColW         = 38f;
     private const  float kAndColW        = 38f;
-    private static readonly Color kJoinHl = new Color(0.45f, 0.85f, 1f); // highlighted join button
+    private static readonly Color kJoinHl = GUIHelper.ColAccent; // interactive highlight
 
     // 1×1 texture used to draw the AND-group bracket line.
     private static GUIStyle _bracketStyle;
@@ -54,7 +57,7 @@ public static class PackManagerWindow
         {
             if (_bracketStyle != null) return _bracketStyle;
             var tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, new Color(0.5f, 0.72f, 0.9f, 0.85f));
+            tex.SetPixel(0, 0, new Color(GUIHelper.ColPop2.r, GUIHelper.ColPop2.g, GUIHelper.ColPop2.b, 0.85f));
             tex.Apply();
             _bracketStyle = new GUIStyle(GUIStyle.none);
             _bracketStyle.normal.background = tex;
@@ -97,8 +100,17 @@ public static class PackManagerWindow
 
     private static void DrawWindow(int _)
     {
+        // Cassette-label strip along the left edge (drawn behind content).
+        GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
+
         // The list we're rendering — staged changes if pending, live list otherwise.
         var list = _staged ?? PackManager.AllPacks.ToList();
+
+        // Indent content past the strip.
+        float indent = GUIHelper.Scaled(StripW + 6f);
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(indent);
+        GUILayout.BeginVertical();
 
         GUIHelper.Space(16);
         DrawToolbar(list);
@@ -110,6 +122,9 @@ public static class PackManagerWindow
         DrawProfilesSection();
         GUIHelper.Space(4);
         DrawConflictsSection();
+
+        GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
     }
@@ -130,20 +145,26 @@ public static class PackManagerWindow
             if (GUILayout.Button("Discard", GUIHelper.ButtonStyle, GUIHelper.Width(72)))
                 _staged = null;
 
+            // Apply — teal-green confirm colour
+            Color prevApply = UnityEngine.GUI.backgroundColor;
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.45f,
+                GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f);
             if (GUILayout.Button("Apply", GUIHelper.ButtonStyle, GUIHelper.Width(66)))
             {
                 PackManager.Apply(_staged);
                 _staged = null;
             }
+            UnityEngine.GUI.backgroundColor = prevApply;
             UnityEngine.GUI.enabled = true;
 
             GUIHelper.Space(6);
             DrawPinButton();
             GUIHelper.Space(4);
 
-            // Close button — consistent with DevHub
+            // Close button — magenta-red danger
             Color prevClose = UnityEngine.GUI.backgroundColor;
-            UnityEngine.GUI.backgroundColor = new Color(0.45f, 0.18f, 0.18f);
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColDanger.r * 0.55f,
+                GUIHelper.ColDanger.g * 0.55f, GUIHelper.ColDanger.b * 0.55f);
             if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(26), GUIHelper.Height(22)))
                 Plugin.ShowPackManager = false;
             UnityEngine.GUI.backgroundColor = prevClose;
@@ -157,8 +178,9 @@ public static class PackManagerWindow
 
         if (PackRamCache.IsPinned)
         {
-            // Pinned — green button shows size, click to unpin
-            UnityEngine.GUI.backgroundColor = new Color(0.15f, 0.55f, 0.15f);
+            // Pinned — teal confirm, click to unpin
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.45f,
+                GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f);
             string label = $"Unpin ({PackRamCache.PinnedSizeLabel})";
             if (GUILayout.Button(label, GUIHelper.ButtonStyle, GUIHelper.Height(22)))
                 PackRamCache.Unpin();
@@ -166,8 +188,9 @@ public static class PackManagerWindow
         else
         {
             // Unpinned — amber experimental button
-            UnityEngine.GUI.backgroundColor = new Color(0.6f, 0.45f, 0.0f);
-            UnityEngine.GUI.contentColor    = new Color(1f, 0.9f, 0.5f);
+            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColWarn.r * 0.6f,
+                GUIHelper.ColWarn.g * 0.6f, GUIHelper.ColWarn.b * 0.6f);
+            UnityEngine.GUI.contentColor    = GUIHelper.ColWarn;
             if (GUILayout.Button("⚠ Pin to RAM", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
                 PackRamCache.Pin(PackManager.ActivePackPaths);
             UnityEngine.GUI.contentColor = Color.white;
@@ -208,12 +231,12 @@ public static class PackManagerWindow
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
             {
-                // Enable / disable toggle — ColSuccess bg when on, muted when off
+                // Enable / disable toggle — teal confirm when on, muted when off
                 Color prevBg = UnityEngine.GUI.backgroundColor;
                 UnityEngine.GUI.backgroundColor = pack.IsEnabled
-                    ? new Color(0.15f, 0.50f, 0.22f)
-                    : new Color(0.20f, 0.20f, 0.25f);
-                UnityEngine.GUI.contentColor = pack.IsEnabled ? GUIHelper.ColSuccess : GUIHelper.ColMuted;
+                    ? new Color(GUIHelper.ColConfirm.r * 0.45f, GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f)
+                    : GUIHelper.ColSurface1;
+                UnityEngine.GUI.contentColor = pack.IsEnabled ? GUIHelper.ColConfirm : GUIHelper.ColMuted;
                 bool clicked = GUILayout.Button(
                     pack.IsEnabled ? "ON" : "OFF",
                     GUIHelper.TagStyle, GUIHelper.Width(40));
@@ -253,7 +276,8 @@ public static class PackManagerWindow
                     Color prevCondBg = UnityEngine.GUI.backgroundColor;
                     if (condOpen || livePack.HasConditions)
                     {
-                        UnityEngine.GUI.backgroundColor = new Color(0.18f, 0.30f, 0.50f);
+                        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColAccent.r * 0.30f,
+                            GUIHelper.ColAccent.g * 0.30f, GUIHelper.ColAccent.b * 0.30f);
                         UnityEngine.GUI.contentColor    = GUIHelper.ColAccent;
                     }
                     string condLabel = livePack.HasConditions
@@ -360,17 +384,18 @@ public static class PackManagerWindow
         // HUD overlay toggle
         Color prev = UnityEngine.GUI.backgroundColor;
         UnityEngine.GUI.backgroundColor = Plugin.ShowStatusOverlay
-            ? new Color(0.2f, 0.6f, 0.2f)
-            : new Color(0.35f, 0.35f, 0.35f);
+            ? new Color(GUIHelper.ColConfirm.r * 0.45f, GUIHelper.ColConfirm.g * 0.45f, GUIHelper.ColConfirm.b * 0.45f)
+            : GUIHelper.ColBorder;
         if (GUILayout.Button("HUD", GUIHelper.ButtonStyle, GUIHelper.Height(22), GUIHelper.Width(40)))
             Plugin.ShowStatusOverlay = !Plugin.ShowStatusOverlay;
         UnityEngine.GUI.backgroundColor = prev;
 
         GUIHelper.Space(4);
 
-        // Dev Tools button — opens the Dev Hub for creators
+        // Dev Tools button — specular blue pop (reserved accent)
         prev = UnityEngine.GUI.backgroundColor;
-        UnityEngine.GUI.backgroundColor = new Color(0.25f, 0.45f, 0.8f);
+        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColPop2.r * 0.50f,
+            GUIHelper.ColPop2.g * 0.50f, GUIHelper.ColPop2.b * 0.50f);
         if (GUILayout.Button("Dev Tools \u2192", GUIHelper.ButtonStyle, GUIHelper.Height(22)))
             DevHub.OpenAt(DevHub.TabGraphics);
         UnityEngine.GUI.backgroundColor = prev;
@@ -471,7 +496,7 @@ public static class PackManagerWindow
             if (newVal != cond.Value) { cond.Value = newVal; PackManager.SaveConditions(); }
         }
 
-        UnityEngine.GUI.contentColor = new Color(1f, 0.45f, 0.45f);
+        UnityEngine.GUI.contentColor = GUIHelper.ColDanger;
         if (GUILayout.Button("×", GUIHelper.ButtonStyle, GUIHelper.Width(22)))
             removeAt = ci;
         UnityEngine.GUI.contentColor = Color.white;
@@ -574,7 +599,7 @@ public static class PackManagerWindow
             {
                 if (count++ >= 60) break;
                 GUILayout.BeginHorizontal();
-                UnityEngine.GUI.contentColor = new Color(0.65f, 0.85f, 1f);
+                UnityEngine.GUI.contentColor = GUIHelper.ColPop2;
                 GUILayout.Label($"[{entry.TypeLabel}]", GUIHelper.LabelStyle, GUIHelper.Width(44));
                 UnityEngine.GUI.contentColor = Color.white;
                 if (GUILayout.Button(entry.Name, GUIHelper.ButtonStyle))
@@ -608,13 +633,13 @@ public static class PackManagerWindow
                 GUILayout.Label("Reload:", GUIHelper.LabelStyle, GUIHelper.Width(50));
 
                 bool sceneActive = pack.ReloadTrigger == ReloadTrigger.OnSceneTransition;
-                if (sceneActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (sceneActive) UnityEngine.GUI.contentColor = GUIHelper.ColAccent;
                 if (GUILayout.Button("on scene", GUIHelper.ButtonStyle, GUIHelper.Width(72)))
                 { pack.ReloadTrigger = ReloadTrigger.OnSceneTransition; PackManager.SaveConditions(); }
                 UnityEngine.GUI.contentColor = Color.white;
 
                 bool hotActive = pack.ReloadTrigger == ReloadTrigger.HotReload;
-                if (hotActive) UnityEngine.GUI.contentColor = new Color(0.45f, 0.85f, 1f);
+                if (hotActive) UnityEngine.GUI.contentColor = GUIHelper.ColAccent;
                 if (GUILayout.Button("hot reload", GUIHelper.ButtonStyle, GUIHelper.Width(80)))
                 { pack.ReloadTrigger = ReloadTrigger.HotReload; PackManager.SaveConditions(); }
                 UnityEngine.GUI.contentColor = Color.white;
@@ -668,7 +693,7 @@ public static class PackManagerWindow
                     GUILayout.BeginHorizontal();
                     {
                         var prevBg = UnityEngine.GUI.backgroundColor;
-                        UnityEngine.GUI.backgroundColor = new Color(0.45f, 0.7f, 0.9f, 0.85f);
+                        UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColPop2.r, GUIHelper.ColPop2.g, GUIHelper.ColPop2.b, 0.85f);
                         GUILayout.Box("", BracketStyle,
                             GUILayout.Width(4), GUILayout.ExpandHeight(true));
                         UnityEngine.GUI.backgroundColor = prevBg;
@@ -728,7 +753,7 @@ public static class PackManagerWindow
             // ── Add condition row ──────────────────────────────────
             GUILayout.BeginHorizontal();
             GUILayout.Space(kCondIndent);
-            UnityEngine.GUI.contentColor = new Color(0.45f, 1f, 0.55f, 0.85f);
+            UnityEngine.GUI.contentColor = new Color(GUIHelper.ColPop1.r, GUIHelper.ColPop1.g, GUIHelper.ColPop1.b, 0.85f);
             if (GUILayout.Button("+ Add A New Condition", GUIHelper.ButtonStyle))
             { pack.Conditions.Add(new PackCondition()); PackManager.SaveConditions(); }
             UnityEngine.GUI.contentColor = Color.white;

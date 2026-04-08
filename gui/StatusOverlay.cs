@@ -19,7 +19,7 @@ public static class StatusOverlay
     private const float BadgeH       = 28f;
     private const float BottomMargin = 10f;
     private const float LeftMargin   = 10f;
-    private const float AccentW      = 3f;
+    private const float StripH       = 2f;  // horizontal cassette strip height
 
     private static GUIStyle _labelStyle;
     private static int      _lastFontSize;
@@ -34,7 +34,7 @@ public static class StatusOverlay
         int clips       = AudioHandler.CachedClipCount;
 
         // Rich-text label: each segment carries its design-token colour.
-        string packPart = $"<color=#59E680>\u25A0 {activePacks} pack{(activePacks != 1 ? "s" : "")}</color>";
+        string packPart = $"<color=#33AA88>\u25A0 {activePacks} pack{(activePacks != 1 ? "s" : "")}</color>";
         string statPart = $"<color=#8C8CA6>{sprites} sprites  |  {clips} clips</color>";
         string text = conflicts > 0
             ? $"{packPart}  <color=#FFBF33>\u26A0 {conflicts} conflict{(conflicts != 1 ? "s" : "")}</color>  {statPart}"
@@ -45,22 +45,21 @@ public static class StatusOverlay
         float h       = GUIHelper.Scaled(BadgeH);
         float x       = GUIHelper.Scaled(LeftMargin);
         float y       = Screen.height - h - GUIHelper.Scaled(BottomMargin);
-        float accentPx = GUIHelper.Scaled(AccentW);
 
         Rect bgRect = new Rect(x, y, w, h);
 
         // Dark panel background
-        UnityEngine.GUI.color = new Color(0.10f, 0.10f, 0.13f, 0.88f);
+        UnityEngine.GUI.color = new Color(GUIHelper.ColSurface.r, GUIHelper.ColSurface.g,
+            GUIHelper.ColSurface.b, 0.88f);
         UnityEngine.GUI.DrawTexture(bgRect, Texture2D.whiteTexture);
 
-        // Left accent stripe
-        UnityEngine.GUI.color = GUIHelper.ColAccent;
-        UnityEngine.GUI.DrawTexture(new Rect(x, y, accentPx, h), Texture2D.whiteTexture);
+        // Horizontal cassette strip along the bottom edge, fading to transparent
+        GUIHelper.DrawCassetteStripHorizontal(bgRect, StripH);
 
         UnityEngine.GUI.color = Color.white;
 
         // Rich-text label (colours embedded in markup)
-        Rect labelRect = new Rect(x + accentPx + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV), w, h);
+        Rect labelRect = new Rect(x + GUIHelper.Scaled(PaddingH), y + GUIHelper.Scaled(PaddingV), w, h);
         UnityEngine.GUI.Label(labelRect, text, _labelStyle);
 
         // Invisible button over the whole badge — click opens Pack Manager
