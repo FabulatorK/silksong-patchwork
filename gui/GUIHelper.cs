@@ -135,12 +135,7 @@ public static class GUIHelper
                 _borderlessStyle = new GUIStyle(GUIStyle.none)
                 {
                     fontSize = fontSize,
-                    padding  = new RectOffset(
-                        ScaledInt(4),
-                        ScaledInt(10),
-                        ScaledInt(8),
-                        ScaledInt(8)
-                    ),
+                    padding  = new RectOffset(0, 0, 0, 0),
                 };
                 var bg = MakeTex(ColSurface);
                 _borderlessStyle.normal.background    = bg;
@@ -387,11 +382,10 @@ public static class GUIHelper
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
-        float padL = ScaledInt(4);   // must match BorderlessWindowStyle left padding
-        float padT = ScaledInt(8);   // must match BorderlessWindowStyle top padding
-        float x  = -padL;           // punch through padding to true window edge
-        float y  = -padT;           // flush with true top
-        float h  = windowRect.height;  // full window height
+        // Zero-padded borderless window: (0,0) IS the true window origin.
+        float x  = 0f;
+        float y  = 0f;
+        float h  = windowRect.height;
 
         int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);

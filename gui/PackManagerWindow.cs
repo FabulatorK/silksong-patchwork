@@ -132,9 +132,16 @@ public static class PackManagerWindow
     private static void DrawWindow(int _)
     {
         // Cassette strip: drawn at negative x to punch through window padding
-        // and sit flush with the true window edge. BorderlessWindowStyle has
-        // left padding = ScaledInt(4), so we offset by that amount.
+        // Strip at (0,0) — flush with true window edge (zero-padded style).
         GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
+
+        // All content indented past the strip + right margin.
+        float indent = GUIHelper.Scaled(StripW + 8f);
+        float rMargin = GUIHelper.Scaled(10f);
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(indent);
+        GUILayout.BeginVertical();
+        GUILayout.Space(GUIHelper.Scaled(8f));  // top margin
 
         // Custom title bar
         GUILayout.BeginHorizontal();
@@ -142,12 +149,6 @@ public static class PackManagerWindow
         GUILayout.EndHorizontal();
 
         var list = _staged ?? PackManager.AllPacks.ToList();
-
-        // Indent content past the strip.
-        float indent = GUIHelper.Scaled(StripW + 10f);
-        GUILayout.BeginHorizontal();
-        GUILayout.Space(indent);
-        GUILayout.BeginVertical();
 
         GUIHelper.Space(4);
         DrawToolbar();
@@ -161,8 +162,10 @@ public static class PackManagerWindow
         DrawActionBar(list);
         GUIHelper.Space(6);
         DrawFooter();
+        GUIHelper.Space(8);  // bottom margin
 
         GUILayout.EndVertical();
+        GUILayout.Space(rMargin);  // right margin
         GUILayout.EndHorizontal();
 
         UnityEngine.GUI.DragWindow(GUIHelper.DragRect);
