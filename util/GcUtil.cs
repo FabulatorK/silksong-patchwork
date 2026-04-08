@@ -67,7 +67,7 @@ public static class GcUtil
 
     /// <summary>
     /// Adjusts TC's HeapUsageThreshold to account for Patchwork's own managed-heap allocations:
-    /// vanilla PNG copies (_originalTextureData) and pinned pack bytes (PackRamCache).
+    /// vanilla PNG copies (_originalTextureData).
     /// TC's vanilla threshold was calibrated for the base game only — without this bump, a full
     /// skin pack can push used-heap above TC's threshold and trigger constant stutter collections.
     ///
@@ -78,7 +78,7 @@ public static class GcUtil
     {
         if (_piThresholdSetter == null) return;
 
-        long extraBytes = T2DLoader.OriginalTextureDataBytes + PackRamCache.PinnedBytes;
+        long extraBytes = T2DLoader.OriginalTextureDataBytes;
         double extraMB  = extraBytes / (1024.0 * 1024.0);
 
         double delta = extraMB - _lastBumpMB;

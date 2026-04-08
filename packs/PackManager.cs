@@ -242,7 +242,6 @@ public static class PackManager
         SaveConfig();
         SaveConditions();
         Util.ConflictTracker.Clear();
-        Util.PackRamCache.Unpin(); // pack set changed — pinned bytes are stale
         TriggerFullReload();
         // Re-scan all packs (including any newly added) and persist stats.
         ScanAllStats();

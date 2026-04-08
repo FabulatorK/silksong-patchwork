@@ -23,10 +23,6 @@ public static class FileCache
     /// </summary>
     public static byte[] ReadBytes(string path)
     {
-        // Pack files pinned to RAM skip the timestamp check entirely.
-        if (PackRamCache.TryGet(path, out var pinned))
-            return pinned;
-
         try
         {
             DateTime modTime = File.GetLastWriteTimeUtc(path);

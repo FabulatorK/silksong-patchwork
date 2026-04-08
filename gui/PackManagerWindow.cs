@@ -128,8 +128,6 @@ public static class PackManagerWindow
         DrawConflictsSection();
         GUIHelper.Space(6);
         DrawActionBar(list);
-        GUIHelper.Space(4);
-        DrawPinRow();
         GUIHelper.Space(6);
         DrawFooter();
 
@@ -356,42 +354,6 @@ public static class PackManagerWindow
         }
 
         GUIHelper.Space(2);
-    }
-
-    // ── Pin to RAM — own row, visually demoted ──────────────────────
-
-    private static void DrawPinRow()
-    {
-        Color prev = UnityEngine.GUI.backgroundColor;
-        UnityEngine.GUI.contentColor = GUIHelper.ColMuted;
-
-        GUILayout.BeginHorizontal();
-        GUILayout.FlexibleSpace();
-
-        if (PackRamCache.IsPinned)
-        {
-            UnityEngine.GUI.backgroundColor = new Color(GUIHelper.ColConfirm.r * 0.30f,
-                GUIHelper.ColConfirm.g * 0.30f, GUIHelper.ColConfirm.b * 0.30f);
-            UnityEngine.GUI.contentColor = GUIHelper.ColConfirm;
-            if (GUILayout.Button($"Unpin RAM ({PackRamCache.PinnedSizeLabel})",
-                    GUIHelper.ButtonStyle, GUIHelper.Height(20), GUIHelper.Width(180)))
-                PackRamCache.Unpin();
-        }
-        else
-        {
-            UnityEngine.GUI.backgroundColor = GUIHelper.ColSurface1;
-            string costLabel = PackRamCache.PinnedBytes > 0
-                ? $"Pin to RAM ({PackRamCache.PinnedSizeLabel})"
-                : "Pin to RAM";
-            if (GUILayout.Button(costLabel, GUIHelper.ButtonStyle, GUIHelper.Height(20), GUIHelper.Width(180)))
-                PackRamCache.Pin(PackManager.ActivePackPaths);
-        }
-
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-
-        UnityEngine.GUI.backgroundColor = prev;
-        UnityEngine.GUI.contentColor    = Color.white;
     }
 
     // ── Action bar: status + Discard / Apply ────────────────────────

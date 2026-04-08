@@ -65,7 +65,7 @@ internal static class ReloadCoordinator
         }
 
         // Re-calibrate TC's heap threshold whenever Patchwork's managed-heap caches change
-        // (originalTextureData after T2D reload, PackRamCache after pin/unpin).
+        // (originalTextureData after T2D reload).
         // BumpThresholdForPatchwork is idempotent — no-op when delta < 1 MB.
         GcUtil.BumpThresholdForPatchwork();
     }
