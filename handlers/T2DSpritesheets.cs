@@ -20,6 +20,12 @@ public static partial class T2DLoader
     private static readonly HashSet<int> ReplacedTextureIds = new();
     private static readonly HashSet<int> SkippedTextureIds = new();
 
+    // Texture names that have been successfully restored to vanilla via TryRestoreTexture.
+    // PruneStaleOriginals uses this to safely evict entries — if a texture was restored,
+    // its _originalTextureData entry is no longer needed.
+    private static readonly HashSet<string> _restoredNames =
+        new(System.StringComparer.OrdinalIgnoreCase);
+
     // Original pixel data (PNG bytes) captured before the first in-place overwrite.
     // Keyed by tex.name (runtime texture name).  Never cleared — used to restore vanilla
     // pixels when a pack is disabled.
@@ -94,6 +100,7 @@ public static partial class T2DLoader
         if (tex.LoadImage(data.PngData))
         {
             ReplacedTextureIds.Add(id);
+            _restoredNames.Remove(tex.name); // no longer restored — has replacement pixels
             Plugin.Logger.LogInfo(
                 $"[T2D] Spritesheet applied in-place: '{cleanName}' " +
                 $"(texture '{tex.name}', {tex.width}x{tex.height})");
@@ -279,12 +286,16 @@ public static partial class T2DLoader
         if (tex == null) return false;
         if (!_originalTextureData.TryGetValue(tex.name, out var png))
         {
+            // Silent miss — texture may never have been replaced, or backup was lost.
+            // Log at debug level so it's visible in verbose logs without spamming.
+            Plugin.Logger.LogDebug($"[T2D] No stored original for '{tex.name}' — skipping restore");
             return false;
         }
 
         if (tex.LoadImage(png))
         {
             Plugin.Logger.LogInfo($"[T2D] Restored vanilla pixels for '{tex.name}'");
+            _restoredNames.Add(tex.name);
             // Do NOT remove the entry: during scene transitions Unity can have two instances
             // of the same atlas name in memory simultaneously. Removing after the first
             // restore leaves the second instance unrestorable. The stored PNG is the true
@@ -313,16 +324,22 @@ public static partial class T2DLoader
         foreach (var key in new List<string>(_originalTextureData.Keys))
         {
             if (liveNames.Contains(key)) continue; // texture still alive, keep
-            // Even if the texture is gone, keep its original-data entry when an active
-            // spritesheet override covers it. If we pruned it and the atlas is later reloaded
-            // (e.g. Inventory scene reopened) with replacement pixels still in-memory, TrySwapTexture
-            // would recapture replacement pixels as "original" → permanent cascade failure.
-            // When the pack is disabled SpritesheetOverrides is empty, so stale entries are
-            // pruned normally and no memory leak occurs.
+
+            // Keep the entry if an active spritesheet override covers it — the texture
+            // will be reloaded later and we'll need the vanilla backup for revert.
             string cleanKey = T2DUtil.CleanTextureName(key);
             if (SpritesheetOverrides.ContainsKey(key) || SpritesheetOverrides.ContainsKey(cleanKey))
                 continue;
+
+            // No active override. Only safe to prune if we've confirmed the texture was
+            // successfully restored to vanilla. If it hasn't been restored (e.g. it was in
+            // an unloaded scene during the revert sweep), keep the backup — the texture may
+            // reload later and still need restoration.
+            if (!_restoredNames.Contains(key))
+                continue;
+
             _originalTextureData.Remove(key);
+            _restoredNames.Remove(key);
         }
 
         int pruned = before - _originalTextureData.Count;

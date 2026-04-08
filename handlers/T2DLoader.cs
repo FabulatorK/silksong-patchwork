@@ -776,6 +776,7 @@ public static partial class T2DLoader
         _t2dProviders.Clear();
         ReplacedTextureIds.Clear();
         SkippedTextureIds.Clear();
+        _restoredNames.Clear();
         T2DUtil.ClearCleanNameCache();
 
         // Clearing SkippedTextureIds removed protection from old sprite-sized textures that are
@@ -808,8 +809,9 @@ public static partial class T2DLoader
                 if (!TrySwapTexture(tex) && !preSkipped)
                     TryRestoreTexture(tex);
             }
-            if (SpritesheetOverrides.Count == 0)
-                _originalTextureData.Clear();
+            // DO NOT clear _originalTextureData here. Textures from unloaded scenes
+            // are not in memory during this sweep — clearing now loses their vanilla
+            // backup permanently. PruneStaleOriginals handles cleanup on scene unload.
         }
 
         foreach (var sr in Resources.FindObjectsOfTypeAll<SpriteRenderer>())
