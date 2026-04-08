@@ -88,8 +88,8 @@ public static class PackManagerWindow
             69761,
             _windowRect,
             DrawWindow,
-            "Patchwork — Resource Packs",
-            GUIHelper.WindowStyle,
+            "",   // no built-in title — we draw our own
+            GUIHelper.BorderlessWindowStyle,
             GUIHelper.WindowLayout(WindowWidth, WindowHeight)
         );
     }
@@ -105,20 +105,49 @@ public static class PackManagerWindow
     // Secondary info indent — past the toggle square + gap.
     private const float InfoIndent   = 30f;
 
+    // ── Title style (drawn manually in borderless window) ──────────
+    private static GUIStyle _titleStyle;
+    private static int      _cachedTitleFontSize;
+
+    private static GUIStyle TitleStyle
+    {
+        get
+        {
+            int fs = GUIHelper.FontSize(14);
+            if (_titleStyle == null || _cachedTitleFontSize != fs)
+            {
+                _cachedTitleFontSize = fs;
+                _titleStyle = new GUIStyle(UnityEngine.GUI.skin.label)
+                {
+                    fontSize  = fs,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                };
+                _titleStyle.normal.textColor = GUIHelper.ColBone;
+            }
+            return _titleStyle;
+        }
+    }
+
     private static void DrawWindow(int _)
     {
-        // Cassette-label strip along the left edge (drawn behind content).
+        // Cassette-label strip flush with the left window edge.
         GUIHelper.DrawCassetteStripVertical(_windowRect, StripW);
+
+        // Custom title bar
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Patchwork — Resource Packs", TitleStyle);
+        GUILayout.EndHorizontal();
 
         var list = _staged ?? PackManager.AllPacks.ToList();
 
         // Indent content past the strip.
-        float indent = GUIHelper.Scaled(StripW + 12f);
+        float indent = GUIHelper.Scaled(StripW + 10f);
         GUILayout.BeginHorizontal();
         GUILayout.Space(indent);
         GUILayout.BeginVertical();
 
-        GUIHelper.Space(16);
+        GUIHelper.Space(4);
         DrawToolbar();
         GUIHelper.Space(6);
         DrawPackList(list);
@@ -191,7 +220,9 @@ public static class PackManagerWindow
 
         bool hasConds = livePack != null && livePack.HasConditions;
 
-        GUILayout.BeginVertical(GUIHelper.CardStyle);
+        // Active packs get a card container; inactive packs are transparent.
+        GUIStyle rowStyle = pack.IsEnabled ? GUIHelper.CardStyle : GUIHelper.CardStyleTransparent;
+        GUILayout.BeginVertical(rowStyle);
         {
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
@@ -340,12 +371,13 @@ public static class PackManagerWindow
         }
         GUILayout.EndVertical();
 
-        // ── Card border overlay ──────────────────────────────────
+        // ── Card fill + border overlay ───────────────────────────
         // Drawn after EndVertical so GetLastRect returns the full card rect.
         Rect cardRect = GUILayoutUtility.GetLastRect();
         if (pack.IsEnabled)
         {
             Color borderCol = hasConds ? GUIHelper.ColAccent : GUIHelper.ColConfirm;
+            GUIHelper.DrawActiveCardFill(cardRect, borderCol);
             GUIHelper.DrawBorder(cardRect, new Color(borderCol.r, borderCol.g, borderCol.b, 0.6f), 1f);
         }
         else if (hasConds)

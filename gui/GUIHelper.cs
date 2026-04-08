@@ -116,6 +116,45 @@ public static class GUIHelper
         }
     }
 
+    // ── Borderless window style ──────────────────────────────────────────────
+    private static GUIStyle _borderlessStyle;
+    private static int      _cachedBorderlessFontSize;
+
+    /// <summary>
+    /// Flat dark-surface window with no Unity chrome. Caller draws their own
+    /// title, drag rect, and decorations. Used for Pack Manager.
+    /// </summary>
+    public static GUIStyle BorderlessWindowStyle
+    {
+        get
+        {
+            int fontSize = FontSize(14);
+            if (_borderlessStyle == null || _cachedBorderlessFontSize != fontSize)
+            {
+                _cachedBorderlessFontSize = fontSize;
+                _borderlessStyle = new GUIStyle(GUIStyle.none)
+                {
+                    fontSize = fontSize,
+                    padding  = new RectOffset(
+                        ScaledInt(4),
+                        ScaledInt(10),
+                        ScaledInt(8),
+                        ScaledInt(8)
+                    ),
+                };
+                var bg = MakeTex(ColSurface);
+                _borderlessStyle.normal.background    = bg;
+                _borderlessStyle.onNormal.background   = bg;
+                _borderlessStyle.focused.background     = bg;
+                _borderlessStyle.onFocused.background   = bg;
+                _borderlessStyle.active.background      = bg;
+                _borderlessStyle.onActive.background    = bg;
+                _borderlessStyle.normal.textColor       = Color.white;
+            }
+            return _borderlessStyle;
+        }
+    }
+
     public static GUIStyle TextFieldStyle
     {
         get
@@ -343,9 +382,9 @@ public static class GUIHelper
     public static void DrawCassetteStripVertical(Rect windowRect, float stripWidth)
     {
         float sw = Scaled(stripWidth);
-        float x  = Scaled(6f);
-        float y  = Scaled(20f);
-        float h  = windowRect.height - Scaled(28f);
+        float x  = 0f;             // flush with window edge
+        float y  = Scaled(4f);     // small top margin
+        float h  = windowRect.height - Scaled(8f);  // small top+bottom margin
 
         int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
@@ -420,7 +459,8 @@ public static class GUIHelper
     private static GUIStyle _cardStyle;
     private static int      _cachedCardPad;
 
-    /// <summary>Flat-colour container background for list cards (pack rows).</summary>
+    /// <summary>Flat-colour container background for list cards (pack rows).
+    /// Use <see cref="CardStyleTransparent"/> for inactive packs.</summary>
     public static GUIStyle CardStyle
     {
         get
@@ -437,6 +477,46 @@ public static class GUIHelper
             }
             return _cardStyle;
         }
+    }
+
+    private static GUIStyle _cardStyleTransparent;
+    private static int      _cachedCardTransPad;
+
+    /// <summary>Same padding as <see cref="CardStyle"/> but no background fill.
+    /// Used for inactive/disabled pack rows.</summary>
+    public static GUIStyle CardStyleTransparent
+    {
+        get
+        {
+            int p = ScaledInt(6);
+            if (_cardStyleTransparent == null || _cachedCardTransPad != p)
+            {
+                _cachedCardTransPad = p;
+                _cardStyleTransparent = new GUIStyle(GUIStyle.none)
+                {
+                    padding = new RectOffset(p, p, ScaledInt(4), ScaledInt(4)),
+                };
+            }
+            return _cardStyleTransparent;
+        }
+    }
+
+    /// <summary>
+    /// Draw a dim colour-matched fill behind an active pack card.
+    /// Call after <c>GUILayout.EndVertical()</c> using <c>GetLastRect()</c>.
+    /// The fill is the border colour at very low brightness, slightly higher saturation.
+    /// </summary>
+    public static void DrawActiveCardFill(Rect rect, Color borderColor)
+    {
+        // Dim: multiply RGB down to ~15% brightness, keep a hint of colour
+        Color fill = new Color(
+            borderColor.r * 0.15f + ColSurface.r * 0.5f,
+            borderColor.g * 0.15f + ColSurface.g * 0.5f,
+            borderColor.b * 0.15f + ColSurface.b * 0.5f,
+            0.6f);
+        UnityEngine.GUI.color = fill;
+        UnityEngine.GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        UnityEngine.GUI.color = Color.white;
     }
 
     private static GUIStyle _chipStyle;
