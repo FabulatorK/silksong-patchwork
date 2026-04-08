@@ -126,10 +126,10 @@ public static class PackManagerWindow
         DrawProfilesSection();
         GUIHelper.Space(4);
         DrawConflictsSection();
-        GUIHelper.Space(4);
-        DrawPinRow();
         GUIHelper.Space(6);
         DrawActionBar(list);
+        GUIHelper.Space(4);
+        DrawPinRow();
         GUIHelper.Space(6);
         DrawFooter();
 
