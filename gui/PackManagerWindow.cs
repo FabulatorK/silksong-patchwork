@@ -40,7 +40,7 @@ public static class PackManagerWindow
     private static Vector2 _pdScrollPos = Vector2.zero;
 
     // ── Cassette strip ─────────────────────────────────────────────────
-    private const float StripW = 8f;  // scaled cassette-label strip width
+    private const float StripW = 12f; // scaled cassette-label strip width
 
     // ── Condition-editor layout constants ─────────────────────────────
     // Conditions sit 2 indent columns to the right.

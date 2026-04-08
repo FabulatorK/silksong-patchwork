@@ -390,8 +390,8 @@ public static class GUIHelper
         float padL = ScaledInt(4);   // must match BorderlessWindowStyle left padding
         float padT = ScaledInt(8);   // must match BorderlessWindowStyle top padding
         float x  = -padL;           // punch through padding to true window edge
-        float y  = -padT + Scaled(4f);
-        float h  = windowRect.height - Scaled(8f);
+        float y  = -padT;           // flush with true top
+        float h  = windowRect.height;  // full window height
 
         int texW = Mathf.Max(Mathf.RoundToInt(sw), 2);
         int texH = Mathf.Max(Mathf.RoundToInt(h), 2);
