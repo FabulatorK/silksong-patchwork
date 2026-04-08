@@ -71,11 +71,39 @@ public static partial class T2DLoader
             return ReplacedTextureIds.Contains(id);
 
         string cleanName = T2DUtil.CleanTextureName(tex.name);
+
+        // Lookup priority:
+        // 1. Exact raw name match (e.g. file named exactly as tex.name)
+        // 2. Clean name match (e.g. file named "Hornet.png")
+        // 3. Fuzzy: any override whose clean name matches AND dimensions match.
+        //    Handles hash changes between game versions and disambiguates
+        //    multiple textures that share the same clean name (e.g. two Hornet
+        //    atlases at different resolutions).
         if (!SpritesheetOverrides.TryGetValue(tex.name, out var data)
             && !SpritesheetOverrides.TryGetValue(cleanName, out data))
         {
-            SkippedTextureIds.Add(id);
-            return false;
+            // Fuzzy fallback: scan all overrides for a clean-name + dimension match.
+            data = default;
+            foreach (var kvp in SpritesheetOverrides)
+            {
+                string overrideClean = T2DUtil.CleanTextureName(kvp.Key);
+                if (string.Equals(overrideClean, cleanName, System.StringComparison.OrdinalIgnoreCase)
+                    && kvp.Value.Width == tex.width && kvp.Value.Height == tex.height)
+                {
+                    data = kvp.Value;
+                    break;
+                }
+            }
+
+            if (data.PngData == null)
+            {
+                SkippedTextureIds.Add(id);
+                return false;
+            }
+
+            Plugin.Logger.LogInfo(
+                $"[T2D] Fuzzy match for '{tex.name}' → clean name '{cleanName}' " +
+                $"({tex.width}x{tex.height})");
         }
 
         if (tex.width != data.Width || tex.height != data.Height)
