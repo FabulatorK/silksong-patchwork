@@ -508,12 +508,13 @@ public static class GUIHelper
     /// </summary>
     public static void DrawActiveCardFill(Rect rect, Color borderColor)
     {
-        // Dim: multiply RGB down to ~15% brightness, keep a hint of colour
+        // Very subtle tint — just enough to distinguish from the window surface.
+        // Low alpha so text rendered on top stays fully readable.
         Color fill = new Color(
-            borderColor.r * 0.15f + ColSurface.r * 0.5f,
-            borderColor.g * 0.15f + ColSurface.g * 0.5f,
-            borderColor.b * 0.15f + ColSurface.b * 0.5f,
-            0.6f);
+            borderColor.r * 0.20f + ColSurface.r * 0.80f,
+            borderColor.g * 0.20f + ColSurface.g * 0.80f,
+            borderColor.b * 0.20f + ColSurface.b * 0.80f,
+            0.35f);
         UnityEngine.GUI.color = fill;
         UnityEngine.GUI.DrawTexture(rect, Texture2D.whiteTexture);
         UnityEngine.GUI.color = Color.white;

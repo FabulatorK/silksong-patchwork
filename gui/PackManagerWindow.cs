@@ -225,9 +225,8 @@ public static class PackManagerWindow
 
         bool hasConds = livePack != null && livePack.HasConditions;
 
-        // Active packs get a card container; inactive packs are transparent.
-        GUIStyle rowStyle = pack.IsEnabled ? GUIHelper.CardStyle : GUIHelper.CardStyleTransparent;
-        GUILayout.BeginVertical(rowStyle);
+        // All rows use transparent style — active fill is drawn manually via overlay.
+        GUILayout.BeginVertical(GUIHelper.CardStyleTransparent);
         {
             // ── Main row ─────────────────────────────────────────
             GUILayout.BeginHorizontal();
