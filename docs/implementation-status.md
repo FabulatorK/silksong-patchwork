@@ -112,6 +112,24 @@ item is implemented or a new plan is recorded.
 | `def.materialId` fix | `handlers/SpriteLoader.cs`, `handlers/SpriteDumper.cs` | Replaces `def.material == mat` reference equality with `def.materialId == matIndex` — prevents sprite-batch misses when Unity creates material instances |
 | `ResolveKey()` helper | `handlers/T2DLoader.cs` | Centralises `_spriteNameToKey` fallback used by `CheckSprite` and `TryGetReplacement`; fixes uninit sweep missing atlas-qualified keys |
 
+### GUI — visual identity and Pack Manager layout
+
+| Feature | Files | Notes |
+|---------|-------|-------|
+| Cassette-label colour palette | `gui/GUIHelper.cs` | 13 design tokens: `ColAccent` (orange), `ColConfirm` (teal-green), `ColDanger` (magenta-red), `ColBone` (mask off-white), `ColPop1`/`ColPop2` (specular green/blue). Strip colours (`StripRed`, `StripOrange`, `StripGreen`, `StripBlue`, `StripBone`) at 40/10/5/5/40 band ratios |
+| Vertical cassette strip | `gui/GUIHelper.cs`, `gui/PackManagerWindow.cs` | `DrawCassetteStripVertical()` — 14px strip on Pack Manager left edge; content indented past it |
+| Horizontal cassette strip | `gui/GUIHelper.cs`, `gui/StatusOverlay.cs` | `DrawCassetteStripHorizontal()` — 2px strip along StatusOverlay bottom edge with alpha fade over final 40% |
+| Card border system | `gui/GUIHelper.cs` | `DrawBorder()` — thin rect outline; used for pack row enabled/condition indicators |
+| Pack Manager layout overhaul | `gui/PackManagerWindow.cs` | Top bar: Rescan + ×. Pack rows: ✓ square toggle, ⚙ gear for conditions, full card border (teal=enabled, orange=has conditions). Action bar: status count + Discard/Apply at bottom. Footer: Status Overlay banner (70%) + Dev Tools ⚒ square |
+| StatusOverlay retune | `gui/StatusOverlay.cs` | Pack count colour → teal `#33AA88`; background from `ColSurface` token; horizontal cassette strip replaces old blue accent stripe |
+| UI visual design doc | `docs/ui-visual-design.md` | Living design document for visual direction and future UI work |
+
+### GUI — deprecated
+
+| Item | Notes |
+|------|-------|
+| `PackRamCache` (Pin to RAM) | Removed — duplicated bytes already held by `FileCache`. Saved only a `stat()` syscall per file. `util/PackRamCache.cs` deleted; all references removed from `FileCache`, `PackManager`, `GcUtil`, `ReloadCoordinator`, `PackManagerWindow` |
+
 ### GUI — tooltip + polish
 
 | Feature | Files | Notes |
@@ -143,6 +161,7 @@ item is implemented or a new plan is recorded.
 | Conflict handling (ZH) | `docs/conflict-handling-zh.md` | Complete |
 | Packed bundle format | `docs/packed-bundle-format.md` | **Plan only — not implemented** |
 | GUI/UX redesign | `docs/gui-ux-redesign.md` | **Implemented** — all 8 steps shipped |
+| UI visual design | `docs/ui-visual-design.md` | **Living document** — cassette palette, layout principles, future direction |
 | This file | `docs/implementation-status.md` | Living document |
 
 ---

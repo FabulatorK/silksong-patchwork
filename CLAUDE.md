@@ -81,7 +81,7 @@ packs/      PackManager.cs       discover, order, enable/disable, hot-reload
             PackStats.cs         per-pack asset file counts (cached)
 
 util/       TexUtil.cs / T2DUtil.cs / SpriteUtil.cs / ConflictTracker.cs
-            PlayerDataCatalog.cs / GcUtil.cs / FileCache.cs / PackRamCache.cs
+            PlayerDataCatalog.cs / GcUtil.cs / FileCache.cs
             RawKeyboardLeakBlocker.cs / IOUtil.cs / StringUtil.cs / IsExternalInit.cs
 
 watchers/   SpriteFileWatcher.cs / AudioFileWatcher.cs / TextFileWatcher.cs
@@ -273,15 +273,15 @@ for each material is logged when a same-named collection collision is first dete
 
 | Commit | Change |
 |---|---|
+| `0906807` | Remove PackRamCache — redundant with FileCache |
+| `4d4f033` | Move Pin to RAM below action bar to match commit-then-pin flow |
+| `eb1b5a5` | Pack Manager layout overhaul: action flow, visual hierarchy, card borders |
+| `6f5d988` | Cassette-label visual style: strip bands, warm palette, token migration |
+| `e62a703` | UI visual redesign: design tokens, chip/tag styles, accent badge |
 | `c1db6ac` | Profile conditions, GUI persistence (window pos + tab), video trigger log |
 | `cfbc722` | Cursor auto-show in `LateUpdate` when DevHub or PackManager is open |
 | `7ce9e8b` | Fix tooltip stuck on cursor; audio browser virtual scroll (FPS fix) |
 | `fdc1390` | Simplify pass: `GetGameObjectPath` dedup, `ResolveKey`, tooltip scale cache, edit-clip opens folder |
-| `c903c9f` | `_collectionsWithFiles` gate — skip atlas RT swap with no replacement files |
-| `ea4522e` | Instance-specific sprite/sheet paths via vanilla texture name discriminator |
-| `4047ab8` | tk2d same-name collection collision fix via composite instance key |
-| `3c5f1b3` | `def.materialId` replaces `def.material` reference equality in SpriteLoader + SpriteDumper |
-| `4591743` | Audio discovery: full `FindObjectsOfTypeAll` sweep + source context in log |
 
 ---
 

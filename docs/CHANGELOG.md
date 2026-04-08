@@ -1,5 +1,19 @@
 ### Unreleased
 
+#### UI visual identity
+* Cassette-label colour palette: 13 design tokens replacing the original 8-colour blue-accent set. Primary accent is now orange (#E87530), confirmations are teal-green (#33AA88), danger is magenta-red (#CC3366), with specular green/blue reserved for rare pops
+* Vertical cassette strip (14px, 5-band: 40% crimson / 10% orange / 5% green / 5% blue / 40% bone) drawn on Pack Manager left edge
+* Horizontal cassette strip (2px, alpha-fading) on StatusOverlay bottom edge
+* All hardcoded inline colours in Pack Manager and StatusOverlay migrated to design tokens
+
+#### Pack Manager layout
+* Top bar stripped to Rescan (left) + × close (right)
+* ON/OFF toggle replaced with prominent ✓ square button; enabled packs get a full teal card border
+* Packs with conditions get an orange card border; condition editor opened via ⚙ gear icon with separator divider
+* Action bar moved to bottom of window (browse → decide → commit flow): status count + "unsaved changes" notice on layer 1, Discard + Apply on layer 2
+* Footer: Status Overlay toggle takes ~70% width as primary banner; Dev Tools is a small ⚒ square
+* Removed Pin to RAM (`PackRamCache`) — redundant with `FileCache`; saved only a `stat()` syscall per file while duplicating all PNG bytes in memory
+
 #### Audio
 * Audio browser rewritten: `AudioHandler.GetClipInventory()` does a full `Resources.FindObjectsOfTypeAll<AudioClip>()` sweep so clips that never fire through the Harmony play path (ambient, music, pre-assigned) are discoverable without ever playing them
 * `AudioClipEntry` model carries length, channel count, frequency, `HasReplacement` flag, and a list of live `AudioSource` game-object paths
