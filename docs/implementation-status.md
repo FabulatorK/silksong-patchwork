@@ -6,6 +6,69 @@ item is implemented or a new plan is recorded.
 
 ---
 
+## State of the Mod (v2.5.0)
+
+**Patchwork** is a BepInEx 5 plugin for Hollow Knight: Silksong that replaces
+game assets at runtime — sprites, textures, audio, video, and text — without
+modifying original files. It ships a pack management system (discovery,
+ordering, enable/disable, conditional activation) and a full creator toolset.
+
+### What works
+
+| System | State | Key files |
+|--------|-------|-----------|
+| **tk2d sprite replacement** | Stable. Composites custom PNGs onto `RenderTexture` copies of vanilla atlases. Instance-key collision fix, `materialId`-based lookup, and `_collectionsWithFiles` gate all shipped. | `SpriteLoader.cs` |
+| **Texture2D replacement** | Stable. Two modes: spritesheet (in-place `LoadImage`) and individual (new `Sprite` on renderers). Deferred GPU upload, IHDR dimension read, vanilla backup/restore. | `T2DLoader.cs`, `T2DSpritesheets.cs`, `T2DHandler.cs` |
+| **Audio replacement** | Stable. Patches `PlayHelper`/`PlayOneShotHelper`. Loads via `UnityWebRequest` on first play. Full clip inventory sweep for the browser. | `AudioHandler.cs` |
+| **Video replacement** | Stable. Patches `EmbeddedCinematicVideoPlayer` + `CinematicPlayer.StartVideo`. File URL override. | `VideoHandler.cs` |
+| **Text/dialogue replacement** | Stable. YAML at `Text/[Sheet]/[LANG].yml`. Patches `Language.Get`. Load order: root first, then active packs by priority. | `DialogueHandler.cs` |
+| **Pack system** | Stable. Thunderstore + local discovery. Enable/disable, priority ordering, profiles with conditions, per-pack asset stats. State files beside the DLL. | `PackManager.cs`, `PackInfo.cs`, `PackCondition.cs`, `PackStats.cs` |
+| **Conditions** | Stable. DNF (OR-of-AND groups). Types: Scene, SceneContains, PackActive, CrestEquipped, NailUpgrade, PlayerData (reflection). Scene-transition or hot-reload trigger. | `PackCondition.cs`, `PlayerDataCatalog.cs` |
+| **Hot reload** | Stable. File watchers on background threads set boolean flags; `Plugin.Update` dispatches to handler `Reload()` on main thread. Text watcher rebuilds when active pack set changes. | `SpriteFileWatcher.cs`, `AudioFileWatcher.cs`, `TextFileWatcher.cs` |
+| **GUI — Pack Manager (IMGUI)** | Stable. Cassette-label visual identity, staged edits, condition editor with DNF brackets, profiles, conflicts, card borders. | `PackManagerWindow.cs` |
+| **GUI — Pack Manager (Canvas)** | Built, untested in-game. Full feature parity with IMGUI version. Flag-toggled via `UseCanvasPackManager` config. Retained-mode, FabricUI-based. | `CanvasPackManager.cs`, `FabricUI.cs` |
+| **GUI — Status Overlay** | Stable. Always-on bottom-left badge (packs, conflicts, sprite/clip counts). Click opens Pack Manager. Horizontal cassette strip. | `StatusOverlay.cs` |
+| **GUI — Dev Hub** | Stable. Tabbed shell with 6 pillars (Dashboard, Graphics, Audio, Text, Video, Performance). Alpha2-7 keybinds. | `DevHub.cs`, `pillars/` |
+| **GUI — Graphics pillar** | Stable. Sub-tabs: Animation (frame inspector + atlas preview) and T2D Textures (scene browser, edit/dump, live preview with UV highlight). | `GraphicsPillar.cs`, `AnimationController.cs`, `T2DTextureController.cs` |
+| **GUI — Audio pillar** | Stable. Two-pane: searchable clip browser with virtual scroll (left) + live play log with source paths (right). | `AudioPillar.cs`, `AudioLog.cs`, `AudioList.cs` |
+| **GUI — Text pillar** | Stable. Two-pane: accessed keys (left, clickable) + editor surface (right). Direct sheet/key/open row for untriggered keys. | `TextPillar.cs`, `TextLog.cs`, `DialogueEditor.cs` |
+| **GUI — Video pillar** | Stable. Replacement table + live cinematic trigger log. | `VideoPillar.cs` |
+| **GUI — Performance pillar** | Stable. FPS, frame timing, GC stats, reload actions. Absorbs DevProfiler. | `PerformancePillar.cs`, `DevProfiler.cs` |
+| **Performance** | Stable. Deferred GPU upload, file index O(1) lookups, `FileCache`, mono heap pre-warm, scene-transition GC, setter-call gating. | Various |
+| **FabricUI toolkit** | Shipped. General-purpose Canvas factory: panels, buttons, text, scroll views, input fields, layout groups, toggles, 9-slice rounded rects. | `FabricUI.cs` |
+
+### What's in progress
+
+| Item | State | Notes |
+|------|-------|-------|
+| **Canvas Pack Manager testing** | Untested | Built with full IMGUI parity; needs in-game validation before becoming the default |
+| **Canvas StatusOverlay** | Planned | Migrate badge to Canvas panel with `RawImage` cassette strip |
+| **Dev Hub visual polish** | Planned | Apply cassette strip; retune tab bar colours to design tokens |
+
+### What's planned but not started
+
+| Item | Design doc | Notes |
+|------|-----------|-------|
+| **Packed bundle format** (`.pwpk`) | `docs/packed-bundle-format.md` | Binary pack format for end-user distribution. v1: RGBA32 sequential. v2: GPU-native compression. v3: scene-based streaming |
+| **Fabricwork rename** | `docs/ui-visual-design.md` | Fork name. Backward-compatible discovery of both `Fabricwork/` and `Patchwork/` paths |
+| **Pack encryption** | `docs/DESIGN_NOTES.md` | Password-protected packs + LSB watermarking. Raises bar against casual redistribution |
+| **Conditional sprite system** | `CLAUDE.md` | Pre-bake N variant RTs per material; condition switch = pointer swap, zero GPU cost |
+| **Apply/Revert pointer swaps** | `CLAUDE.md` | `_originalTextures` and `LoadedAtlasesTextures` both in memory; pack toggle should be pointer swap, not blit |
+| **Material colour tint tooling** | `docs/DESIGN_NOTES.md` | Expose per-material shader properties in AnimationController so creators can pre-compensate for TC's colour corrections |
+
+### Architecture invariants
+
+These are non-negotiable and apply to all future work:
+
+1. **Self-containment** — no external native plugins, no NuGet packages, no Unity Editor requirement
+2. **Dual-path transparency** — dev mode and packed mode must produce identical visual results
+3. **No coverage regression** — every migration step must leave all existing functionality reachable
+4. **Data layer independence** — handlers never import or call GUI; GUI reads from handlers via events
+5. **Audience separation** — end-user surfaces (Pack Manager, StatusOverlay) usable without creator tooling
+6. **Memory rules** — never store raw `Texture` long-term; `Destroy(tex)` after every temporary blit; `LoadedAtlasesTextures` never cleared; clear instance ID sets on scene unload
+
+---
+
 ## Shipped
 
 ### Performance — loading pipeline

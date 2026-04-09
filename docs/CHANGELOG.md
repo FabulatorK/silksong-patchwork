@@ -16,6 +16,7 @@
 * Procedural cassette strip textures: rounded caps, AA diagonal transitions, depth gradient — single `DrawTexture` call replaces dozens of IMGUI rects
 * Borderless window: custom title bar, zero-padding style, strip flush with true window edge
 * FabricUI Canvas toolkit (`gui/FabricUI.cs`): general-purpose factory for Canvas UI elements — panels, buttons, text, scroll views, input fields, layout groups, toggles, rounded-rect 9-slice sprites. Foundation for Canvas migration of all end-user UI surfaces
+* Canvas Pack Manager (`gui/CanvasPackManager.cs`): retained-mode replacement for the IMGUI Pack Manager, built on FabricUI. Full feature parity: pack list with toggle/arrows/gear/conflict badge, DNF condition editor with AND-group brackets and type cycling, profiles, conflicts foldout, action bar with staging, footer, cassette strip as RawImage, draggable panel. Toggled via `UseCanvasPackManager` config (default: off, experimental)
 
 #### T2D sprite loader
 * Fixed T2D spritesheet revert failure after long sessions: `_originalTextureData.Clear()` was destroying vanilla backups for textures in unloaded scenes before they could be restored. Now protected by `_restoredNames` confirmation tracking
