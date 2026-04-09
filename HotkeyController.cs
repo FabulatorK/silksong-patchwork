@@ -19,7 +19,12 @@ internal static class HotkeyController
             SceneTraverser.TraverseAllScenes();
 
         if (Input.GetKeyDown(Plugin.Config.ShowPackManagerKey))
-            Plugin.ShowPackManager = !Plugin.ShowPackManager;
+        {
+            if (Plugin.Config.UseCanvasPackManager)
+                CanvasPackManager.Toggle();
+            else
+                Plugin.ShowPackManager = !Plugin.ShowPackManager;
+        }
 
         if (Input.GetKeyDown(Plugin.Config.DevHubDashboardKey))
             DevHub.ToggleAt(DevHub.TabDashboard);

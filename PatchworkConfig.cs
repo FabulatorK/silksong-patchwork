@@ -84,6 +84,10 @@ public class PatchworkConfig
         set => _ShowStatusOverlay.Value = value;
     }
 
+    private readonly ConfigEntry<bool> _UseCanvasPackManager;
+    /// <summary>Use the Canvas-based Pack Manager instead of the IMGUI version.</summary>
+    public bool UseCanvasPackManager => _UseCanvasPackManager.Value;
+
     // ── Window state persistence ─────────────────────────────────────────────
     private readonly ConfigEntry<float> _DevHubX;
     private readonly ConfigEntry<float> _DevHubY;
@@ -134,6 +138,9 @@ public class PatchworkConfig
 
         _ShowStatusOverlay = config.Bind("GUI", "ShowStatusOverlay", true,
             "Show the HUD status badge in the bottom-left corner. Can also be toggled from the Pack Manager.");
+
+        _UseCanvasPackManager = config.Bind("GUI", "UseCanvasPackManager", false,
+            "Use the Canvas-based Pack Manager (experimental). Restart required after changing.");
 
         _DevHubX      = config.Bind("GUI", "DevHubX",      0f, "Dev Hub window X position (saved on exit).");
         _DevHubY      = config.Bind("GUI", "DevHubY",      0f, "Dev Hub window Y position (saved on exit).");

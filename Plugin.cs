@@ -211,7 +211,7 @@ public class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
-        if (ShowDevHub || ShowPackManager)
+        if (ShowDevHub || ShowPackManager || CanvasPackManager.IsVisible)
             GUIHelper.ShowCursorForWindow();
 
         DevProfiler.StartOp();

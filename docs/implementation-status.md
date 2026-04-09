@@ -132,8 +132,8 @@ item is implemented or a new plan is recorded.
 | Item | Files | Status |
 |------|-------|--------|
 | FabricUI toolkit | `gui/FabricUI.cs` | **Shipped** |
-| Canvas Pack Manager | `gui/CanvasPackManager.cs` | **Not started** — must replicate all PackManagerWindow features |
-| Plugin.cs integration | `Plugin.cs` | **Not started** — flag-toggled coexistence with IMGUI version |
+| Canvas Pack Manager | `gui/CanvasPackManager.cs` | **Shipped** — full feature parity with IMGUI PackManagerWindow: pack list with toggle/arrows/gear, condition editor (DNF clauses with AND-group brackets, type cycling, crest/nail pickers, free-text input), profiles (load/save/delete), conflicts foldout, action bar (Discard/Apply with staging), footer (Status Overlay toggle + Dev Tools), cassette strip via RawImage, draggable panel, rounded-rect background |
+| Plugin.cs integration | `Plugin.cs`, `HotkeyController.cs`, `PatchworkConfig.cs`, `gui/StatusOverlay.cs` | **Shipped** — `UseCanvasPackManager` config flag; keybind routes to Canvas or IMGUI; StatusOverlay click routes correctly; cursor handling covers Canvas PM |
 | Canvas StatusOverlay | `gui/StatusOverlay.cs` | **Planned** |
 
 ### GUI — deprecated

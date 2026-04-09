@@ -65,7 +65,12 @@ public static class StatusOverlay
 
         // Invisible button over the whole badge — click opens Pack Manager
         if (UnityEngine.GUI.Button(bgRect, GUIContent.none, GUIStyle.none))
-            Plugin.ShowPackManager = true;
+        {
+            if (Plugin.Config.UseCanvasPackManager)
+                CanvasPackManager.Show();
+            else
+                Plugin.ShowPackManager = true;
+        }
     }
 
     private static void EnsureStyles()

@@ -139,15 +139,19 @@ views, input fields, layout groups, toggles, rounded-rect sprites via 9-slice).
 - Architecture decision: Canvas for end-user surfaces (Pack Manager,
   StatusOverlay), IMGUI stays for creator tools (Dev Hub).
 
+**What's done (Canvas PM):**
+- `gui/CanvasPackManager.cs` — full Canvas Pack Manager with feature parity:
+  pack list (toggle/arrows/gear/conflict badge), condition editor (DNF with
+  AND-group brackets, type cycling, crest/nail pickers), profiles, conflicts,
+  action bar (Discard/Apply with staging), footer, cassette strip as RawImage,
+  draggable panel, rounded-rect background via 9-slice sprite.
+- Wired into `Plugin.cs` via `UseCanvasPackManager` config flag. Keybind,
+  StatusOverlay click, and cursor handling all route correctly.
+- Cassette strip is a Canvas `RawImage` child — no coordinate hacking.
+
 **What's next:**
-- `gui/CanvasPackManager.cs` — full Canvas Pack Manager replacing
-  `PackManagerWindow.cs`. Must replicate all features: pack list with
-  toggle/arrows/gear, condition editor, profiles, conflicts, action bar,
-  footer, cassette strip, dragging, input blocking.
-- Wire into `Plugin.cs` alongside the IMGUI version (flag-toggled during
-  development, Canvas becomes default once proven).
-- Cassette strip becomes a Canvas `RawImage` child — no more coordinate
-  hacking or negative offsets.
+- In-game testing and polish pass once the game is available.
+- Canvas becomes default once proven stable.
 
 **Canvas advantages over IMGUI:**
 - Real pointer events (`PointerEnter/Exit/Down`) — hover states for free

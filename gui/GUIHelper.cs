@@ -225,8 +225,9 @@ public static class GUIHelper
 
     /// <summary>
     /// Get (or regenerate) the vertical cassette strip texture for a given pixel height.
+    /// Used by IMGUI DrawCassetteStripVertical and Canvas CanvasPackManager.
     /// </summary>
-    private static Texture2D GetVerticalStripTex(int texW, int texH)
+    internal static Texture2D GetVerticalStripTex(int texW, int texH)
     {
         if (_vertStripTex != null && _vertStripH == texH) return _vertStripTex;
 
