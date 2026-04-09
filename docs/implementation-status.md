@@ -123,6 +123,18 @@ item is implemented or a new plan is recorded.
 | Pack Manager layout overhaul | `gui/PackManagerWindow.cs` | Top bar: Rescan + ×. Pack rows: ✓ square toggle, ⚙ gear for conditions, full card border (teal=enabled, orange=has conditions). Action bar: status count + Discard/Apply at bottom. Footer: Status Overlay banner (70%) + Dev Tools ⚒ square |
 | StatusOverlay retune | `gui/StatusOverlay.cs` | Pack count colour → teal `#33AA88`; background from `ColSurface` token; horizontal cassette strip replaces old blue accent stripe |
 | UI visual design doc | `docs/ui-visual-design.md` | Living design document for visual direction and future UI work |
+| Procedural strip textures | `gui/GUIHelper.cs` | `GenerateStripTexture()` — rounded caps, AA diagonal band transitions, depth gradient. Cached, regenerated on resolution change. Single `DrawTexture` call replaces dozens of IMGUI rects |
+| Borderless window style | `gui/GUIHelper.cs` | `BorderlessWindowStyle` — zero-padding flat dark background; Pack Manager draws its own chrome |
+| FabricUI Canvas toolkit | `gui/FabricUI.cs` | General-purpose Canvas element factory (630 lines). Panels, buttons, text, scroll views, input fields, layout groups, toggles, separators, rounded-rect 9-slice sprites. Resolution-independent. Hover via `ColorTint` with 0.08s fade |
+
+### GUI — Canvas migration (IN PROGRESS)
+
+| Item | Files | Status |
+|------|-------|--------|
+| FabricUI toolkit | `gui/FabricUI.cs` | **Shipped** |
+| Canvas Pack Manager | `gui/CanvasPackManager.cs` | **Not started** — must replicate all PackManagerWindow features |
+| Plugin.cs integration | `Plugin.cs` | **Not started** — flag-toggled coexistence with IMGUI version |
+| Canvas StatusOverlay | `gui/StatusOverlay.cs` | **Planned** |
 
 ### GUI — deprecated
 

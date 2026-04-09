@@ -273,15 +273,16 @@ for each material is logged when a same-named collection collision is first dete
 
 | Commit | Change |
 |---|---|
+| `a9c7cbb` | Add FabricUI: Canvas UI toolkit for retained-mode Patchwork surfaces |
+| `dfbf7d2` | Deduplicate SpriteLoader same-name collection warnings |
+| `12554b9` | Fix T2D spritesheet clean-name fallback with dimension disambiguation |
+| `bce8861` | Fix T2D spritesheet revert failure after long sessions |
+| `c970682` | Drop card fill, thicker borders (2px), more spacing between rows |
 | `0906807` | Remove PackRamCache — redundant with FileCache |
 | `4d4f033` | Move Pin to RAM below action bar to match commit-then-pin flow |
 | `eb1b5a5` | Pack Manager layout overhaul: action flow, visual hierarchy, card borders |
 | `6f5d988` | Cassette-label visual style: strip bands, warm palette, token migration |
 | `e62a703` | UI visual redesign: design tokens, chip/tag styles, accent badge |
-| `c1db6ac` | Profile conditions, GUI persistence (window pos + tab), video trigger log |
-| `cfbc722` | Cursor auto-show in `LateUpdate` when DevHub or PackManager is open |
-| `7ce9e8b` | Fix tooltip stuck on cursor; audio browser virtual scroll (FPS fix) |
-| `fdc1390` | Simplify pass: `GetGameObjectPath` dedup, `ResolveKey`, tooltip scale cache, edit-clip opens folder |
 
 ---
 

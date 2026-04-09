@@ -13,6 +13,14 @@
 * Action bar moved to bottom of window (browse → decide → commit flow): status count + "unsaved changes" notice on layer 1, Discard + Apply on layer 2
 * Footer: Status Overlay toggle takes ~70% width as primary banner; Dev Tools is a small ⚒ square
 * Removed Pin to RAM (`PackRamCache`) — redundant with `FileCache`; saved only a `stat()` syscall per file while duplicating all PNG bytes in memory
+* Procedural cassette strip textures: rounded caps, AA diagonal transitions, depth gradient — single `DrawTexture` call replaces dozens of IMGUI rects
+* Borderless window: custom title bar, zero-padding style, strip flush with true window edge
+* FabricUI Canvas toolkit (`gui/FabricUI.cs`): general-purpose factory for Canvas UI elements — panels, buttons, text, scroll views, input fields, layout groups, toggles, rounded-rect 9-slice sprites. Foundation for Canvas migration of all end-user UI surfaces
+
+#### T2D sprite loader
+* Fixed T2D spritesheet revert failure after long sessions: `_originalTextureData.Clear()` was destroying vanilla backups for textures in unloaded scenes before they could be restored. Now protected by `_restoredNames` confirmation tracking
+* Fixed T2D spritesheet clean-name fallback: dimension-based disambiguation allows multiple textures sharing a clean name (e.g. two Hornet atlases at different resolutions) to each match their correct override. Handles game-update hash changes in texture names
+* Deduplicated SpriteLoader same-name collection warnings: fires once per name instead of every LoadCollection call
 
 #### Audio
 * Audio browser rewritten: `AudioHandler.GetClipInventory()` does a full `Resources.FindObjectsOfTypeAll<AudioClip>()` sweep so clips that never fire through the Harmony play path (ambient, music, pre-assigned) are discoverable without ever playing them

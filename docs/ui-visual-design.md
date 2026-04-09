@@ -124,15 +124,77 @@ Not yet restyled under the cassette identity. Future work.
 Areas to explore as the visual identity matures. These are open questions,
 not commitments.
 
+### Canvas Migration (IN PROGRESS)
+
+The Pack Manager is being migrated from IMGUI to Unity's retained-mode Canvas
+system. `FabricUI.cs` provides the foundation — a general-purpose toolkit for
+creating Canvas UI elements programmatically (panels, buttons, text, scroll
+views, input fields, layout groups, toggles, rounded-rect sprites via 9-slice).
+
+**What's done:**
+- `gui/FabricUI.cs` — complete Canvas UI factory (630 lines). Resolution-
+  independent via `GUIHelper.Scale`. Hover transitions via Unity's built-in
+  `ColorTint` with 0.08s fade. Rounded sprites with procedural generation
+  and caching. All colour tokens flow from GUIHelper.
+- Architecture decision: Canvas for end-user surfaces (Pack Manager,
+  StatusOverlay), IMGUI stays for creator tools (Dev Hub).
+
+**What's next:**
+- `gui/CanvasPackManager.cs` — full Canvas Pack Manager replacing
+  `PackManagerWindow.cs`. Must replicate all features: pack list with
+  toggle/arrows/gear, condition editor, profiles, conflicts, action bar,
+  footer, cassette strip, dragging, input blocking.
+- Wire into `Plugin.cs` alongside the IMGUI version (flag-toggled during
+  development, Canvas becomes default once proven).
+- Cassette strip becomes a Canvas `RawImage` child — no more coordinate
+  hacking or negative offsets.
+
+**Canvas advantages over IMGUI:**
+- Real pointer events (`PointerEnter/Exit/Down`) — hover states for free
+- Retained state — widgets persist between frames, no rebuild every OnGUI
+- Unity's `Button.ColorTint` transition — smooth hover/press without a
+  custom animator
+- `Image.sprite` with 9-slice — actual rounded rectangles, anti-aliased
+- `ScrollRect` with inertia — smooth scrolling
+- `CanvasGroup.alpha` — fade transitions
+- Single draw call per batch — cheaper than dozens of IMGUI DrawTexture calls
+
+**Design references:**
+- DebugMod (hk-speedrunning/Silksong.DebugMod): built a retained-mode UI
+  on Canvas from scratch. Catppuccin palette, hover borders, panel builder.
+  Patchwork's FabricUI is more concise — uses Unity's built-in layout
+  components directly instead of a custom scene graph.
+- osu!lazer: custom framework, not directly portable, but the design
+  principles apply — everything responds to interaction, rounded shapes,
+  consistent spacing grid, blur backdrops, colour as information.
+
+### Fork: Fabricwork
+
+The project is forking from Patchwork to **Fabricwork**. The name carries
+triple meaning: textile (silk, thread, Silksong), construction (a workshop,
+*faber* = craftsman), and the underlying structure (the fabric of the game).
+
+Rename plan:
+- New name in UI, logs, window titles, manifest
+- Backward compatibility: discover both `Fabricwork/` and `Patchwork/`
+  subfolders for pack structure. Config reads from both paths.
+- Namespace migration can be gradual — `Patchwork` internally is fine
+  initially.
+- `FabricUI` already fits the new name.
+
 ### Dev Hub
 
 - Apply the cassette strip to the Dev Hub window.
 - Retune tab bar from inline hardcoded colours to design tokens.
 - Consider whether pillar content needs card-style containers or can stay
   denser (audience is creators, not end users).
+- Canvas migration is lower priority — Dev Hub is creator-facing and density
+  matters more than polish.
 
 ### StatusOverlay
 
+- Migrate to Canvas — becomes a Canvas panel with the horizontal cassette
+  strip as a child `RawImage`. No more IMGUI coordinate hacking.
 - Explore whether the badge should grow/shrink based on content.
 - Consider a compact mode (icon-only) vs expanded mode (current text).
 
@@ -146,13 +208,19 @@ not commitments.
 
 ### Animation and transitions
 
-- IMGUI is immediate-mode with no retained state. Real transitions require
-  a custom animator (keyed float/colour lerping per frame).
-- Highest-impact candidates: smooth colour fades on hover, window
-  open/close slide, toggle fill transition.
-- Consider whether the complexity justifies the polish given IMGUI's
-  constraints, or whether a Canvas migration (like DebugMod's approach)
-  is the longer-term path.
+With Canvas, the barriers to animation are removed:
+- `Button.ColorTint` gives hover/press transitions for free (already in FabricUI)
+- `CanvasGroup.alpha` enables fade-in/out on panels
+- Position lerping in Update() for slide transitions
+- Spring-based easing for osu!-style bouncy feedback
+- Consider a small `FabricAnimator` utility for keyed value lerping
+
+### Blur backdrop
+
+- Possible via a custom shader in `patchwork.assetbundle`
+- Blur a small rect behind the Pack Manager panel only, downsampled 4x
+- Only active when the panel is open — zero cost when closed
+- Gives depth and the frosted-glass look (osu! / iOS style)
 
 ### Profiles section
 
